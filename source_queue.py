@@ -51,7 +51,7 @@ def run(settings,query=None,selected=None,limit=20):
             c.execute('INSERT OR REPLACE INTO source_topics VALUES(?,?,?)',(query,json.dumps(selected),now()))
     instant=datetime.now(timezone.utc)
     with connect(settings.db_path) as c:
-        candidates=[dict(r) for r in c.execute('SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY coalesce(s.checked_at,\'\'),p.id')]
+        candidates=[dict(r) for r in c.execute("SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY (s.checked_at IS NOT NULL),CASE WHEN trim(lower(p.catalog_no)) NOT IN ('','none','未確認') THEN 0 ELSE 1 END,coalesce(s.checked_at,''),p.id")]
     due=[]
     for row in candidates:
         if row['saved_fingerprint']==fingerprint(row) and row['retry_at']>instant.isoformat():
