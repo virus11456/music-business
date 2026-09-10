@@ -14,6 +14,8 @@ import workflow
 import sheet_sync
 import platforms
 import matching
+import comparisons
+import sourcing
 from cli import currency
 from config import Settings, load_env, money
 from db import connect, decide, init, job, latest_decision, now
@@ -66,7 +68,7 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
@@ -93,13 +95,19 @@ class Dashboard:
 
     def mutate(self,path,data):
         s=self.settings
-        if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match'):
+        if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find'):
             with connect(s.db_path) as c:
                 mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
             if mode and mode[0]=='demo':
                 raise ValueError('示範庫不能抓入真實資料')
             if not s.token:
                 raise ValueError('請先在本機 .env 設定 Discogs token')
+        if path=='/api/sourcing/find':
+            rid=release_id(required(data,'release_id'))
+            selected=data.get('platforms')
+            if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
+            query=required(data,'query',120) if data.get('query') else None
+            return self.start('依 Discogs 需求找貨',lambda:sourcing.find(s,rid,selected,query))
         if path=='/api/platforms/match':
             candidate_id=int(required(data,'candidate_id'))
             query=data.get('query')

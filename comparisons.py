@@ -1,0 +1,80 @@
+"""Transparent source-to-release comparisons; potential matches never imply ownership."""
+import json
+from datetime import datetime,timezone
+from decimal import Decimal
+from db import connect
+from fx import convert
+from matching import media
+
+def amount(v):return str(v.quantize(Decimal('.01'))) if v is not None else None
+def stale(stamp):
+ try:
+  age=(datetime.now(timezone.utc)-datetime.fromisoformat(stamp)).total_seconds()
+  return age<0 or age>172800
+ except (TypeError,ValueError):return True
+
+def build(settings):
+ rows=[]
+ with connect(settings.db_path) as c:
+  candidates={r['source_url']:dict(r) for r in c.execute('SELECT * FROM platform_candidates')}
+  offers=[dict(r) for r in c.execute('SELECT o.*,r.title,r.artist FROM sourcing_offers o JOIN releases r USING(release_id) ORDER BY o.id DESC')]
+  covered=set()
+  for o in offers:
+   source=candidates.get(o['source_url']);covered.add((o['source_url'],o['release_id']))
+   rows.append(calculate(c,settings,o,source,True))
+  if c.execute("SELECT 1 FROM sqlite_master WHERE name='version_searches'").fetchone():
+   for search in c.execute('SELECT v.*,p.source_url FROM version_searches v JOIN platform_candidates p ON p.id=v.candidate_id'):
+    source=candidates[search['source_url']]
+    for r in json.loads(search['results']):
+     if (source['source_url'],r['release_id']) in covered:continue
+     o={'id':None,'release_id':r['release_id'],'title':r['title'],'artist':'','vendor':source['platform'],
+        'source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,'sale_price':None,'sale_currency':None,
+        'amount':None,'currency':source['currency'],'media_cond':'未確認','sleeve_cond':'未確認','recorded_at':source['captured_at']}
+     row=calculate(c,settings,o,source,False);row['evidence']=r['evidence'];rows.append(row)
+ return rows
+
+def calculate(c,s,o,source,confirmed_offer):
+ release=c.execute('SELECT format FROM releases WHERE release_id=?',(o['release_id'],)).fetchone()
+ snapshot=c.execute('SELECT * FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 1',(o['release_id'],)).fetchone()
+ row={'key':f"offer-{o['id']}" if confirmed_offer else f"candidate-{source['id']}-{o['release_id']}",'offer':o if confirmed_offer else None,
+      'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
+      'format':media(release['format']) if release else None,'source_format':media(source['format']) if source else None,
+      'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
+      'source_price':source['price'] if source else None,'source_currency':source['currency'] if source else o['currency'],
+      'price_kind':source['price_kind'] if source else 'manual','availability':source['availability'] if source else '人工報價',
+      'version_confirmed':bool(o['version_confirmed']),'has_market':bool(snapshot),'market_price':snapshot['lowest_price'] if snapshot else None,
+      'market_currency':snapshot['currency'] if snapshot else None,'market_at':snapshot['captured_at'] if snapshot else None,
+      'sale_basis':'人工預定售價' if o.get('sale_price') else 'Discogs 最低掛牌價（非成交價）',
+      'sale_twd':None,'source_twd':None,'cost_twd':None,'spread_twd':None,'gross_twd':None,'gross_margin':None,
+      'fees_twd':None,'net_twd':None,'net_margin':None,'ready':False,'issues':[]}
+ issues=row['issues']
+ if row['format'] and row['source_format'] and row['format']!=row['source_format']:issues.append('來源與 Discogs 格式不一致')
+ day=datetime.now(timezone.utc).date().isoformat()
+ def twd(value,currency,label):
+  if value is None or not currency:return None
+  try:return convert(c,value,currency,day)[0]
+  except ValueError:
+   issues.append(label+'缺有效匯率');return None
+ sale=twd(o.get('sale_price') or (snapshot['lowest_price'] if snapshot else None),o.get('sale_currency') if o.get('sale_price') else snapshot['currency'] if snapshot else None,'售價')
+ buy=twd(source['price'],source['currency'],'標價') if source else None
+ cost=twd(o['amount'],o['currency'],'成本') if o['amount'] is not None else None
+ row.update(sale_twd=amount(sale),source_twd=amount(buy),cost_twd=amount(cost),spread_twd=amount(sale-buy) if sale is not None and buy is not None else None)
+ if sale is not None and cost is not None and sale>0:
+  gross=sale-cost;fees=sale*s.fee_pct+s.shipping+s.packing+s.reserve;net=gross-fees
+  row.update(gross_twd=amount(gross),gross_margin=float(gross/sale),fees_twd=amount(fees),net_twd=amount(net),net_margin=float(net/sale))
+ if not o['version_confirmed']:issues.append('待核對版本')
+ if o['amount'] is None:issues.append('待填含運進貨成本')
+ if not o.get('sale_price'):issues.append('待確認預定售價')
+ if not snapshot or snapshot['lowest_price'] is None:issues.append('待抓 Discogs 行情')
+ elif stale(snapshot['captured_at']):issues.append('行情超過兩天')
+ if stale(o['recorded_at']):issues.append('報價超過兩天')
+ if o['media_cond']=='未確認' or o['sleeve_cond']=='未確認':issues.append('待確認品相')
+ if not o.get('owned_confirmed'):issues.append('尚未確認持有商品')
+ if source and not o.get('owned_confirmed'):
+  if source['price_kind']=='current_bid':issues.append('拍賣價格尚未確定')
+  if source['availability'] in ('現在オンラインショップ取扱なし','予約受付中','お取り寄せ','預購'):issues.append('貨源無現貨或待調貨')
+ if sale is None or sale<=0:issues.append('缺有效售價')
+ if row['net_margin'] is not None and (Decimal(row['net_twd'])<=0 or row['net_margin']<s.min_margin):issues.append('未達淨利門檻')
+ row['ready']=not issues and row['net_twd'] is not None
+ row['status']='可建立上架草稿' if row['ready'] else '待補資料／確認' if issues else '待檢查'
+ return row

@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS listing_drafts (
 def init_workflow(settings):
     with connect(settings.db_path) as c:
         c.executescript(SCHEMA)
+        columns={r[1] for r in c.execute('PRAGMA table_info(sourcing_offers)')}
+        for name,definition in [('owned_confirmed','INTEGER NOT NULL DEFAULT 0'),('sale_price','TEXT'),('sale_currency','TEXT')]:
+            if name not in columns:c.execute(f'ALTER TABLE sourcing_offers ADD COLUMN {name} {definition}')
 
 def web_url(value):
     url=urlsplit(value.strip())
@@ -68,10 +71,17 @@ def save_offer(c,data,parse_id,parse_currency,required):
     sleeve=str(data.get('sleeve_cond','未確認'))
     if media not in GRADES+('未確認',) or sleeve not in GRADES+('未確認',):
         raise ValueError('品相無效')
-    c.execute('INSERT INTO sourcing_offers(release_id,vendor,source_url,amount,currency,media_cond,sleeve_cond,version_confirmed,recorded_at) VALUES(?,?,?,?,?,?,?,?,?)',
-      (parse_id(required(data,'release_id')),required(data,'vendor'),web_url(required(data,'source_url',1500)),
+    sale=money(data['sale_price']) if data.get('sale_price') else None
+    if sale is not None and sale<=0:raise ValueError('預定售價必須大於零')
+    values=(parse_id(required(data,'release_id')),required(data,'vendor'),web_url(required(data,'source_url',1500)),
        str(money(required(data,'amount'))),parse_currency(required(data,'currency')),media,sleeve,
-       int(data.get('version_confirmed')=='yes'),now()))
+       int(data.get('version_confirmed')=='yes'),now(),int(data.get('owned_confirmed')=='yes'),
+       str(sale) if sale is not None else None,parse_currency(required(data,'sale_currency')) if sale is not None else None)
+    if data.get('offer_id'):
+        changed=c.execute('UPDATE sourcing_offers SET release_id=?,vendor=?,source_url=?,amount=?,currency=?,media_cond=?,sleeve_cond=?,version_confirmed=?,recorded_at=?,owned_confirmed=?,sale_price=?,sale_currency=? WHERE id=?',values+(int(data['offer_id']),)).rowcount
+        if not changed:raise ValueError('找不到報價')
+    else:
+        c.execute('INSERT INTO sourcing_offers(release_id,vendor,source_url,amount,currency,media_cond,sleeve_cond,version_confirmed,recorded_at,owned_confirmed,sale_price,sale_currency) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',values)
 
 def save_draft(c,data,parse_id,parse_currency,required):
     if data.get('owned_confirmed')!='yes' or data.get('version_confirmed')!='yes':
