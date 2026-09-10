@@ -281,3 +281,5 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 - 本輪已保存收集主題 The Beatles Rubber Soul，Yahoo JP／露天下次頁碼 2、Tower 仍為首頁；Yahoo TW 失敗保留原進度。尚未聲稱全站所有商品或下一次 10:00 排程已驗證。
 
 正式站：https://music-business.vercel.app 。使用「進貨與 Sheets」查看反查與毛利，Want 人數預設由高到低，可切換毛利金額／毛利率排序；刊登狀態目前依人工登錄的實際 Discogs 刊登編號管理。Yahoo TW 連線與 Tower 完整分頁仍待後續處理。
+
+部署清理確認：已從 VPS 移除本次臨時 SSH 金鑰，實際再連線回覆 Permission denied；本機臨時公私鑰亦已刪除。正式 API、Vercel 新版畫面及 10／16／22 排程狀態正常。
