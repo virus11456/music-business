@@ -163,3 +163,16 @@
 - VPS Python 3.12 環境下完整 107 項後端測試通過；前端型別及建置通過。
 
 - HTTPS 身分與來源檢查通過，正式 Vercel 已指向 VPS；真實單版本流程完成行情與 Sheets 同步，三平台回傳候選，Yahoo 台灣失敗已如實標示。
+
+
+### 2026-09-11 正式資料讀回核對
+
+以 VPS 已驗證登入的唯讀 API，對照指定 Google Sheets API 實際儲存值（沒有從 Mac 同步資料）：
+- Discogs 行情 11 列，全數版本、價格、幣別與擷取時間一致。
+- PlatformCandidates 共 367 列；核對 VPS API 可見最新 200 筆，全部欄位一致。其餘 167 筆未逐筆核對。
+- Comparisons 共 1,250 列，與 VPS 全數比對列的前 16 個資料欄一致。這是候選組合數，並非確認版本或可獲利商品數。
+- Sources、Analysis 均 0 列，VPS 正式報價及草稿也為 0；尚無已確認含運成本，不能宣稱真實毛利或刊登流程已完成。
+- 最近一次正式流程 Yahoo JP 40、露天 40、Tower 16 筆成功；Yahoo TW HTTP 404，仍需修復來源接入。
+- 排程狀態為 Asia/Taipei 每日 10:00、16:00、22:00；本次僅驗證設定，尚未觀察遷移後下一次定時觸發。
+
+本次僅讀取正式資料，未建立或修改報價、刊登商品。Google Sheets：https://docs.google.com/spreadsheets/d/1rWwqsgdMLdNOcesZHS-JmORms8YPsnwQhKWtbGHxZOY/edit

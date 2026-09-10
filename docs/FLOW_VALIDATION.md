@@ -157,3 +157,16 @@
 HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel Origin 200；排程 enabled，時段 10:00、16:00、22:00 Asia/Taipei。前端 Vercel 正式資源已含 VPS API 網址，瀏覽器確認管理者登入表單。登入後 API 讀取已驗證，未使用瀏覽器輸入存取碼。
 
 實際執行一筆既有版本 6696246 的完整更新：Discogs 成功、日本 Yahoo 40 件、露天 40 件、Tower 16 件；Yahoo 台灣失敗。共 96 件候選、79 件可能配對（非人工確認）；Sheets 成功同步 11 列行情、0 列報價。整體正確標為部分失敗，不能聲稱所有平台皆可抓。正式批次刊登與 AI 尚未實作；自然到點長期運作仍需觀察。
+
+
+### 2026-09-11 正式資料讀回核對
+
+以 VPS 已驗證登入的唯讀 API，對照指定 Google Sheets API 實際儲存值（沒有從 Mac 同步資料）：
+- Discogs 行情 11 列，全數版本、價格、幣別與擷取時間一致。
+- PlatformCandidates 共 367 列；核對 VPS API 可見最新 200 筆，全部欄位一致。其餘 167 筆未逐筆核對。
+- Comparisons 共 1,250 列，與 VPS 全數比對列的前 16 個資料欄一致。這是候選組合數，並非確認版本或可獲利商品數。
+- Sources、Analysis 均 0 列，VPS 正式報價及草稿也為 0；尚無已確認含運成本，不能宣稱真實毛利或刊登流程已完成。
+- 最近一次正式流程 Yahoo JP 40、露天 40、Tower 16 筆成功；Yahoo TW HTTP 404，仍需修復來源接入。
+- 排程狀態為 Asia/Taipei 每日 10:00、16:00、22:00；本次僅驗證設定，尚未觀察遷移後下一次定時觸發。
+
+本次僅讀取正式資料，未建立或修改報價、刊登商品。Google Sheets：https://docs.google.com/spreadsheets/d/1rWwqsgdMLdNOcesZHS-JmORms8YPsnwQhKWtbGHxZOY/edit

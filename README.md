@@ -236,3 +236,16 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 正式後端與資料庫已搬到 Hostinger srv1542946，API：https://srv1542946.hstgr.cloud。Vercel 前端建置預設連接此網址，登入使用獨立管理者存取碼。systemd 負責開機启动與失敗重啟，程式內每天台北時間 10:00、16:00、22:00 更新；Mac 正式後端已停止，避免雙重排程。
 
 主機原有網站保留，API 僅在 loopback 8765 接收代理請求，外部經 Caddy HTTPS 與存取碼驗證。VPS 使用 music 非 root 帳號，資料及憑證不進入 GitHub 或 Vercel。詳細重建方式見 deploy/README.md。
+
+
+### 2026-09-11 正式資料讀回核對
+
+以 VPS 已驗證登入的唯讀 API，對照指定 Google Sheets API 實際儲存值（沒有從 Mac 同步資料）：
+- Discogs 行情 11 列，全數版本、價格、幣別與擷取時間一致。
+- PlatformCandidates 共 367 列；核對 VPS API 可見最新 200 筆，全部欄位一致。其餘 167 筆未逐筆核對。
+- Comparisons 共 1,250 列，與 VPS 全數比對列的前 16 個資料欄一致。這是候選組合數，並非確認版本或可獲利商品數。
+- Sources、Analysis 均 0 列，VPS 正式報價及草稿也為 0；尚無已確認含運成本，不能宣稱真實毛利或刊登流程已完成。
+- 最近一次正式流程 Yahoo JP 40、露天 40、Tower 16 筆成功；Yahoo TW HTTP 404，仍需修復來源接入。
+- 排程狀態為 Asia/Taipei 每日 10:00、16:00、22:00；本次僅驗證設定，尚未觀察遷移後下一次定時觸發。
+
+本次僅讀取正式資料，未建立或修改報價、刊登商品。Google Sheets：https://docs.google.com/spreadsheets/d/1rWwqsgdMLdNOcesZHS-JmORms8YPsnwQhKWtbGHxZOY/edit
