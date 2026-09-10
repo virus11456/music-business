@@ -161,3 +161,5 @@
 - 後端、SQLite 與每日三次排程遷移至 srv1542946，設定非 root systemd 服務及開機恢復。
 - 新增獨立 Caddy HTTPS 站點，保留既有網站與服務，Vercel 使用公開 API 預設網址。
 - VPS Python 3.12 環境下完整 107 項後端測試通過；前端型別及建置通過。
+
+- HTTPS 身分與來源檢查通過，正式 Vercel 已指向 VPS；真實單版本流程完成行情與 Sheets 同步，三平台回傳候選，Yahoo 台灣失敗已如實標示。
