@@ -33,8 +33,11 @@ def init_workflow(settings):
 
     with connect(settings.db_path) as c:
         columns={r[1] for r in c.execute('PRAGMA table_info(listing_drafts)')}
-        for name,definition in [('supply_confirmed','INTEGER NOT NULL DEFAULT 0'),('dispatch_days','INTEGER'),('source_url',"TEXT NOT NULL DEFAULT ''")]:
+        for name,definition in [('supply_confirmed','INTEGER NOT NULL DEFAULT 0'),('dispatch_days','INTEGER'),('source_url',"TEXT NOT NULL DEFAULT ''"),('source_offer_id','INTEGER')]:
             if name not in columns:c.execute(f'ALTER TABLE listing_drafts ADD COLUMN {name} {definition}')
+
+    with connect(settings.db_path) as c:
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS one_draft_per_offer ON listing_drafts(source_offer_id) WHERE source_offer_id IS NOT NULL')
 
 def supply_details(data):
     confirmed=data.get('supply_confirmed')=='yes'
@@ -81,7 +84,7 @@ def get_workflow(settings):
 def save_offer(c,data,parse_id,parse_currency,required):
     media=str(data.get('media_cond','未確認'))
     sleeve=str(data.get('sleeve_cond','未確認'))
-    if media not in GRADES+('未確認',) or sleeve not in GRADES+('未確認',):
+    if media not in GRADES+('未確認',) or sleeve not in GRADES+('未確認','Generic','No Cover','Not Graded'):
         raise ValueError('品相無效')
     sale=money(data['sale_price']) if data.get('sale_price') else None
     if sale is not None and sale<=0:raise ValueError('預定售價必須大於零')
@@ -110,8 +113,17 @@ def save_draft(c,data,parse_id,parse_currency,required):
         raise ValueError('售價必須大於零')
     note=str(data.get('note','')).strip()[:500]
     description=f'Media: {media}. Sleeve: {sleeve}.'+(f' {note}' if note else '')
-    c.execute('INSERT INTO listing_drafts(release_id,media_cond,sleeve_cond,price,currency,note,description,version_confirmed,owned_confirmed,created_at,supply_confirmed,dispatch_days,source_url) VALUES(?,?,?,?,?,?,?,1,?,?,?,?,?)',
-      (parse_id(required(data,'release_id')),media,sleeve,str(price),parse_currency(required(data,'currency')),note,description,int(data.get('owned_confirmed')=='yes'),now(),supply,days,web_url(data['source_url']) if data.get('source_url') else ''))
+    rid=parse_id(required(data,'release_id'))
+    offer_id=int(data['source_offer_id']) if data.get('source_offer_id') else None
+    if offer_id:
+        offer=c.execute('SELECT * FROM sourcing_offers WHERE id=?',(offer_id,)).fetchone()
+        if not offer or offer['release_id']!=rid:raise ValueError('草稿與來源報價版本不一致')
+    values=(rid,media,sleeve,str(price),parse_currency(required(data,'currency')),note,description,int(data.get('owned_confirmed')=='yes'),now(),supply,days,web_url(data['source_url']) if data.get('source_url') else '',offer_id)
+    existing=c.execute('SELECT id FROM listing_drafts WHERE source_offer_id=?',(offer_id,)).fetchone() if offer_id else None
+    if existing:
+        c.execute('UPDATE listing_drafts SET release_id=?,media_cond=?,sleeve_cond=?,price=?,currency=?,note=?,description=?,owned_confirmed=?,created_at=?,supply_confirmed=?,dispatch_days=?,source_url=?,source_offer_id=? WHERE id=?',values+(existing['id'],))
+    else:
+        c.execute('INSERT INTO listing_drafts(release_id,media_cond,sleeve_cond,price,currency,note,description,version_confirmed,owned_confirmed,created_at,supply_confirmed,dispatch_days,source_url,source_offer_id) VALUES(?,?,?,?,?,?,?,1,?,?,?,?,?,?)',values)
 
 def review_csv(settings):
     """Review export, deliberately NOT a live Discogs listing upload file."""
