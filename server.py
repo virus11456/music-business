@@ -77,7 +77,7 @@ class Dashboard:
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
-                           'packing':str(self.settings.packing),'reserve':str(self.settings.reserve)}}
+                           'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
     def start(self, name, operation):
         if not self.lock.acquire(blocking=False):
@@ -170,6 +170,13 @@ class Dashboard:
         if not self.lock.acquire(blocking=False):
             raise ValueError('行情工作執行中，請完成後再儲存')
         try:
+            if path=='/api/assumptions':
+                from config import business_values
+                values=business_values(data)
+                with connect(s.db_path) as c:c.execute("INSERT OR REPLACE INTO meta VALUES('business_assumptions',?)",(json.dumps({k:str(v) for k,v in values.items()}),))
+                for key,value in values.items():setattr(s,key,float(value) if key=='min_margin' else value)
+                analyze.run(s)
+                return {'saved':True,'message':'費用設定已儲存並重新計算；Sheets Inputs 保留原設定'}
             if path=='/api/drafts/batch':
                 return workflow.create_batch(s,data.get('offer_ids'),release_id,currency,required)
             with connect(s.db_path) as c:

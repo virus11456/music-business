@@ -1,5 +1,8 @@
 """Dependency-free configuration. Monetary assumptions are NOT market facts."""
 import os
+import json
+import sqlite3
+from contextlib import closing
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -27,6 +30,13 @@ def load_env(path=ROOT / '.env'):
             raise ValueError('.env 格式錯誤')
         os.environ.setdefault(key.strip(), value.strip().strip('\"\''))
 
+def business_values(data):
+    fields=('fee_pct','shipping','packing','reserve','min_margin')
+    if any(k not in data for k in fields):raise ValueError('請填齊所有費用設定')
+    result={k:money(data[k]) for k in fields}
+    if result['fee_pct']>=1 or result['min_margin']>1:raise ValueError('費率須小於 100%，最低淨利率不可超過 100%')
+    return result
+
 @dataclass
 class Settings:
     db_path: Path = field(default_factory=lambda: Path(os.getenv('DB_PATH', str(ROOT / 'data/live.sqlite3'))))
@@ -53,6 +63,13 @@ class Settings:
 
     def __post_init__(self):
         self.db_path = Path(self.db_path).resolve()
+        if self.db_path.exists():
+            with closing(sqlite3.connect(self.db_path)) as c:
+                if c.execute("SELECT 1 FROM sqlite_master WHERE name='meta'").fetchone():
+                    row=c.execute("SELECT value FROM meta WHERE key='business_assumptions'").fetchone()
+                    if row:
+                        for key,value in business_values(json.loads(row[0])).items():
+                            setattr(self,key,float(value) if key=='min_margin' else value)
         if not 0 <= self.fee_pct < 1 or not 0 <= self.min_margin <= 1:
             raise ValueError('費率與淨利率門檻必須介於 0 與 1')
         if len(self.weights) != 4 or abs(sum(self.weights) - 1) > 1e-9:
