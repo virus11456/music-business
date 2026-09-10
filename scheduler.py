@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 import threading
 from db import connect
 import pipeline
+import source_queue
+import json
 
 TZ=ZoneInfo('Asia/Taipei')
 HOURS=(10,16,22)
@@ -38,9 +40,11 @@ class Scheduler:
                 ids=[r[0] for r in c.execute('SELECT release_id FROM releases ORDER BY release_id')]
             report={'scheduled_slot':slot,'versions':len(ids),'failed':0,'batches':[]}
             try:
-                for offset in range(0,len(ids),20):
-                    result=pipeline.run(self.app.settings,ids[offset:offset+20],['yahoo_tw','yahoo_jp','ruten','tower'])
-                    report['batches'].append(result);report['failed']+=result['failed']
+                source_queue.init(self.app.settings)
+                with connect(self.app.settings.db_path) as c:
+                    topic=c.execute('SELECT * FROM source_topics ORDER BY collected_at LIMIT 1').fetchone()
+                result=source_queue.run(self.app.settings,topic['query'] if topic else None,json.loads(topic['platforms']) if topic else None)
+                report['batches'].append(result);report['failed']+=result['failed']
             except Exception:
                 with connect(self.app.settings.db_path) as c:c.execute('UPDATE meta SET value=? WHERE key=?',('failed',slot))
                 raise

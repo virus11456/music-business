@@ -19,6 +19,7 @@ import sheet_sync
 import platforms
 import matching
 import comparisons
+import source_queue
 import sourcing
 from cli import currency
 from config import Settings, load_env, money
@@ -49,6 +50,7 @@ class Dashboard:
         workflow.init_workflow(settings)
         platforms.init(settings)
         matching.init(settings)
+        source_queue.init(settings)
 
     def state(self):
         with connect(self.settings.db_path) as c:
@@ -74,7 +76,7 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
@@ -101,6 +103,15 @@ class Dashboard:
 
     def mutate(self,path,data):
         s=self.settings
+        if path=='/api/sourcing/reverse':
+            if not s.token:raise ValueError('尚未設定 Discogs')
+            with connect(s.db_path) as c:
+                mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
+            if mode and mode[0]=='demo':raise ValueError('示範庫不能抓入真實資料')
+            query=required(data,'query',120) if data.get('query') else None
+            selected=data.get('platforms')
+            if query and (not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected)):raise ValueError('請選擇平台')
+            return self.start('先找貨 → 反查需求 → 比價同步',lambda:source_queue.run(s,query,selected))
         if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find','/api/pipeline/run'):
             with connect(s.db_path) as c:
                 mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
@@ -186,6 +197,15 @@ class Dashboard:
                     c.execute("INSERT OR REPLACE INTO meta VALUES('google_sheet_id',?)",(sid,))
                 elif path=='/api/offers':
                     workflow.save_offer(c,data,release_id,currency,required)
+                elif path=='/api/listings/register':
+                    rid=release_id(required(data,'release_id'));url=workflow.web_url(required(data,'source_url',1500))
+                    listing=required(data,'listing_id',30)
+                    if not listing.isascii() or not listing.isdigit() or int(listing)<=0:raise ValueError('請填 Discogs 刊登編號')
+                    if not c.execute('SELECT 1 FROM releases WHERE release_id=?',(rid,)).fetchone():raise ValueError('版本尚未追蹤')
+                    if not c.execute('SELECT 1 FROM platform_candidates WHERE source_url=? UNION SELECT 1 FROM sourcing_offers WHERE source_url=?',(url,url)).fetchone():raise ValueError('找不到貨源')
+                    c.execute('INSERT INTO published_listings VALUES(?,?,?,?) ON CONFLICT(source_url,release_id) DO UPDATE SET listing_id=excluded.listing_id,recorded_at=excluded.recorded_at',(url,rid,listing,now()))
+                elif path=='/api/listings/unregister':
+                    c.execute('DELETE FROM published_listings WHERE source_url=? AND release_id=?',(workflow.web_url(required(data,'source_url',1500)),release_id(required(data,'release_id'))))
                 elif path=='/api/comparisons/exclude':
                     rid=release_id(required(data,'release_id'));url=workflow.web_url(required(data,'source_url'))
                     if not isinstance(data.get('excluded'),bool):raise ValueError('排除狀態無效')

@@ -124,12 +124,13 @@ def parse_ruten(raw):
  return out
 
 PARSERS={'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten}
-def search_url(platform,query):
+def search_url(platform,query,page=1):
  q=quote(query,safe='')
- return {'yahoo_tw':f'https://tw.bid.yahoo.com/search/auction/product?p={q}',
-         'yahoo_jp':f'https://auctions.yahoo.co.jp/search/search?p={q}&ei=utf-8',
+ if not isinstance(page,int) or not 1<=page<=1000:raise ValueError('搜尋頁數無效')
+ return {'yahoo_tw':f'https://tw.bid.yahoo.com/search/auction/product?p={q}'+(f'&pg={page}' if page>1 else ''),
+         'yahoo_jp':f'https://auctions.yahoo.co.jp/search/search?p={q}&ei=utf-8'+(f'&b={(page-1)*50+1}&n=50' if page>1 else ''),
          'tower':f'https://tower.jp/search/item/{q}',
-         'ruten':f'https://rtapi.ruten.com.tw/api/search/v4/index.php/core/prod?q={q}&type=direct&sort=rnk%2Fdc&limit=40&offset=1'}[platform]
+         'ruten':f'https://rtapi.ruten.com.tw/api/search/v4/index.php/core/prod?q={q}&type=direct&sort=rnk%2Fdc&limit=40&offset={(page-1)*40+1}'}[platform]
 
 def fetch(url):
  req=Request(url,headers={'User-Agent':'SimplesRecordResearch/0.1','Accept':'text/html'})
@@ -139,7 +140,7 @@ def fetch(url):
   if len(raw)>5_000_000:raise ValueError('搜尋頁過大')
   return raw.decode('utf-8')
 
-def search(settings,query,selected,fetcher=fetch):
+def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
  if not isinstance(query,str) or not 1<=len(query.strip())<=120:raise ValueError('請填搜尋詞，最多 120 字')
  if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in PARSERS for p in selected):raise ValueError('請選擇已支援的平台')
  query=query.strip();total=0;failed=0;reports=[]
@@ -151,7 +152,7 @@ def search(settings,query,selected,fetcher=fetch):
     from datetime import datetime,timezone
     elapsed=(datetime.now(timezone.utc)-datetime.fromisoformat(previous[0])).total_seconds()
     if elapsed<3:time.sleep(3-elapsed)
-   raw=fetcher(search_url(platform,query))
+   raw=fetcher(search_url(platform,query,page))
    if platform=='ruten':
     hits=json.loads(raw)['Rows']
     ids=[str(h['Id']) for h in hits[:40]]
@@ -160,7 +161,7 @@ def search(settings,query,selected,fetcher=fetch):
      time.sleep(3)
      raw=fetcher('https://rtapi.ruten.com.tw/api/prod/v3/index.php/prod?id='+','.join(ids))
     else:raw='[]'
-   rows=PARSERS[platform](raw)[:40]
+   rows=PARSERS[platform](raw)[:50 if platform=='yahoo_jp' and (page>1 or full_page) else 40]
    stamp=now()
    with connect(settings.db_path) as c:
     for row in rows:

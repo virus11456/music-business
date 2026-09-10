@@ -62,6 +62,7 @@ def calculate(c,s,o,source,confirmed_offer):
       'price_kind':source['price_kind'] if source else 'manual','availability':source['availability'] if source else '人工報價',
       'version_confirmed':bool(o['version_confirmed']),'has_market':bool(snapshot),'market_price':snapshot['lowest_price'] if snapshot else None,
       'market_currency':snapshot['currency'] if snapshot else None,'market_at':snapshot['captured_at'] if snapshot else None,
+      'want':snapshot['want'] if snapshot else None,'have':snapshot['have'] if snapshot else None,
       'sale_basis':'人工預定售價' if o.get('sale_price') else 'Discogs 最低掛牌價（非成交價）',
       'sale_twd':None,'source_twd':None,'cost_twd':None,'spread_twd':None,'gross_twd':None,'gross_margin':None,
       'fees_twd':None,'net_twd':None,'net_margin':None,'ready':False,'issues':[]}
@@ -78,12 +79,14 @@ def calculate(c,s,o,source,confirmed_offer):
  sale=twd(o.get('sale_price') or (snapshot['lowest_price'] if snapshot else None),o.get('sale_currency') if o.get('sale_price') else snapshot['currency'] if snapshot else None,'售價')
  buy=twd(source['price'],source['currency'],'標價') if source else None
  cost=twd(o['amount'],o['currency'],'成本') if o['amount'] is not None else None
+ row['cost_basis']='confirmed_total' if o['amount'] is not None else 'source_price'
+ estimated_cost=cost if o['amount'] is not None else buy
  row.update(sale_twd=amount(sale),source_twd=amount(buy),cost_twd=amount(cost),spread_twd=amount(sale-buy) if sale is not None and buy is not None else None)
- if sale is not None and cost is not None and sale>0:
-  gross=sale-cost;fees=sale*s.fee_pct+s.shipping+s.packing+s.reserve;net=gross-fees
+ if sale is not None and estimated_cost is not None and sale>0:
+  gross=sale-estimated_cost;fees=sale*s.fee_pct+s.shipping+s.packing+s.reserve;net=gross-fees
   row.update(gross_twd=amount(gross),gross_margin=float(gross/sale),fees_twd=amount(fees),net_twd=amount(net),net_margin=float(net/sale))
  if not o['version_confirmed']:issues.append('待核對版本')
- if o['amount'] is None:issues.append('待填含運進貨成本')
+ if o['amount'] is None:issues.append('依来源標價估算，未含進貨運費與代購費')
  if not o.get('sale_price'):issues.append('待確認預定售價')
  if not snapshot or snapshot['lowest_price'] is None:issues.append('待抓 Discogs 行情')
  elif stale(snapshot['captured_at']):issues.append('行情超過兩天')
@@ -97,4 +100,9 @@ def calculate(c,s,o,source,confirmed_offer):
  if row['net_margin'] is not None and (Decimal(row['net_twd'])<=0 or row['net_margin']<s.min_margin):issues.append('未達淨利門檻')
  row['ready']=not issues and row['net_twd'] is not None
  row['status']='已人工排除' if row['excluded'] else '可建立上架草稿' if row['ready'] else '待補資料／確認' if issues else '待檢查'
+ if not confirmed_offer and not row['excluded']:row['status']='已找到候選，待核對版本'
+ listing=c.execute('SELECT listing_id,recorded_at FROM published_listings WHERE source_url=? AND release_id=?',(o['source_url'],o['release_id'])).fetchone()
+ row['listing_status']='listed' if listing else 'unlisted'
+ row['listing_id']=listing['listing_id'] if listing else None
+ if listing:row['ready']=False;row['status']='已上架（人工登錄）'
  return row

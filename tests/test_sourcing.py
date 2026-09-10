@@ -17,4 +17,4 @@ class SourcingTests(unittest.TestCase):
     return {'candidates':3}
    with patch('sourcing.platforms.search',side_effect=fake):r=sourcing.find(s,900000001,['tower'])
    self.assertEqual(r['possible_matches'],1)
-   rows=comparisons.build(s);self.assertEqual(len(rows),1);self.assertEqual(rows[0]['format'],'Vinyl');self.assertFalse(rows[0]['ready']);self.assertIsNone(rows[0]['gross_twd'])
+   rows=comparisons.build(s);self.assertEqual(len(rows),1);self.assertEqual(rows[0]['format'],'Vinyl');self.assertFalse(rows[0]['ready']);self.assertIsNotNone(rows[0]['gross_twd']);self.assertEqual(rows[0]['cost_basis'],'source_price')

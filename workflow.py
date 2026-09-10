@@ -12,6 +12,7 @@ from fx import convert,business_day
 
 GRADES=('Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)')
 SCHEMA='''
+CREATE TABLE IF NOT EXISTS published_listings (source_url TEXT NOT NULL,release_id INTEGER NOT NULL,listing_id TEXT UNIQUE NOT NULL,recorded_at TEXT NOT NULL,PRIMARY KEY(source_url,release_id));
 CREATE TABLE IF NOT EXISTS listing_exports (id INTEGER PRIMARY KEY, generated_at TEXT NOT NULL, currency TEXT NOT NULL, items TEXT NOT NULL, content_sha256 TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS excluded_matches (source_url TEXT NOT NULL, release_id INTEGER NOT NULL, recorded_at TEXT NOT NULL, PRIMARY KEY(source_url,release_id));
 CREATE TABLE IF NOT EXISTS sourcing_offers (
@@ -83,6 +84,7 @@ def get_workflow(settings):
             offers.append(offer)
         drafts=[dict(r) for r in c.execute('SELECT d.*,r.title,r.artist,r.format FROM listing_drafts d JOIN releases r USING(release_id) ORDER BY d.id DESC')]
         for draft in drafts:
+            draft['listing_status']='listed' if c.execute('SELECT 1 FROM published_listings WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone() else 'unlisted'
             draft['export_issues']=draft_export_issues(c,draft)
             draft['profit_review']=draft_profit_review(c,settings,draft)
     return {'exports':export_history(settings),'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
@@ -153,6 +155,7 @@ def review_csv(settings):
 def draft_export_issues(c,draft):
     """Recheck mutable source facts at download time, not only when drafting."""
     issues=[]
+    if c.execute('SELECT 1 FROM published_listings WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone():issues.append('此貨源版本已登錄上架，避免重複匯出')
     if c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone():issues.append('此貨源配對已被排除，請先核對或恢復配對')
     def stale(value):
         try:

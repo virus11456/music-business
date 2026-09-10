@@ -71,13 +71,13 @@ def build_tables(settings):
             for r in c.execute('SELECT * FROM platform_candidates ORDER BY id'):
                 candidates.append([r['platform'],r['external_id'],r['query'],r['title'],r['artist'],r['format'],r['catalog_no'],float(r['price']) if r['price'] else None,r['currency'],r['price_kind'],r['availability'],r['source_url'],r['captured_at']])
     import comparisons
-    comparison_rows=[['配對狀態','Discogs 版本','格式','商品','平台','貨源連結','來源標價','來源幣別','參考售價 TWD','總成本 TWD','價差 TWD','毛利 TWD','毛利率','淨利 TWD','淨利率','待確認事項','計算說明']]
+    comparison_rows=[['配對狀態','Discogs 版本','格式','商品','平台','貨源連結','來源標價','來源幣別','參考售價 TWD','總成本 TWD','價差 TWD','毛利 TWD','毛利率','淨利 TWD','淨利率','待確認事項','計算說明','Want 人數','Have 人數','刊登狀態','Discogs 刊登編號','成本依據']]
     with connect(settings.db_path) as c:
         has_platforms=c.execute("SELECT 1 FROM sqlite_master WHERE name='platform_candidates'").fetchone()
     if has_platforms:
         for r in comparisons.build(settings):
             def number(key):return float(r[key]) if r[key] is not None else None
-            comparison_rows.append([r['status'],r['release_id'],r['format'],r['source_title'],r['vendor'],r['source_url'],number('source_price'),r['source_currency'],number('sale_twd'),number('cost_twd'),number('spread_twd'),number('gross_twd'),r['gross_margin'],number('net_twd'),r['net_margin'],'；'.join(r['issues']),'本機計算快照；正式報價公式請看 Analysis，可在 Inputs 調整假設'])
+            comparison_rows.append([r['status'],r['release_id'],r['format'],r['source_title'],r['vendor'],r['source_url'],number('source_price'),r['source_currency'],number('sale_twd'),number('cost_twd'),number('spread_twd'),number('gross_twd'),r['gross_margin'],number('net_twd'),r['net_margin'],'；'.join(r['issues']),'預估毛利按來源標價計算；未含未填的進貨費用。已填總成本時改用總成本。匯率 https://www.exchangerate-api.com',r.get('want'),r.get('have'),'已上架（人工登錄）' if r.get('listing_status')=='listed' else '未上架',r.get('listing_id'),'進貨總成本' if r.get('cost_basis')=='confirmed_total' else '來源標價'])
     return {'Comparisons':comparison_rows,'PlatformCandidates':candidates,'Discogs':market,'Sources':sources,'Inputs':inputs,'Analysis':analysis},formula_positions
 
 def sync(settings,session=None):
