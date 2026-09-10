@@ -18,7 +18,9 @@ class Scheduler:
     def state(self,instant=None):
         local=(instant or datetime.now(TZ)).astimezone(TZ)
         upcoming=[local.replace(hour=h,minute=0,second=0,microsecond=0)+timedelta(days=d) for d in (0,1) for h in HOURS]
-        return {'enabled':bool(self.thread and self.thread.is_alive()),'timezone':'Asia/Taipei','times':['10:00','16:00','22:00'],'next_run':min(t for t in upcoming if t>local).isoformat()}
+        with connect(self.app.settings.db_path) as c:
+            last=c.execute("SELECT key,value FROM meta WHERE key LIKE 'schedule_slot:%' ORDER BY key DESC LIMIT 1").fetchone()
+        return {'last_run':{'at':last['key'].removeprefix('schedule_slot:'),'status':last['value']} if last else None,'enabled':bool(self.thread and self.thread.is_alive()),'timezone':'Asia/Taipei','times':['10:00','16:00','22:00'],'next_run':min(t for t in upcoming if t>local).isoformat()}
 
     def tick(self,instant=None):
         local=(instant or datetime.now(TZ)).astimezone(TZ)
@@ -35,9 +37,13 @@ class Scheduler:
                 if not c.execute('INSERT OR IGNORE INTO meta(key,value) VALUES(?,?)',(slot,'started')).rowcount:return {}
                 ids=[r[0] for r in c.execute('SELECT release_id FROM releases ORDER BY release_id')]
             report={'scheduled_slot':slot,'versions':len(ids),'failed':0,'batches':[]}
-            for offset in range(0,len(ids),20):
-                result=pipeline.run(self.app.settings,ids[offset:offset+20],['yahoo_tw','yahoo_jp','ruten','tower'])
-                report['batches'].append(result);report['failed']+=result['failed']
+            try:
+                for offset in range(0,len(ids),20):
+                    result=pipeline.run(self.app.settings,ids[offset:offset+20],['yahoo_tw','yahoo_jp','ruten','tower'])
+                    report['batches'].append(result);report['failed']+=result['failed']
+            except Exception:
+                with connect(self.app.settings.db_path) as c:c.execute('UPDATE meta SET value=? WHERE key=?',('failed',slot))
+                raise
             with connect(self.app.settings.db_path) as c:
                 c.execute('UPDATE meta SET value=? WHERE key=?',('partial' if report['failed'] else 'complete',slot))
             return report

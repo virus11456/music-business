@@ -37,3 +37,13 @@ class SchedulerTests(unittest.TestCase):
     def test_demo_does_not_run(self):
         with connect(self.settings.db_path) as c:c.execute("INSERT INTO meta VALUES('mode','demo')")
         self.assertFalse(self.scheduler.tick(datetime(2026,9,10,10,0,tzinfo=TZ)))
+    def test_failure_is_recorded_and_not_falsely_running(self):
+        instant=datetime(2026,9,10,10,0,tzinfo=TZ)
+        with patch('scheduler.pipeline.run',side_effect=RuntimeError('test')):
+            with self.assertRaises(RuntimeError):self.scheduler.tick(instant)
+        self.assertEqual(self.scheduler.state(instant)['last_run']['status'],'failed')
+        self.assertFalse(self.scheduler.tick(instant))
+    def test_last_completed_slot_survives_restart(self):
+        instant=datetime(2026,9,10,10,0,tzinfo=TZ)
+        with patch('scheduler.pipeline.run',return_value={'failed':0}):self.scheduler.tick(instant)
+        self.assertEqual(Scheduler(self.app).state(instant)['last_run'],{'at':instant.isoformat(),'status':'complete'})
