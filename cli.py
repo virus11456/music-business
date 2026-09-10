@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from fx import business_day
 import argparse
 import json
 import sqlite3
@@ -38,7 +39,7 @@ def parser():
     fx = sub.add_parser('set-fx')
     fx.add_argument('currency')
     fx.add_argument('twd_per_unit')
-    fx.add_argument('--date',default=date.today().isoformat())
+    fx.add_argument('--date',default=business_day())
     fx.add_argument('--source',required=True)
     d = sub.add_parser('decide')
     d.add_argument('release_id',type=positive)

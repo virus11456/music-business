@@ -1,4 +1,5 @@
 """Local-only dashboard API. Shares the CLI database and business logic."""
+from fx import business_day
 import argparse
 import json
 import secrets
@@ -206,7 +207,7 @@ class Dashboard:
                         (rid,required(data,'source'),str(amount),currency(required(data,'currency')),str(data.get('grading',''))[:100],now()))
                 elif path=='/api/fx':
                     day=date.fromisoformat(required(data,'date'))
-                    if day>date.today():
+                    if day>date.fromisoformat(business_day()):
                         raise ValueError('匯率日期不能在未來')
                     rate=money(required(data,'rate'))
                     cc=currency(required(data,'currency'))

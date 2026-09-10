@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from config import money
 from db import connect, now, latest_decision
-from fx import convert
+from fx import convert,business_day
 
 def clamp(x):
     return max(0., min(1., x))
@@ -26,8 +26,8 @@ def evaluate(c, s, settings, at=None):
         warnings.append('缺少進貨成本：利潤分項暫用中性值，不代表可獲利')
     elif s['lowest_price'] is not None and s['currency']:
         try:
-            sale, a = convert(c,s['lowest_price'],s['currency'],at.date().isoformat(),settings.fx_max_age_days)
-            purchase, b = convert(c,cost['cost_amount'],cost['cost_currency'],at.date().isoformat(),settings.fx_max_age_days)
+            sale, a = convert(c,s['lowest_price'],s['currency'],business_day(at),settings.fx_max_age_days)
+            purchase, b = convert(c,cost['cost_amount'],cost['cost_currency'],business_day(at),settings.fx_max_age_days)
             fx_used = [a,b]
             if sale > 0:
                 net = sale-purchase-sale*settings.fee_pct-settings.shipping-settings.packing-settings.reserve

@@ -3,7 +3,7 @@ import json
 from datetime import datetime,timezone
 from decimal import Decimal
 from db import connect
-from fx import convert
+from fx import convert,business_day
 from matching import media
 from source_match import evidence as match_evidence
 
@@ -69,7 +69,7 @@ def calculate(c,s,o,source,confirmed_offer):
  issues=row['issues']
  if row['excluded']:issues.append('已人工排除此配對')
  if row['format'] and row['source_format'] and row['format']!=row['source_format']:issues.append('來源與 Discogs 格式不一致')
- day=datetime.now(timezone.utc).date().isoformat()
+ day=business_day()
  def twd(value,currency,label):
   if value is None or not currency:return None
   try:return convert(c,value,currency,day)[0]

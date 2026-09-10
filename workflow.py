@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from db import connect, now
 from config import money
-from fx import convert
+from fx import convert,business_day
 
 GRADES=('Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)')
 SCHEMA='''
@@ -71,7 +71,7 @@ def get_workflow(settings):
             offer.update(net_twd=None,margin=None,status='缺少行情')
             if s and s['lowest_price'] is not None and s['currency']:
                 try:
-                    day=datetime.now(timezone.utc).date().isoformat()
+                    day=business_day()
                     sale,_=convert(c,row['sale_price'] or s['lowest_price'],row['sale_currency'] if row['sale_price'] else s['currency'],day)
                     purchase,_=convert(c,row['amount'],row['currency'],day)
                     net=sale-purchase-sale*settings.fee_pct-settings.shipping-settings.packing-settings.reserve

@@ -142,7 +142,7 @@ def fetch(url):
 def search(settings,query,selected,fetcher=fetch):
  if not isinstance(query,str) or not 1<=len(query.strip())<=120:raise ValueError('請填搜尋詞，最多 120 字')
  if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in PARSERS for p in selected):raise ValueError('請選擇已支援的平台')
- query=query.strip();total=0;failed=0
+ query=query.strip();total=0;failed=0;reports=[]
  for platform in dict.fromkeys(selected):
   try:
    with connect(settings.db_path) as c:
@@ -169,8 +169,10 @@ def search(settings,query,selected,fetcher=fetch):
      c.execute(f"INSERT INTO platform_candidates ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)}) ON CONFLICT(platform,external_id) DO UPDATE SET "+','.join(f'{k}=excluded.{k}' for k in cols if k not in ('platform','external_id')),list(row.values()))
     c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,len(rows),'完成' if rows else '沒有符合商品',stamp))
    total+=len(rows)
+   reports.append({'platform':platform,'count':len(rows),'status':'success' if rows else 'empty'})
   except Exception as e:
    status=f'來源拒絕連線（HTTP {e.code}），請人工開啟平台' if isinstance(e,HTTPError) else '讀取失敗或頁面結構改變；請人工開啟平台'
    with connect(settings.db_path) as c:c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,0,status,now()))
    failed+=1
- return {'candidates':total,'failed_platforms':failed}
+   reports.append({'platform':platform,'count':0,'status':'failed'})
+ return {'candidates':total,'failed_platforms':failed,'platforms':reports}

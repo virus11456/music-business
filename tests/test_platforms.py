@@ -35,7 +35,7 @@ class PlatformTests(unittest.TestCase):
    if 'auctions.yahoo.co.jp' in url:raise HTTPError(url,403,'blocked',{},None)
    return self.yahoo()
   result=platforms.search(self.s,'test',['yahoo_jp','yahoo_tw'],fetch)
-  self.assertEqual(result,{'candidates':1,'failed_platforms':1})
+  self.assertEqual(result,{'candidates':1,'failed_platforms':1,'platforms':[{'platform':'yahoo_jp','count':0,'status':'failed'},{'platform':'yahoo_tw','count':1,'status':'success'}]})
   self.assertIn('403',platforms.state(self.s)['runs'][1]['status'])
  def test_query_is_encoded_not_url_injected(self):
   self.assertEqual(platforms.search_url('tower','a/b?x=1'),'https://tower.jp/search/item/a%2Fb%3Fx%3D1')

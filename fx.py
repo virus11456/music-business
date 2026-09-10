@@ -1,6 +1,10 @@
-from datetime import date
+from datetime import date,datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from config import money
+
+def business_day(instant=None):
+    return (instant or datetime.now(ZoneInfo('Asia/Taipei'))).astimezone(ZoneInfo('Asia/Taipei')).date().isoformat()
 
 def convert(c, amount, currency, as_of, max_age=7):
     if currency == 'TWD':
