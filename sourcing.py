@@ -2,7 +2,7 @@
 import json
 from db import connect,now
 import platforms
-from matching import normalized,media
+from source_match import evidence as match_evidence
 
 def find(settings,rid,selected,query=None):
  with connect(settings.db_path) as c:
@@ -17,11 +17,8 @@ def find(settings,rid,selected,query=None):
   linked=0
   for candidate in c.execute('SELECT * FROM platform_candidates WHERE query=?',(query,)).fetchall():
    if stamps.get(candidate['platform'])!=candidate['captured_at']:continue
-   source_format=media(candidate['format']);target_format=media(release['format'])
-   if source_format and target_format and source_format!=target_format:continue
-   evidence=['依指定 Discogs 唱片搜尋貨源，版本待核對']
-   if candidate['catalog_no'] and normalized(candidate['catalog_no']) in [normalized(x) for x in release['catno'].split(',')]:evidence.append('規格品番一致，仍需核對壓片')
-   if source_format and source_format==target_format:evidence.append('格式一致')
+   evidence=match_evidence(candidate,release)
+   if not evidence:continue
    match={'release_id':rid,'title':release['artist']+' — '+release['title'],'country':release['country'],'year':str(release['year']),
           'format':release['format'],'catno':release['catno'],'labels':'','evidence':evidence,'url':f'https://www.discogs.com/release/{rid}'}
    existing=c.execute('SELECT results FROM version_searches WHERE candidate_id=?',(candidate['id'],)).fetchone()

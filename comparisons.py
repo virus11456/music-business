@@ -5,6 +5,7 @@ from decimal import Decimal
 from db import connect
 from fx import convert
 from matching import media
+from source_match import evidence as match_evidence
 
 def amount(v):return str(v.quantize(Decimal('.01'))) if v is not None else None
 def stale(stamp):
@@ -26,6 +27,12 @@ def build(settings):
    for search in c.execute('SELECT v.*,p.source_url FROM version_searches v JOIN platform_candidates p ON p.id=v.candidate_id'):
     source=candidates[search['source_url']]
     for r in json.loads(search['results']):
+     target=c.execute('SELECT * FROM releases WHERE release_id=?',(r['release_id'],)).fetchone()
+     if not target:
+      target={'title':r['title'].split(' - ',1)[-1],'format':r.get('format',''),'catno':r.get('catno','')}
+     reasons=match_evidence(source,target)
+     if not reasons:continue
+     r['evidence']=reasons
      if (source['source_url'],r['release_id']) in covered:continue
      o={'id':None,'release_id':r['release_id'],'title':r['title'],'artist':'','vendor':source['platform'],
         'source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,'sale_price':None,'sale_currency':None,

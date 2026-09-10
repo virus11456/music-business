@@ -12,7 +12,7 @@ class SourcingTests(unittest.TestCase):
     stamp=now()
     with connect(s.db_path) as c:
      for i,fmt in [(1,'LP'),(2,'CD'),(3,'カセット')]:
-      c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,'tower',str(i),query,'Test','Artist',fmt,'','200','JPY','listed','未確認',f'https://tower.jp/item/{i}',stamp))
+      c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,'tower',str(i),query,c.execute('SELECT title FROM releases WHERE release_id=900000001').fetchone()[0],'Artist',fmt,'','200','JPY','listed','未確認',f'https://tower.jp/item/{i}',stamp))
      c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',('tower',query,3,'完成',stamp))
     return {'candidates':3}
    with patch('sourcing.platforms.search',side_effect=fake):r=sourcing.find(s,900000001,['tower'])
