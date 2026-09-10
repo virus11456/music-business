@@ -44,9 +44,14 @@ export default defineConfig(async () => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
+  const apiPort = Number(process.env.LOCAL_API_PORT || '8765');
+  if (!Number.isInteger(apiPort) || apiPort < 1024 || apiPort > 65535) {
+    throw new Error('LOCAL_API_PORT must be an integer between 1024 and 65535');
+  }
+
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
-    server: { host: '127.0.0.1', port: 5173, strictPort: true, proxy: { '/api': 'http://127.0.0.1:8765' }, watch: isCodexSeatbeltSandbox ? { useFsEvents: false, usePolling: true } : undefined },
+    server: { host: '127.0.0.1', port: 5173, strictPort: true, proxy: { '/api': `http://127.0.0.1:${apiPort}` }, watch: isCodexSeatbeltSandbox ? { useFsEvents: false, usePolling: true } : undefined },
     plugins: [
       vinext(),
       sites(),
