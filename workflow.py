@@ -82,6 +82,7 @@ def get_workflow(settings):
         drafts=[dict(r) for r in c.execute('SELECT d.*,r.title,r.artist,r.format FROM listing_drafts d JOIN releases r USING(release_id) ORDER BY d.id DESC')]
         for draft in drafts:
             draft['export_issues']=draft_export_issues(c,draft)
+            draft['profit_review']=draft_profit_review(c,settings,draft)
     return {'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
 
 def save_offer(c,data,parse_id,parse_currency,required):
@@ -169,6 +170,19 @@ def draft_export_issues(c,draft):
             if offer['recorded_at']>draft['created_at']:issues.append('來源報價已更新，請重新確認草稿')
             if not draft['owned_confirmed'] and not offer['supply_confirmed']:issues.append('來源已取消供貨確認')
     return issues
+
+def draft_profit_review(c,settings,draft):
+    """Estimate using the draft sale price, retaining current source evidence."""
+    from comparisons import calculate
+    offer=c.execute('SELECT * FROM sourcing_offers WHERE id=?',(draft['source_offer_id'],)).fetchone()
+    fields=('sale_twd','cost_twd','gross_twd','fees_twd','net_twd','net_margin')
+    if not offer or offer['release_id']!=draft['release_id']:
+        return {**{key:None for key in fields},'ready':False,'issues':['尚未連結相同版本的進貨報價，無法估算利潤']}
+    values={**dict(offer),'title':draft['title'],'sale_price':draft['price'],'sale_currency':draft['currency']}
+    source=c.execute('SELECT * FROM platform_candidates WHERE source_url=?',(offer['source_url'],)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE name='platform_candidates'").fetchone() else None
+    row=calculate(c,settings,values,source,True)
+    issues=list(dict.fromkeys(row['issues']+draft_export_issues(c,draft)))
+    return {**{key:row[key] for key in fields},'ready':row['ready'] and not issues,'issues':issues}
 
 def quicklister_csv(settings,ids,seller_currency):
     """Export selected drafts using the documented Quicklister schema, never publish."""
