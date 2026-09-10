@@ -51,3 +51,7 @@
 ## 2026-09-10 Vercel 前端準備
 
 新增獨立靜態建置入口與 vercel.json，保留本機 Vinext 與後端排程；線上版明示後端未連接，避免無效資料操作。TypeScript 與前端建置通過。等待使用者登入 Vercel，尚未實際部署。
+
+## 2026-09-10 Vercel 前端上線
+
+已部署 https://music-business.vercel.app ，來源 e6e1cbb，frontend 根目錄、Vite。Vercel 部署成功，正式網址瀏覽器驗證通過。後端仍在 Mac，線上版清楚顯示未連接並停用資料操作；沒有部署後端、憑證或排程。

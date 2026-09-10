@@ -14,6 +14,6 @@
 
 ## 驗證與進度
 
-Vercel 靜態建置與 TypeScript 檢查通過。Vercel 帳號目前未登入，尚未建立雲端專案或取得部署網址。等待使用者登入後完成匯入、建置與網址驗證。
+2026-09-10 已在使用者 Vercel 帳號 virus11456 的專案下完成部署，專案名 music-business。線上網址：https://music-business.vercel.app 。GitHub main 分支、frontend 根目錄、Vite 設定已套用，部署來源 e6e1cbb。Vercel 顯示部署成功，已從瀏覽器開啟正式網址，確認 React 畫面載入、顯示後端尚未連接、更新與新增按鈕停用。未設定後端環境變數，也未上傳任何金鑰。
 
 官方依據：https://vercel.com/docs/frameworks/frontend/vite

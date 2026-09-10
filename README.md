@@ -147,6 +147,6 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 
 請保持 Mac 開機、連網且後端服務開著；關閉或休眠期間不執行，也尚未設定系統開機自啟。尚未部署 VPS。不自動購買或刊登。三個時段、重啟去重、繁忙重試、部分失敗、跨日時間及示範庫已測試；首次自然到點執行待驗證。
 
-## Vercel 前端（2026-09-10 準備）
+## Vercel 前端（2026-09-10 已部署）
 
-已依使用者要求新增 Vercel 專用靜態前端建置，Root Directory 為 frontend。後端與排程保留在 Mac；線上版目前會顯示尚未連接後端並停用資料操作。部署建置已通過，等待 Vercel 登入，尚無線上網址。詳見 [部署設定](docs/VERCEL_DEPLOY.md)。
+已依使用者要求新增 Vercel 專用靜態前端建置，Root Directory 為 frontend。後端與排程保留在 Mac；線上版目前會顯示尚未連接後端並停用資料操作。已完成 Vercel 部署並從瀏覽器驗證，線上網址：https://music-business.vercel.app 。詳見 [部署設定](docs/VERCEL_DEPLOY.md)。
