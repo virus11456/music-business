@@ -1,5 +1,6 @@
 """Sourcing records and listing preparation; no external purchase or listing POST."""
 import csv
+import hashlib
 import io
 import json
 import re
@@ -11,6 +12,7 @@ from fx import convert
 
 GRADES=('Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)')
 SCHEMA='''
+CREATE TABLE IF NOT EXISTS listing_exports (id INTEGER PRIMARY KEY, generated_at TEXT NOT NULL, currency TEXT NOT NULL, items TEXT NOT NULL, content_sha256 TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS excluded_matches (source_url TEXT NOT NULL, release_id INTEGER NOT NULL, recorded_at TEXT NOT NULL, PRIMARY KEY(source_url,release_id));
 CREATE TABLE IF NOT EXISTS sourcing_offers (
  id INTEGER PRIMARY KEY, release_id INTEGER NOT NULL REFERENCES releases,
@@ -83,7 +85,7 @@ def get_workflow(settings):
         for draft in drafts:
             draft['export_issues']=draft_export_issues(c,draft)
             draft['profit_review']=draft_profit_review(c,settings,draft)
-    return {'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
+    return {'exports':export_history(settings),'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
 
 def save_offer(c,data,parse_id,parse_currency,required):
     media=str(data.get('media_cond','未確認'))
@@ -184,12 +186,18 @@ def draft_profit_review(c,settings,draft):
     issues=list(dict.fromkeys(row['issues']+draft_export_issues(c,draft)))
     return {**{key:row[key] for key in fields},'ready':row['ready'] and not issues,'issues':issues}
 
+def export_history(settings):
+    with connect(settings.db_path) as c:
+        return [{**dict(r),'items':json.loads(r['items'])} for r in c.execute('SELECT id,generated_at,currency,items FROM listing_exports ORDER BY id DESC LIMIT 20')]
+
 def quicklister_csv(settings,ids,seller_currency):
     """Export selected drafts using the documented Quicklister schema, never publish."""
     if not ids or len(ids)>500 or len(ids)!=len(set(ids)):raise ValueError('請選擇 1 至 500 筆不同草稿')
     output=io.StringIO();writer=csv.writer(output)
     writer.writerow(['artist','title','catno','format','year','media_condition','sleeve_condition','price','comments','external_id','accept_offer'])
+    items=[]
     with connect(settings.db_path) as c:
+        c.execute('BEGIN IMMEDIATE')
         for draft_id in ids:
             r=c.execute('SELECT d.*,r.artist,r.title,r.catno,r.format,r.year FROM listing_drafts d JOIN releases r USING(release_id) WHERE d.id=?',(draft_id,)).fetchone()
             if not r:raise ValueError('草稿不存在')
@@ -200,7 +208,10 @@ def quicklister_csv(settings,ids,seller_currency):
             if r['dispatch_days']:description+=f" Dispatch within {r['dispatch_days']} days after payment."
             values=[r['artist'],r['title'],r['catno'],r['format'],r['year'],r['media_cond'],r['sleeve_cond'],r['price'],description[:500],f"simples-{r['id']}-release-{r['release_id']}",'N']
             writer.writerow(["'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v for v in values])
-    return output.getvalue()
+            items.append({key:r[key] for key in ('id','release_id','artist','title','format','price','media_cond','sleeve_cond')})
+        content=output.getvalue()
+        c.execute('INSERT INTO listing_exports(generated_at,currency,items,content_sha256) VALUES(?,?,?,?)',(now(),seller_currency,json.dumps(items,ensure_ascii=False),hashlib.sha256(content.encode()).hexdigest()))
+    return content
 
 class BatchDraftError(ValueError):
     pass
