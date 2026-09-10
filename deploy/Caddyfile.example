@@ -1,0 +1,9 @@
+# Replace api.example.com with the user's actual API hostname.
+api.example.com {
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8765
+    }
+    handle {
+        respond 404
+    }
+}

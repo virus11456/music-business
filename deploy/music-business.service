@@ -1,0 +1,23 @@
+[Unit]
+Description=Music business API and built-in scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=music
+Group=music
+WorkingDirectory=/opt/music-business
+EnvironmentFile=/opt/music-business/.env
+ExecStart=/opt/music-business/.venv/bin/python /opt/music-business/server.py
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/music-business/data /opt/music-business/logs
+
+[Install]
+WantedBy=multi-user.target

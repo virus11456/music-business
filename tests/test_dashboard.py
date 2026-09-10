@@ -111,4 +111,20 @@ class DashboardTests(unittest.TestCase):
             urlopen(self.url+f"/api/drafts/quicklister?currency=JPY&id={draft['id']}")
         self.assertEqual(err.exception.code,400);err.exception.close()
 
+    def test_remote_auth_preflight_and_csv(self):
+        import os
+        from unittest.mock import patch
+        from remote_access import RemoteAccess
+        token='x'*40;origin='https://music-business.vercel.app'
+        with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':token,'FRONTEND_ORIGIN':origin,'PUBLIC_API_ORIGIN':'https://api.example.com'}):
+            self.app.access=RemoteAccess()
+        h={'Host':'api.example.com','Origin':origin}
+        with urlopen(Request(self.url+'/api/state',headers=h,method='OPTIONS')) as r:
+            self.assertEqual(r.status,204);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)
+        for path in ['/api/state','/api/drafts/export']:
+            with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+path,headers=h))
+            self.assertEqual(error.exception.code,401);error.exception.close()
+            with urlopen(Request(self.url+path,headers={**h,'Authorization':'Bearer '+token})) as r:
+                self.assertEqual(r.status,200);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)
+
 if __name__=='__main__':unittest.main()

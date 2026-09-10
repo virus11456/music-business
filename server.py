@@ -10,6 +10,7 @@ from urllib.parse import urlsplit,parse_qs
 
 import analyze
 import pipeline
+from remote_access import RemoteAccess
 from scheduler import Scheduler
 import ingest
 import workflow
@@ -39,6 +40,7 @@ def required(data, key, limit=300):
 class Dashboard:
     def __init__(self, settings):
         self.settings=settings
+        self.access=RemoteAccess()
         self.csrf=secrets.token_urlsafe(32)
         self.lock=threading.Lock()
         self.active=None
@@ -225,6 +227,28 @@ def handler(dashboard):
             host=urlsplit('//'+self.headers.get('Host','')).hostname
             return host in ('127.0.0.1','localhost','::1')
 
+        def end_headers(self):
+            if dashboard.access.token and self.headers.get('Origin')==dashboard.access.origin:
+                self.send_header('Access-Control-Allow-Origin',dashboard.access.origin)
+                self.send_header('Vary','Origin')
+            super().end_headers()
+
+        def authorized(self):
+            status=dashboard.access.allowed(self.headers)
+            if status!=200:
+                self.respond(status,{'error':'請登入工作室' if status==401 else '不允許此來源連線'})
+                return False
+            return True
+
+        def do_OPTIONS(self):
+            if not dashboard.access.token or self.headers.get('Origin')!=dashboard.access.origin:
+                return self.respond(403,{'error':'不允許此來源連線'})
+            self.send_response(204)
+            self.send_header('Access-Control-Allow-Methods','GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers','Authorization, Content-Type, X-CSRF-Token')
+            self.send_header('Access-Control-Max-Age','600')
+            self.end_headers()
+
         def respond(self,status,data):
             body=json.dumps(data,ensure_ascii=False).encode()
             self.send_response(status)
@@ -236,8 +260,7 @@ def handler(dashboard):
             self.wfile.write(body)
 
         def do_GET(self):
-            if not self.local():
-                return self.respond(403,{'error':'僅允許本機連線'})
+            if not self.authorized():return
             if urlsplit(self.path).path=='/api/drafts/quicklister':
                 try:
                     query=parse_qs(urlsplit(self.path).query)
@@ -267,9 +290,7 @@ def handler(dashboard):
                 self.respond(500,{'error':'資料讀取失敗，請檢查本機服務'})
 
         def do_POST(self):
-            origin=urlsplit(self.headers.get('Origin',''))
-            if not self.local() or (origin.hostname and origin.hostname not in ('127.0.0.1','localhost','::1')):
-                return self.respond(403,{'error':'僅允許本機操作'})
+            if not self.authorized():return
             if not secrets.compare_digest(self.headers.get('X-CSRF-Token',''),dashboard.csrf):
                 return self.respond(403,{'error':'頁面驗證已過期，請重新整理'})
             if self.headers.get('Content-Type','').split(';')[0]!='application/json':

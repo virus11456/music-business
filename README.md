@@ -150,3 +150,7 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 ## Vercel 前端（2026-09-10 已部署）
 
 已依使用者要求新增 Vercel 專用靜態前端建置，Root Directory 為 frontend。後端與排程保留在 Mac；線上版目前會顯示尚未連接後端並停用資料操作。已完成 Vercel 部署並從瀏覽器驗證，線上網址：https://music-business.vercel.app 。詳見 [部署設定](docs/VERCEL_DEPLOY.md)。
+
+## 2026-09-10 線上後端串接準備
+
+加入 VITE_API_ORIGIN 前端設定、管理者存取碼登入、登出與帶授權 CSV 下載。後端遠端模式要求長隨機存取碼、精確 HTTPS 前端與 API 來源，所有讀寫與匯出均需驗證，保留 CSRF；未設定時維持本機模式。準備 Caddy 與 systemd 檔，但未安裝或遷移資料。70 項測試通過，包含未登入、來源限制、CORS 及匯出驗證。仍等待 VPS 位址、SSH 使用者與後端網域，公開站尚未接通真實資料。
