@@ -17,3 +17,6 @@ dist/
 .DS_Store
 .env.*
 !.env.example
+
+.vercel/
+dist-vercel/
