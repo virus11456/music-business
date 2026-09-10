@@ -10,6 +10,7 @@ from urllib.parse import urlsplit,parse_qs
 
 import analyze
 import pipeline
+from scheduler import Scheduler
 import ingest
 import workflow
 import sheet_sync
@@ -41,6 +42,7 @@ class Dashboard:
         self.csrf=secrets.token_urlsafe(32)
         self.lock=threading.Lock()
         self.active=None
+        self.scheduler=Scheduler(self)
         workflow.init_workflow(settings)
         platforms.init(settings)
         matching.init(settings)
@@ -69,7 +71,7 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
@@ -296,6 +298,11 @@ if __name__=='__main__':
     load_env()
     settings=Settings()
     init(settings.db_path)
-    http=ThreadingHTTPServer(('127.0.0.1',args.port),handler(Dashboard(settings)))
+    dashboard=Dashboard(settings)
+    http=ThreadingHTTPServer(('127.0.0.1',args.port),handler(dashboard))
+    dashboard.scheduler.start()
     print(f'Local API ready: http://127.0.0.1:{args.port}',flush=True)
-    http.serve_forever()
+    try:http.serve_forever()
+    finally:
+        dashboard.scheduler.stop()
+        http.server_close()
