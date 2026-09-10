@@ -17,3 +17,7 @@
 2026-09-10 已在使用者 Vercel 帳號 virus11456 的專案下完成部署，專案名 music-business。線上網址：https://music-business.vercel.app 。GitHub main 分支、frontend 根目錄、Vite 設定已套用，部署來源 e6e1cbb。Vercel 顯示部署成功，已從瀏覽器開啟正式網址，確認 React 畫面載入、顯示後端尚未連接、更新與新增按鈕停用。未設定後端環境變數，也未上傳任何金鑰。
 
 官方依據：https://vercel.com/docs/frameworks/frontend/vite
+
+## 2026-09-11 VPS 接通更新
+
+使用者核准由 Web Console 架設，後端已搬到 Hostinger srv1542946。Vercel 建置預設 API 為 https://srv1542946.hstgr.cloud，可由 VITE_API_ORIGIN 覆蓋；公開設定僅含網址，不含憑證。前端仍使用 https://music-business.vercel.app。先前「後端未串接」段落為歷史紀錄，以本節及最新驗收紀錄為準。

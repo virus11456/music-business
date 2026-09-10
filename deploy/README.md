@@ -1,9 +1,9 @@
-# VPS 部署準備（尚未安裝）
+# VPS 部署
 
-仍需使用者提供 VPS 位址、SSH 使用者、後端網域。本目錄提供準備檔，不代表已部署。
+2026-09-11 已部署於使用者核准的 Hostinger srv1542946（Ubuntu 24.04 / 2 核心 / 8 GB）。後端 https://srv1542946.hstgr.cloud，程式 /opt/music-business，使用 music 帳號與 systemd。以下保留重建步驟。
 
 1. 在主機建立非 root 的 music 帳號，專案放 /opt/music-business；建立 data、logs、secrets 目錄並設定 music 擁有權。
-2. Python 3.11+ 建立 .venv；安裝 google-auth 與 requests（目前 Mac 已驗證版本分別 2.58.0、2.34.0）。
+2. Python 3.11+ 建立 .venv；安裝 google-auth 與 requests（目前 Mac 已驗證版本分別 2.58.0、2.34.2）。
 3. 私密傳入 Discogs 設定、Google service-account JSON 及 SQLite 一致性備份；環境檔與憑證權限 600。轉移後以 VPS 為唯一正式資料與排程，停用 Mac 正式排程，避免雙重執行。
 4. .env 設 REMOTE_ACCESS_TOKEN 為本機產生的隨機至少 32 字元管理者存取碼；FRONTEND_ORIGIN=https://music-business.vercel.app；PUBLIC_API_ORIGIN=https://實際後端網域。所有網址不得含路徑或查詢。
 5. DNS 指向主機，Caddy 提供 HTTPS，反向代理 API 至 loopback 8765；外部不開放 8765。Caddyfile.example 必須換成實際網域。

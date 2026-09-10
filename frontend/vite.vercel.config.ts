@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/postcss';
 import { fileURLToPath } from 'node:url';
 
-const apiOrigin=(process.env.VITE_API_ORIGIN||'').replace(/\/$/,'');
+const apiOrigin=(process.env.VITE_API_ORIGIN||'https://srv1542946.hstgr.cloud').replace(/\/$/,'');
 if(apiOrigin){const u=new URL(apiOrigin);if(u.protocol!=='https:'||u.username||u.password||u.pathname!=='/'||u.search||u.hash)throw Error('VITE_API_ORIGIN must be an HTTPS origin');}
 
 // Frontend-only Vercel build. No local database or backend secrets are bundled.
