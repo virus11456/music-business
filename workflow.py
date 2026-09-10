@@ -187,3 +187,27 @@ def quicklister_csv(settings,ids,seller_currency):
             values=[r['artist'],r['title'],r['catno'],r['format'],r['year'],r['media_cond'],r['sleeve_cond'],r['price'],description[:500],f"simples-{r['id']}-release-{r['release_id']}",'N']
             writer.writerow(["'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v for v in values])
     return output.getvalue()
+
+class BatchDraftError(ValueError):
+    pass
+
+def create_batch(settings,offer_ids,parse_id,parse_currency,required):
+    """Validate all selections before writing; preserve already edited drafts."""
+    import comparisons
+    if not isinstance(offer_ids,list) or not 1<=len(offer_ids)<=50 or any(type(x) is not int or x<=0 for x in offer_ids) or len(set(offer_ids))!=len(offer_ids):
+        raise BatchDraftError('請選擇 1 至 50 筆不同的已核對報價')
+    rows={r['offer']['id']:r for r in comparisons.build(settings) if r['offer']}
+    for oid in offer_ids:
+        row=rows.get(oid)
+        if not row or not row['ready']:
+            raise BatchDraftError(f'報價 #{oid} 尚未備妥：'+('；'.join(row['issues']) if row else '找不到報價'))
+    created=skipped=0
+    with connect(settings.db_path) as c:
+        for oid in offer_ids:
+            if c.execute('SELECT 1 FROM listing_drafts WHERE source_offer_id=?',(oid,)).fetchone():
+                skipped+=1;continue
+            offer=rows[oid]['offer']
+            data={**offer,'source_offer_id':oid,'price':offer['sale_price'],'currency':offer['sale_currency']}
+            for field in ('version_confirmed','owned_confirmed','supply_confirmed'):data[field]='yes' if offer.get(field) else ''
+            save_draft(c,data,parse_id,parse_currency,required);created+=1
+    return {'saved':True,'created':created,'skipped':skipped,'message':f'已建立 {created} 件草稿；{skipped} 件已有草稿，保留原內容'}

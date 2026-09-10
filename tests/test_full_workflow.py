@@ -13,12 +13,33 @@ import platforms,sheet_sync
 
 FORMATS={990000001:'Vinyl',990000002:'CD',990000003:'Cassette'}
 
-def run_flow(settings,sync_callback=None):
+def run_flow(settings,sync_callback=None,in_memory=False):
     init(settings.db_path);app=Dashboard(settings)
-    http=ThreadingHTTPServer(('127.0.0.1',0),handler(app));thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
-    base=f'http://127.0.0.1:{http.server_port}'
+    http=thread=None
+    if in_memory:
+        from test_batch_http import MemoryConnection
+        from types import SimpleNamespace
+        from urllib.parse import urlsplit
+        base='http://127.0.0.1:8765'
+        def open_request(request,timeout=None):
+            request=Request(request) if isinstance(request,str) else request
+            body=request.data or b''
+            url=urlsplit(request.full_url)
+            path=url.path+('?' + url.query if url.query else '')
+            headers=[request.get_method()+' '+path+' HTTP/1.1','Host: 127.0.0.1:8765','Connection: close','Content-Length: '+str(len(body))]
+            headers.extend(k+': '+v for k,v in request.header_items())
+            conn=MemoryConnection(('\r\n'.join(headers)+'\r\n\r\n').encode()+body)
+            handler(app)(conn,('127.0.0.1',12345),SimpleNamespace())
+            head,body=bytes(conn.output).split(b'\r\n\r\n',1)
+            status=int(head.split()[1])
+            if status>=400:raise HTTPError(request.full_url,status,'TEST HTTP error',{},io.BytesIO(body))
+            return io.BytesIO(body)
+    else:
+        http=ThreadingHTTPServer(('127.0.0.1',0),handler(app));thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
+        base=f'http://127.0.0.1:{http.server_port}'
+        open_request=urlopen
     def post(path,data):
-        with urlopen(Request(base+path,data=json.dumps(data).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':app.csrf,'Origin':'http://127.0.0.1:5173'}),timeout=10) as r:result=json.load(r)
+        with open_request(Request(base+path,data=json.dumps(data).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':app.csrf,'Origin':'http://127.0.0.1:5173'}),timeout=10) as r:result=json.load(r)
         if result.get('accepted'):
             deadline=time.monotonic()+10
             while app.active and time.monotonic()<deadline:time.sleep(.01)
@@ -44,6 +65,7 @@ def run_flow(settings,sync_callback=None):
             rows=app.state()['workflow']['comparisons'];assert len(rows)==3, [(r['release_id'],r.get('source')) for r in rows]
             assert all(not r['ready'] and r['gross_twd'] is None for r in rows)
             for cc,rate in [('USD','32'),('JPY','.22')]:post('/api/fx',{'currency':cc,'rate':rate,'date':date.today().isoformat(),'source':'TEST ONLY synthetic rate'})
+            draft_inputs=[]
             for rid in FORMATS:
                 data={'release_id':rid,'vendor':'TEST ONLY supplier','source_url':f'https://tower.jp/item/{rid}','amount':'4500','currency':'JPY','sale_price':'80','sale_currency':'USD','media_cond':'Very Good (VG)','sleeve_cond':'No Cover','version_confirmed':'yes','supply_confirmed':'yes','dispatch_days':'7'}
                 post('/api/offers',data)
@@ -51,22 +73,33 @@ def run_flow(settings,sync_callback=None):
                 assert row['ready'],row['issues']
                 assert (row['gross_twd'],row['net_twd'])==('1570.00','612.80')
                 draft={**data,'price':'80','currency':'USD','source_offer_id':row['offer']['id']}
-                post('/api/drafts',draft);post('/api/drafts',{**draft,'note':'TEST revised draft'})
+                draft_inputs.append(draft)
+            batch_ids=[d['source_offer_id'] for d in draft_inputs]
+            assert post('/api/drafts/batch',{'offer_ids':batch_ids})['created']==3
+            assert post('/api/drafts/batch',{'offer_ids':batch_ids})['skipped']==3
+            for draft in draft_inputs:
+                rid=draft['release_id']
+                post('/api/drafts',{**draft,'note':'TEST revised draft'})
                 try:
                     post('/api/drafts',{**draft,'release_id':next(x for x in FORMATS if x!=rid)})
                     raise AssertionError('Mismatched source offer accepted')
                 except HTTPError as error:
                     assert error.code==400
                     error.close()
+            tables,formulas=sheet_sync.build_tables(settings)
+            assert len(tables['Sources'])==4 and len(tables['Analysis'])==4
+            assert {r[3] for r in tables['Discogs'][1:]}==set(FORMATS.values())
+            assert (1,9) in formulas
             drafts=app.state()['workflow']['drafts'];assert len(drafts)==3
             assert all(d['owned_confirmed']==0 and d['supply_confirmed']==1 and d['note']=='TEST revised draft' for d in drafts)
             ids='&'.join('id='+str(d['id']) for d in drafts)
-            with urlopen(base+'/api/drafts/quicklister?currency=USD&'+ids) as r:export=list(csv.DictReader(io.StringIO(r.read().decode())))
+            with open_request(base+'/api/drafts/quicklister?currency=USD&'+ids) as r:export=list(csv.DictReader(io.StringIO(r.read().decode())))
             assert len(export)==3 and {r['format'] for r in export}==set(FORMATS.values())
             assert all(r['price']=='80' and r['sleeve_condition']=='No Cover' for r in export)
         if sync_callback:sync_callback(settings)
         return {'formats':list(FORMATS.values()),'matched_rows':3,'drafts':3,'export_rows':3,'gross_twd':1570,'net_twd':612.8,'synthetic':True}
-    finally:http.shutdown();http.server_close();thread.join()
+    finally:
+        if http:http.shutdown();http.server_close();thread.join()
 
 class FullWorkflowTests(unittest.TestCase):
     def test_three_formats_demand_to_export(self):

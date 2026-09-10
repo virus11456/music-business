@@ -170,6 +170,8 @@ class Dashboard:
         if not self.lock.acquire(blocking=False):
             raise ValueError('行情工作執行中，請完成後再儲存')
         try:
+            if path=='/api/drafts/batch':
+                return workflow.create_batch(s,data.get('offer_ids'),release_id,currency,required)
             with connect(s.db_path) as c:
                 if path=='/api/sheets/config':
                     sid=workflow.sheet_id(required(data,'url',1500))
@@ -313,6 +315,8 @@ def handler(dashboard):
                     raise ValueError('資料格式無效')
                 result=dashboard.mutate(self.path,data)
                 self.respond(202 if result.get('accepted') else 200,result)
+            except workflow.BatchDraftError as error:
+                self.respond(400,{'error':str(error)})
             except (ValueError,KeyError,TypeError):
                 self.respond(400,{'error':'資料無效或系統忙碌，請檢查欄位並等待目前工作完成'})
             except sqlite3.IntegrityError:
