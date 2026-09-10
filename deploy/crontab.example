@@ -1,0 +1,13 @@
+# 範本，尚未安裝。前提：系統 cron 以 UTC 執行；使用者為 discogs。
+# 台北 06:00 = UTC 前一天 22:00；台北 08:00 = UTC 00:00；台北 20:00 = UTC 12:00。
+# 請確認主機 cron 時區，不要只依賴 TZ 改變排程時區。
+SHELL=/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=""
+
+0 22 * * * cd /opt/discogs-arb && /usr/bin/flock -n data/jobs.lock .venv/bin/python cli.py scan --pages 2 >> logs/scan.log 2>&1
+0 0 * * * cd /opt/discogs-arb && /usr/bin/flock -n data/jobs.lock .venv/bin/python cli.py pipeline >> logs/pipeline.log 2>&1
+# 通知目前僅預覽。接收對象與內容經確認後，才加入 --send。
+0 2 * * * cd /opt/discogs-arb && /usr/bin/flock -n data/jobs.lock .venv/bin/python cli.py digest --urgent-only >> logs/urgent.log 2>&1
+0 12 * * * cd /opt/discogs-arb && /usr/bin/flock -n data/jobs.lock .venv/bin/python cli.py digest >> logs/digest.log 2>&1
+# flock 無法取得鎖會跳過本輪；標的增加後應改採常駐工作佇列並監控漏跑。

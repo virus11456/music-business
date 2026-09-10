@@ -1,0 +1,119 @@
+"""Optional Google Sheets synchronization. Credentials never enter browser state.
+
+Only writes the managed source/calculation tabs; editable Inputs are preserved.
+Requires an existing spreadsheet explicitly selected by the owner.
+"""
+import json
+import os
+from pathlib import Path
+from db import connect, now
+
+PREFIX='SIMPLES_'
+
+def configured():
+    path=os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE','')
+    return bool(path and Path(path).is_file())
+
+def cell(value,formula=False):
+    if value is None:
+        return {}
+    if formula:
+        return {'userEnteredValue':{'formulaValue':value}}
+    kind='boolValue' if isinstance(value,bool) else 'numberValue' if isinstance(value,(int,float)) else 'stringValue'
+    return {'userEnteredValue':{kind:value}}
+
+def build_tables(settings):
+    with connect(settings.db_path) as c:
+        market=[['release_id','artist','title','format','lowest_price','currency','num_for_sale','captured_at','source_url']]
+        indices={}
+        for r in c.execute('SELECT r.*,s.lowest_price,s.currency,s.num_for_sale,s.captured_at FROM releases r JOIN snapshots s ON s.id=(SELECT id FROM snapshots WHERE release_id=r.release_id ORDER BY captured_at DESC LIMIT 1) ORDER BY r.release_id'):
+            indices[r['release_id']]=len(market)+1
+            market.append([r['release_id'],r['artist'],r['title'],r['format'],float(r['lowest_price']) if r['lowest_price'] is not None else None,
+                           r['currency'],r['num_for_sale'],r['captured_at'],f"https://www.discogs.com/release/{r['release_id']}"])
+        sources=[['offer_id','release_id','vendor','cost_total','currency','media_condition','sleeve_condition','version_confirmed','captured_at','source_url']]
+        offers=c.execute('SELECT * FROM sourcing_offers ORDER BY id').fetchall()
+        for r in offers:
+            sources.append([r['id'],r['release_id'],r['vendor'],float(r['amount']),r['currency'],r['media_cond'],r['sleeve_cond'],bool(r['version_confirmed']),r['recorded_at'],r['source_url']])
+        inputs=[['參數','數值','說明'],['合計費率',float(settings.fee_pct),'請按實際費用調整'],['淨出貨運費 TWD',float(settings.shipping),'賣家自行承擔部分'],
+                ['包材 TWD',float(settings.packing),'每件包材'],['風險準備 TWD',float(settings.reserve),'每件預留費用'],['最低淨利率',settings.min_margin,'初始篩選門檻'],
+                ['','', ''],['幣別','1 外幣 = TWD','匯率日期 YYYY-MM-DD']]
+        for cc in ('TWD','USD','JPY','EUR','GBP'):
+            fx=c.execute('SELECT * FROM fx_rates WHERE currency=? ORDER BY rate_date DESC LIMIT 1',(cc,)).fetchone()
+            inputs.append([cc,1 if cc=='TWD' else float(fx['twd_per_unit']) if fx else None,now()[:10] if cc=='TWD' else fx['rate_date'] if fx else None])
+        analysis=[['offer_id','release_id','售價 TWD','進貨成本 TWD','費用 TWD','估算淨利 TWD','淨利率','資料檢查','候選結果']]
+        formula_positions=set()
+        for i,r in enumerate(offers,2):
+            mi=indices.get(r['release_id'])
+            src=f"'{PREFIX}Sources'!"
+            m=f"'{PREFIX}Discogs'!"
+            inp=f"'{PREFIX}Inputs'!"
+            # Exact currency lookups; missing and expired rates remain visibly unavailable.
+            def rate_formula(cc):
+                table=f'{inp}$A$9:$C$13'
+                return f'IF(COUNTIF({inp}$A$9:$A$13,{cc})<>1,"缺匯率",IF(OR(VLOOKUP({cc},{table},2,FALSE)="",VLOOKUP({cc},{table},3,FALSE)=""),"缺匯率",IF(OR(TODAY()-DATEVALUE(VLOOKUP({cc},{table},3,FALSE))>7,TODAY()<DATEVALUE(VLOOKUP({cc},{table},3,FALSE))),"匯率日期無效",VLOOKUP({cc},{table},2,FALSE))))'
+            sale=f'IF({m}E{mi}="","缺行情",IF(ISNUMBER({rate_formula(f"{m}F{mi}")}),{m}E{mi}*({rate_formula(f"{m}F{mi}")}),"缺有效匯率"))' if mi else '"缺行情"'
+            cost=f'IF(ISNUMBER({rate_formula(f"{src}E{i}")}),{src}D{i}*({rate_formula(f"{src}E{i}")}),"缺有效匯率")'
+            check=(f'IF({src}H{i}<>TRUE,"待核對版本",IF(OR(TODAY()-DATEVALUE(LEFT({src}I{i},10))>2,TODAY()-DATEVALUE(LEFT({m}H{mi},10))>2),"報價或行情過期",IF(AND(ISNUMBER(C{i}),ISNUMBER(D{i}),C{i}>0,{m}G{mi}>0),"資料齊全","缺有效價格／匯率")))' if mi else '"缺行情"')
+            vals=[f'={src}A{i}',f'={src}B{i}','='+sale,'='+cost,
+                  f'=IF(ISNUMBER(C{i}),C{i}*{inp}$B$2+SUM({inp}$B$3:$B$5),"待補資料")',
+                  f'=IF(AND(ISNUMBER(C{i}),ISNUMBER(D{i}),ISNUMBER(E{i})),C{i}-D{i}-E{i},"待補資料")',
+                  f'=IF(AND(ISNUMBER(F{i}),ISNUMBER(C{i}),C{i}>0),F{i}/C{i},"待補資料")','='+check,
+                  f'=IF(H{i}<>"資料齊全",H{i},IF(AND(F{i}>0,G{i}>={inp}$B$6),"候選：仍需核對品相與成交價","暫無空間"))']
+            analysis.append(vals)
+            formula_positions.update((i-1,j) for j in range(9))
+    candidates=[['平台','商品編號','搜尋詞','商品名稱','藝人','格式','規格品番','商品標價（未含進貨費用）','幣別','價格類型','庫存狀態','來源連結','擷取時間']]
+    with connect(settings.db_path) as c:
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_candidates'").fetchone():
+            for r in c.execute('SELECT * FROM platform_candidates ORDER BY id'):
+                candidates.append([r['platform'],r['external_id'],r['query'],r['title'],r['artist'],r['format'],r['catalog_no'],float(r['price']) if r['price'] else None,r['currency'],r['price_kind'],r['availability'],r['source_url'],r['captured_at']])
+    return {'PlatformCandidates':candidates,'Discogs':market,'Sources':sources,'Inputs':inputs,'Analysis':analysis},formula_positions
+
+def sync(settings,session=None):
+    with connect(settings.db_path) as c:
+        row=c.execute("SELECT value FROM meta WHERE key='google_sheet_id'").fetchone()
+    if not row:
+        raise ValueError('尚未選擇 Google Sheets 試算表')
+    if session is None:
+        if not configured():
+            raise ValueError('尚未設定 Google Sheets 帳號授權')
+        try:
+            from google.oauth2.service_account import Credentials
+            from google.auth.transport.requests import AuthorizedSession
+        except ImportError:
+            raise ValueError('尚未安裝 Google Sheets 連接套件') from None
+        creds=Credentials.from_service_account_file(os.environ['GOOGLE_SERVICE_ACCOUNT_FILE'],scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        session=AuthorizedSession(creds)
+    base='https://sheets.googleapis.com/v4/spreadsheets/'+row[0]
+    def request(method,url,**kwargs):
+        response=session.request(method,url,timeout=40,**kwargs)
+        if response.status_code>=400:
+            raise ValueError('Google Sheets 請求未完成，請確認試算表分享權限與 API 設定')
+        return response.json()
+    info=request('GET',base,params={'fields':'sheets(properties,developerMetadata)'})
+    existing={s['properties']['title']:s for s in info.get('sheets',[])}
+    tables,formulas=build_tables(settings)
+    requests=[]
+    ids=set(s['properties']['sheetId'] for s in existing.values())
+    for title,rows in tables.items():
+        name=PREFIX+title
+        existing_sheet=existing.get(name)
+        if existing_sheet:
+            if not any(m.get('metadataKey')=='simples_owner' and m.get('metadataValue')=='record_business_v1' for m in existing_sheet.get('developerMetadata',[])):
+                raise ValueError('同名工作表不是本系統建立，為避免覆寫已停止')
+            sid=existing_sheet['properties']['sheetId']
+            if title=='Inputs':
+                continue # User-owned assumptions and rates survive every subsequent sync.
+        else:
+            sid=max(ids or {0})+1;ids.add(sid)
+            requests.extend([{'addSheet':{'properties':{'sheetId':sid,'title':name}}},
+                {'createDeveloperMetadata':{'developerMetadata':{'metadataKey':'simples_owner','metadataValue':'record_business_v1','visibility':'DOCUMENT','location':{'sheetId':sid}}}}])
+        encoded=[{'values':[cell(v,title=='Analysis' and (i,j) in formulas) for j,v in enumerate(values)]} for i,values in enumerate(rows)]
+        requests.extend([
+            {'updateSheetProperties':{'properties':{'sheetId':sid,'gridProperties':{'rowCount':max(1000,len(rows)+10),'columnCount':max(26,len(rows[0])),'frozenRowCount':1}},'fields':'gridProperties'}},
+            {'updateCells':{'range':{'sheetId':sid},'rows':encoded,'fields':'userEnteredValue'}},
+            {'repeatCell':{'range':{'sheetId':sid,'startRowIndex':0,'endRowIndex':1},'cell':{'userEnteredFormat':{'backgroundColor':{'red':.14,'green':.31,'blue':.24},'textFormat':{'bold':True,'foregroundColor':{'red':1,'green':1,'blue':1}}}},'fields':'userEnteredFormat'}},
+            {'updateDimensionProperties':{'range':{'sheetId':sid,'dimension':'COLUMNS','startIndex':0,'endIndex':len(rows[0])},'properties':{'pixelSize':170},'fields':'pixelSize'}}])
+    request('POST',base+':batchUpdate',json={'requests':requests})
+    with connect(settings.db_path) as c:
+        c.execute("INSERT OR REPLACE INTO meta VALUES('last_sheet_sync',?)",(now(),))
+    return {'synced':True,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}

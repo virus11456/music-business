@@ -1,0 +1,2 @@
+# 第一版只用 Python 3.11+ 標準函式庫；不需安裝套件。
+# Dashboard 階段再加入 FastAPI / Jinja2 與鎖定版本。

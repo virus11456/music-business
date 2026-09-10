@@ -1,0 +1,17 @@
+# 驗證紀錄 · 2026-09-10
+
+- Python unittest：46 項通過，涵蓋行情、防洩漏、CSRF、跨來源拒絕、人工核對限制、Sheets 輸入保留、平台價格分類、格式篩選、重複更新與來源失敗隔離。
+- 前端 TypeScript 檢查通過，Vinext 正式建置通過。
+- HTTP 驗證：5173 首頁及代理 API 均 200；API 返回 141 筆真實候選。
+- Discogs PAT 真實讀取已成功，release 3910512 與其行情保存於正式庫。
+- 真實 Beatles 平台搜尋：Yahoo 台灣 40、日本 40、露天 40、Tower 21，四平台均成功。這些不等於套利推薦。
+- 公開 HTML／JSON 擷取，不使用登入 cookie。403／解析失敗不重試繞過。
+
+尚未驗證：Google 真實寫入和公式原生重算、前端瀏覽器互動、啟動器雙擊流程、其他平台、定時背景排程、AI、Discogs 真正刊登。建置只驗證可產生前端成品，不代表 VPS／Vercel 部署已完成。
+
+測試時有 HTTPError 測試物件清理的 ResourceWarning，不影響斷言結果；沒有真實 API 錯誤訊息或憑證輸出。
+
+
+## 最新更新：2026-09-10 Google 與 GitHub
+
+Google 服務帳戶已建立並保存於本機排除目錄，Sheets API 已啟用。真實同步及前端 API 同步均成功，回讀確認 141 筆平台商品與 1 筆行情。尚無核對後報價，因此分析公式仍待實際資料驗證。後續固定將程式碼、README、CHANGELOG 與 docs 同步到 https://github.com/virus11456/music-business 。

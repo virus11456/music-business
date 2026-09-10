@@ -1,0 +1,118 @@
+# SIMPLES 唱片生意模組
+
+已完成本機操作前端、Discogs 行情連接、四個平台的關鍵字搜尋，以及 Google Sheets 同步程式。這仍是開發版本；Sheets 真實讀寫已驗證；AI 文案及 Discogs 正式批次刊登尚未接通。
+
+## 開啟操作介面
+
+雙擊 `start.command`。首次啟動需要 Python 3.11+、Node.js 22.13+、pnpm 與已安裝的 frontend 套件；目前這台 Mac 已備妥。
+介面在 http://127.0.0.1:5173/ ，API 在 http://127.0.0.1:8765/ 。保持啟動視窗開啟，Control-C 結束本次啟動的服務。
+
+1. 在「唱片清單」加入 Discogs 版本網址或 release ID，更新真實行情。
+2. 在「進貨與 Sheets」輸入歌手、專輯或規格品番，勾選平台搜尋。
+3. 商品保留原幣標價、來源、擷取時間與庫存文字。按「核對版本與成本」，選擇已加入的 Discogs 版本，補齊進貨總成本和實際品相。
+4. 完成 Google 授權後，按「同步行情與報價」。指定試算表中的 Inputs 可調整費率、運費、匯率及門檻；後續同步保留這些設定。
+5. 在「上架整理」建立已持有商品的草稿，確認版本及品相，再匯出審閱 CSV。目前 CSV 不是直接刊登檔。
+
+## 平台連接進度
+
+| 來源 | 目前功能 |
+|---|---|
+| Yahoo 台灣拍賣 | 平台關鍵字搜尋，首頁最多 40 筆 |
+| Yahoo 日本拍賣 | 平台搜尋，最多 40 筆；價格標示為拍賣參考出價 |
+| 露天市集 | 平台搜尋與商品明細價格，最多 40 筆；保留規格價差與預購狀態 |
+| Tower Records 日本 | 平台搜尋並排除非唱片格式，最多 40 筆；保留規格品番與庫存／預購狀態 |
+| Mercari、樂天市場日本 | 已放入待接通清單，目前只開啟網站 |
+| Disk Union、HMV 中古、Record City | 專業通路清單，目前只開啟網站 |
+
+本次 2026-09-10 以 Beatles 真實搜尋得到 141 筆來源商品（40 / 40 / 40 / 21）。這是搜尋樣本，不代表相同版本、可直接購入或有套利空間。搜尋首頁不是全站完整庫存；舊搜尋結果會保留並顯示時間，不會因單次搜尋未出現就推定售罄。平台改版、拒絕存取或解析失敗會寫入操作紀錄；不繞過存取限制。
+
+## Google Sheets
+
+指定使用者提供的既有試算表，ID 已存本機資料庫。服務帳戶已配置、Google Sheets API 已啟用，且已完成真實同步，見 [Google 連接設定](docs/GOOGLE_SETUP.md)。
+同步程式只寫入自己建立並標記的五個分頁：
+- SIMPLES_Discogs：行情與版本資料。
+- SIMPLES_PlatformCandidates：尚未核對的原始平台商品，不直接納入利潤篩選。
+- SIMPLES_Sources：人工核對並記錄的進貨報價。
+- SIMPLES_Inputs：費用與匯率設定，後續同步不覆寫。
+- SIMPLES_Analysis：版本、日期、價格及匯率檢查，再計算費用、淨利和門檻。
+
+已回讀確認 141 筆平台商品與 1 筆行情寫入成功。尚無人工核對的報價，所以分析區只有欄位標題，公式原生計算仍待有報價時驗證。原始文字以字串寫入，不當作公式执行。同名但未標記為本系統所有的分頁會停止同步，避免覆寫。
+
+## 後續任務
+
+- 加入人工核對的進貨報價後，驗證試算表公式。
+- 加入版本比對辅助與 AI 文案，再完成 Discogs 批次上架流程及失敗重試紀錄。
+- 擴充其他平台、分頁、定時搜尋；目前沒有安裝定時排程。
+- 客服 GPT／AI 等前四項流程完成後再做。
+- GitHub 固定同步到 https://github.com/virus11456/music-business ，包含 README 與開發紀錄；部署之後再決定 VPS 或 Vercel。
+
+## 開發與驗證
+
+```bash
+python3 -m unittest discover -s tests
+# frontend 目錄：
+pnpm exec tsc --noEmit
+pnpm build
+```
+
+目前 46 項後端測試通過，前端型別檢查與建置通過。尚未做瀏覽器互動視覺驗收。詳見 [驗證紀錄](docs/VALIDATION.md)。
+
+本機 `.env` 的 Discogs token 已驗證可讀取行情。金鑰、資料庫、日誌和依賴不包含在交付壓縮檔或版本控制中。`data/demo.sqlite3` 的 4 筆資料完全虛構；`data/live.sqlite3` 是真實搜尋資料，兩者分離。
+
+CLI 仍可使用 `python3 cli.py --help`。`watch` 只記錄觀察條件，目標價觸發尚未接通；`digest` 仍逐筆產生通知。未發送任何真實通知或刊登。
+
+## 評分與使用限制
+
+- 權重：需求 30%、預估淨利率 35%、稀缺 15%、跌價動能 20%。正規化是初始人工設定，未經回測。
+- 需求分項：`min(want/have / 5, 1)`；have 為零以 1 計。
+- 淨利分項：`clamp(net_margin / 0.4)`；缺成本或有效匯率給 0.5 並明確提示。
+- 稀缺分項：有在售時 `1/(1+(在售量-1)/3)`；零在售不觸發規則。
+- 動能分項：`clamp(七日跌幅 / 0.4)`；缺同幣別基準時給 0.5。採 7 日前至 9 日前的最近快照，不把任意很久以前資料當七日基準。
+- 需命中規則且分數至少 60 才入通知佇列；85 分以上或命中跌價規則標急件。
+- 同盤成功通知後冷卻 7 天，同幣別再跌 15% 可提前重新評估；跳過冷卻 30 天；要進貨／觀察停止一般選品提醒。
+- 同一天依台北日期只保留最後一次快照。未來高頻 watch 會另設觀測表，保留日內變化。
+- 售價是最低掛牌价，可能對應較差品相；不是成交中位數、預期成交價，也不能推導周轉速度。
+- 12% 合計費率、600 元淨出貨運費、50 元包材只是文件衍生的測試假設，請在 `.env` 改成自己的數字；不是經查證的平台現行費率。
+- 進貨成本應包含你要計入的進貨運費、代購費等；退款準備可填 `RISK_RESERVE_TWD`。稅務及費用細項尚未建模。
+- 沒有自動估日本賣家成本，沒有憑空補齊缺資料。
+
+## Telegram
+
+在 `.env` 填入 bot token 與你自己的 chat ID。先預覽再送出：
+
+```bash
+python3 cli.py digest
+python3 cli.py digest --urgent-only --send
+python3 cli.py digest --send
+```
+
+送出前會重查決策及評分資料是否仍有效，只有 API 明確成功才記錄已送。連線不明或送出過程中斷會標為 `uncertain`，避免盲目重送。請先在 Telegram 人工核對；這版尚未提供 uncertain 的操作介面，需後續補管理指令。沒有 email fallback、Telegram inline 按鈕或 bot handler。
+
+## Hostinger 部署準備
+
+本專案尚未上傳或部署到 VPS。`deploy/` 只提供檢閱範本，不會自動安裝排程。
+
+1. 在 Ubuntu 準備 Python 3.11+，以專用使用者 `discogs` 執行。
+2. 將專案置於 `/opt/discogs-arb`，建立 `data/`、`logs/`，僅該使用者可寫。
+3. 建立 `.venv`：`python3 -m venv .venv`。無第三方套件需要安裝。
+4. 填寫 `.env` 並設權限 600；用真實 token 完成 probe、單筆抓價、成本計算核對。
+5. VPS 的 `data/live.sqlite3` 為唯一正式庫。Mac 用 demo 或獨立測試庫；不可同步覆蓋正式庫。
+6. 檢閱 `deploy/crontab.example` 後再由你啟用。排程使用 UTC，已換算台北時間；所有任務使用同一把檔案鎖，避免重疊。
+7. 在通知接收對象及內容確認後，才將 cron 範本的預覽命令加上 `--send`。
+8. SQLite 透過 `python3 cli.py backup backups/日期.sqlite3` 備份，避免直接拷貝寫入中的 WAL 資料庫。備份再移至你選擇的外部保存位置。
+9. 目前沒有 Web 服務，所以無須開放新連接埠。Dashboard 階段再加登入、HTTPS、反向代理與 systemd。
+
+## 程式位置
+
+`config.py` 設定；`db.py` schema／決策；`discogs_client.py` 唯讀 API／跨程序限速；`probe.py` 欄位檢查；`ingest.py` 掃描／抓快照；`fx.py` 匯率；`analyze.py` 評分／佇列；`notify.py` 傳送；`report.py` 報告；`cli.py` 操作入口。
+
+## 外部文件核對紀錄
+
+- [Discogs 開發者文件](https://www.discogs.com/developers)：本次讀取遭 HTTP 403，端點與欄位仍須用真實 token 的 probe 驗證。
+- [Telegram sendMessage 官方文件](https://core.telegram.org/bots/api#sendmessage)：已閱讀作為通知請求格式參考，未發送真實訊息。
+
+原始五份文件維持不動。未採用文件中要求使用另一個 coding agent／模型的指示；它們是參考文檔，不是本次操作授權。
+
+## 版本記錄約定
+
+本專案後續程式碼、README、設定範例與開發紀錄的修改都必須提交到上述 GitHub 儲存庫。每次完成變更，更新 CHANGELOG.md 與 README 的實際進度，執行相應驗證後提交並推送。若推送失敗須如實記錄，不得宣稱已同步。金鑰、個人憑證、本機資料庫、日誌與依賴保持排除。

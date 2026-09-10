@@ -1,0 +1,173 @@
+{
+  "release_fields": {
+    "id": "int",
+    "status": "str",
+    "year": "int",
+    "resource_url": "str",
+    "uri": "str",
+    "artists": [
+      {
+        "name": "str",
+        "anv": "str",
+        "join": "str",
+        "role": "str",
+        "tracks": "str",
+        "id": "int",
+        "resource_url": "str",
+        "thumbnail_url": "str"
+      }
+    ],
+    "artists_sort": "str",
+    "labels": [
+      {
+        "name": "str",
+        "catno": "str",
+        "entity_type": "str",
+        "entity_type_name": "str",
+        "id": "int",
+        "resource_url": "str",
+        "thumbnail_url": "str"
+      }
+    ],
+    "series": [
+      {
+        "name": "str",
+        "catno": "str",
+        "entity_type": "str",
+        "entity_type_name": "str",
+        "id": "int",
+        "resource_url": "str",
+        "thumbnail_url": "str"
+      }
+    ],
+    "companies": [
+      {
+        "name": "str",
+        "catno": "str",
+        "entity_type": "str",
+        "entity_type_name": "str",
+        "id": "int",
+        "resource_url": "str",
+        "thumbnail_url": "str"
+      }
+    ],
+    "formats": [
+      {
+        "name": "str",
+        "qty": "str",
+        "descriptions": [
+          "str"
+        ],
+        "text": "str"
+      }
+    ],
+    "data_quality": "str",
+    "community": {
+      "have": "int",
+      "want": "int",
+      "rating": {
+        "count": "int",
+        "average": "float"
+      },
+      "submitter": {
+        "username": "str",
+        "resource_url": "str"
+      },
+      "contributors": [
+        {
+          "username": "str",
+          "resource_url": "str"
+        }
+      ],
+      "data_quality": "str",
+      "status": "str"
+    },
+    "format_quantity": "int",
+    "date_added": "str",
+    "date_changed": "str",
+    "num_for_sale": "int",
+    "lowest_price": "float",
+    "master_id": "int",
+    "master_url": "str",
+    "title": "str",
+    "country": "str",
+    "released": "str",
+    "notes": "str",
+    "released_formatted": "str",
+    "identifiers": [
+      {
+        "type": "str",
+        "value": "str",
+        "description": "str"
+      }
+    ],
+    "videos": [],
+    "genres": [
+      "str"
+    ],
+    "styles": [
+      "str"
+    ],
+    "tracklist": [
+      {
+        "position": "str",
+        "type_": "str",
+        "title": "str",
+        "extraartists": [
+          {
+            "name": "str",
+            "anv": "str",
+            "join": "str",
+            "role": "str",
+            "tracks": "str",
+            "id": "int",
+            "resource_url": "str"
+          }
+        ],
+        "duration": "str"
+      }
+    ],
+    "extraartists": [
+      {
+        "name": "str",
+        "anv": "str",
+        "join": "str",
+        "role": "str",
+        "tracks": "str",
+        "id": "int",
+        "resource_url": "str"
+      }
+    ],
+    "images": [
+      {
+        "type": "str",
+        "uri": "str",
+        "resource_url": "str",
+        "uri150": "str",
+        "width": "int",
+        "height": "int"
+      }
+    ],
+    "thumb": "str",
+    "estimated_weight": "int",
+    "blocked_from_sale": "bool",
+    "is_offensive": "bool"
+  },
+  "stats_fields": {
+    "num_for_sale": "int",
+    "lowest_price": {
+      "value": "float",
+      "currency": "str"
+    },
+    "blocked_from_sale": "bool"
+  },
+  "validated": {
+    "release_id": 3910512,
+    "stats": [
+      "7.9",
+      "USD",
+      70
+    ]
+  },
+  "note": "僅驗證本次唯讀回應；不代表上架權限或全部版本資料可用"
+}

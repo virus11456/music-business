@@ -1,0 +1,3 @@
+# 選用：Google Sheets service-account connector；核心 CLI 不依賴這兩個套件。
+google-auth>=2.40,<3
+requests>=2.32,<3
