@@ -89,6 +89,24 @@ class DashboardTests(unittest.TestCase):
         with self.assertRaises(ValueError):sheet_sync.sync(self.settings,Session())
 
 
+    def test_exclude_restore_persists_and_blocks_export(self):
+        data={'release_id':900000001,'vendor':'TEST','source_url':'https://example.com/test-only','amount':'4500','currency':'USD','media_cond':'Very Good (VG)','sleeve_cond':'No Cover','version_confirmed':'yes','supply_confirmed':'yes','dispatch_days':'7','price':'80'}
+        with self.post('/api/offers',data):pass
+        with self.post('/api/drafts',data):pass
+        draft=self.app.state()['workflow']['drafts'][0]
+        change={'release_id':900000001,'source_url':data['source_url'],'excluded':True}
+        with self.post('/api/comparisons/exclude',change):pass
+        # Recreate application and refresh the offer: neither removes an exclusion.
+        self.assertTrue(Dashboard(self.settings).state()['workflow']['comparisons'][0]['excluded'])
+        with self.post('/api/offers',{**data,'offer_id':self.app.state()['workflow']['offers'][0]['id']}):pass
+        self.assertFalse(self.app.state()['workflow']['comparisons'][0]['ready'])
+        with self.assertRaises(HTTPError) as error:
+            urlopen(self.url+f"/api/drafts/quicklister?currency=USD&id={draft['id']}")
+        self.assertIn('已被排除',json.load(error.exception)['error']);error.exception.close()
+        with self.post('/api/comparisons/exclude',{**change,'excluded':False}):pass
+        self.assertFalse(self.app.state()['workflow']['comparisons'][0]['excluded'])
+        with urlopen(self.url+f"/api/drafts/quicklister?currency=USD&id={draft['id']}") as response:self.assertEqual(response.status,200)
+
     def test_supplier_offer_to_comparison_draft_and_quicklister(self):
         import csv,io
         data={'release_id':900000001,'vendor':'TEST SUPPLIER','source_url':'https://example.com/test-only','amount':'4500','currency':'JPY','media_cond':'Very Good (VG)','sleeve_cond':'Very Good Plus (VG+)','version_confirmed':'yes','supply_confirmed':'yes','dispatch_days':'7','sale_price':'80','sale_currency':'USD'}

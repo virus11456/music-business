@@ -11,6 +11,7 @@ from fx import convert
 
 GRADES=('Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)')
 SCHEMA='''
+CREATE TABLE IF NOT EXISTS excluded_matches (source_url TEXT NOT NULL, release_id INTEGER NOT NULL, recorded_at TEXT NOT NULL, PRIMARY KEY(source_url,release_id));
 CREATE TABLE IF NOT EXISTS sourcing_offers (
  id INTEGER PRIMARY KEY, release_id INTEGER NOT NULL REFERENCES releases,
  vendor TEXT NOT NULL, source_url TEXT NOT NULL, amount TEXT NOT NULL,
@@ -149,6 +150,7 @@ def review_csv(settings):
 def draft_export_issues(c,draft):
     """Recheck mutable source facts at download time, not only when drafting."""
     issues=[]
+    if c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone():issues.append('此貨源配對已被排除，請先核對或恢復配對')
     def stale(value):
         try:
             age=(datetime.now(timezone.utc)-datetime.fromisoformat(value)).total_seconds()

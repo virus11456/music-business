@@ -31,13 +31,24 @@ def build(settings):
      if not target:
       target={'title':r['title'].split(' - ',1)[-1],'format':r.get('format',''),'catno':r.get('catno','')}
      reasons=match_evidence(source,target)
-     if not reasons:continue
+     excluded=c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(source['source_url'],r['release_id'])).fetchone()
+     if not reasons and not excluded:continue
      r['evidence']=reasons
      if (source['source_url'],r['release_id']) in covered:continue
      o={'id':None,'release_id':r['release_id'],'title':r['title'],'artist':'','vendor':source['platform'],
         'source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,'sale_price':None,'sale_currency':None,
         'amount':None,'currency':source['currency'],'media_cond':'未確認','sleeve_cond':'未確認','recorded_at':source['captured_at']}
      row=calculate(c,settings,o,source,False);row['evidence']=r['evidence'];rows.append(row)
+  present={(r['source_url'],r['release_id']) for r in rows}
+  for excluded in c.execute('SELECT * FROM excluded_matches'):
+   if (excluded['source_url'],excluded['release_id']) in present:continue
+   source=candidates.get(excluded['source_url'])
+   if not source:continue
+   target=c.execute('SELECT * FROM releases WHERE release_id=?',(excluded['release_id'],)).fetchone()
+   o={'id':None,'release_id':excluded['release_id'],'title':target['title'] if target else f"Discogs #{excluded['release_id']}",'artist':'','vendor':source['platform'],
+      'source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,'sale_price':None,'sale_currency':None,
+      'amount':None,'currency':source['currency'],'media_cond':'未確認','sleeve_cond':'未確認','recorded_at':source['captured_at']}
+   rows.append(calculate(c,settings,o,source,False))
  return rows
 
 def calculate(c,s,o,source,confirmed_offer):
@@ -54,7 +65,9 @@ def calculate(c,s,o,source,confirmed_offer):
       'sale_basis':'人工預定售價' if o.get('sale_price') else 'Discogs 最低掛牌價（非成交價）',
       'sale_twd':None,'source_twd':None,'cost_twd':None,'spread_twd':None,'gross_twd':None,'gross_margin':None,
       'fees_twd':None,'net_twd':None,'net_margin':None,'ready':False,'issues':[]}
+ row['excluded']=bool(c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(o['source_url'],o['release_id'])).fetchone())
  issues=row['issues']
+ if row['excluded']:issues.append('已人工排除此配對')
  if row['format'] and row['source_format'] and row['format']!=row['source_format']:issues.append('來源與 Discogs 格式不一致')
  day=datetime.now(timezone.utc).date().isoformat()
  def twd(value,currency,label):
@@ -83,5 +96,5 @@ def calculate(c,s,o,source,confirmed_offer):
  if sale is None or sale<=0:issues.append('缺有效售價')
  if row['net_margin'] is not None and (Decimal(row['net_twd'])<=0 or row['net_margin']<s.min_margin):issues.append('未達淨利門檻')
  row['ready']=not issues and row['net_twd'] is not None
- row['status']='可建立上架草稿' if row['ready'] else '待補資料／確認' if issues else '待檢查'
+ row['status']='已人工排除' if row['excluded'] else '可建立上架草稿' if row['ready'] else '待補資料／確認' if issues else '待檢查'
  return row

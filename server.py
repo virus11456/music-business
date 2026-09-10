@@ -176,6 +176,13 @@ class Dashboard:
                     c.execute("INSERT OR REPLACE INTO meta VALUES('google_sheet_id',?)",(sid,))
                 elif path=='/api/offers':
                     workflow.save_offer(c,data,release_id,currency,required)
+                elif path=='/api/comparisons/exclude':
+                    rid=release_id(required(data,'release_id'));url=workflow.web_url(required(data,'source_url'))
+                    if not isinstance(data.get('excluded'),bool):raise ValueError('排除狀態無效')
+                    exists=c.execute('SELECT 1 FROM platform_candidates WHERE source_url=? UNION SELECT 1 FROM sourcing_offers WHERE source_url=?',(url,url)).fetchone()
+                    if not exists:raise ValueError('找不到貨源')
+                    if data['excluded']:c.execute('INSERT OR REPLACE INTO excluded_matches VALUES(?,?,?)',(url,rid,now()))
+                    else:c.execute('DELETE FROM excluded_matches WHERE source_url=? AND release_id=?',(url,rid))
                 elif path=='/api/drafts':
                     workflow.save_draft(c,data,release_id,currency,required)
                 elif path=='/api/decisions':
@@ -265,9 +272,11 @@ def handler(dashboard):
                 try:
                     query=parse_qs(urlsplit(self.path).query)
                     ids=[int(v) for v in query.get('id',[])]
-                    body=workflow.quicklister_csv(dashboard.settings,ids,currency(query.get('currency',[''])[0])).encode()
+                    seller_currency=currency(query.get('currency',[''])[0])
                 except (ValueError,TypeError):
                     return self.respond(400,{'error':'請選取草稿，且全部幣別須與你確認的 Discogs 賣家幣別一致'})
+                try:body=workflow.quicklister_csv(dashboard.settings,ids,seller_currency).encode()
+                except ValueError as error:return self.respond(400,{'error':str(error)})
                 self.send_response(200)
                 self.send_header('Content-Type','text/csv; charset=utf-8')
                 self.send_header('Content-Disposition','attachment; filename="discogs-quicklister.csv"')
