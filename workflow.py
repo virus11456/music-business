@@ -78,7 +78,9 @@ def get_workflow(settings):
                 except ValueError:
                     offer['status']='缺少有效匯率'
             offers.append(offer)
-        drafts=[dict(r) for r in c.execute('SELECT d.*,r.title,r.artist FROM listing_drafts d JOIN releases r USING(release_id) ORDER BY d.id DESC')]
+        drafts=[dict(r) for r in c.execute('SELECT d.*,r.title,r.artist,r.format FROM listing_drafts d JOIN releases r USING(release_id) ORDER BY d.id DESC')]
+        for draft in drafts:
+            draft['export_issues']=draft_export_issues(c,draft)
     return {'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
 
 def save_offer(c,data,parse_id,parse_currency,required):
@@ -115,11 +117,16 @@ def save_draft(c,data,parse_id,parse_currency,required):
     description=f'Media: {media}. Sleeve: {sleeve}.'+(f' {note}' if note else '')
     rid=parse_id(required(data,'release_id'))
     offer_id=int(data['source_offer_id']) if data.get('source_offer_id') else None
-    if offer_id:
+    if offer_id is not None:
         offer=c.execute('SELECT * FROM sourcing_offers WHERE id=?',(offer_id,)).fetchone()
         if not offer or offer['release_id']!=rid:raise ValueError('草稿與來源報價版本不一致')
+    draft_id=int(data['draft_id']) if data.get('draft_id') else None
+    if draft_id is not None:
+        previous=c.execute('SELECT * FROM listing_drafts WHERE id=?',(draft_id,)).fetchone()
+        if not previous:raise ValueError('草稿不存在')
+        if previous['source_offer_id']!=offer_id:raise ValueError('不能更換草稿的來源報價')
     values=(rid,media,sleeve,str(price),parse_currency(required(data,'currency')),note,description,int(data.get('owned_confirmed')=='yes'),now(),supply,days,web_url(data['source_url']) if data.get('source_url') else '',offer_id)
-    existing=c.execute('SELECT id FROM listing_drafts WHERE source_offer_id=?',(offer_id,)).fetchone() if offer_id else None
+    existing=c.execute('SELECT id FROM listing_drafts WHERE id=?',(draft_id,)).fetchone() if draft_id is not None else c.execute('SELECT id FROM listing_drafts WHERE source_offer_id=?',(offer_id,)).fetchone() if offer_id is not None else None
     if existing:
         c.execute('UPDATE listing_drafts SET release_id=?,media_cond=?,sleeve_cond=?,price=?,currency=?,note=?,description=?,owned_confirmed=?,created_at=?,supply_confirmed=?,dispatch_days=?,source_url=?,source_offer_id=? WHERE id=?',values+(existing['id'],))
     else:
@@ -139,6 +146,28 @@ def review_csv(settings):
             writer.writerow([r['id'],r['release_id'],r['media_cond'],r['sleeve_cond'],r['price'],r['currency'],text,'待確認照片及刊登權限'])
     return '\ufeff'+output.getvalue()
 
+def draft_export_issues(c,draft):
+    """Recheck mutable source facts at download time, not only when drafting."""
+    issues=[]
+    def stale(value):
+        try:
+            age=(datetime.now(timezone.utc)-datetime.fromisoformat(value)).total_seconds()
+            return age<0 or age>48*3600
+        except (ValueError,TypeError):return True
+    if stale(draft['created_at']):issues.append('草稿確認已超過 48 小時，請編輯並重新確認')
+    if not draft['version_confirmed']:issues.append('尚未確認版本')
+    if draft['media_cond'] not in GRADES or draft['sleeve_cond'] not in GRADES+('Generic','No Cover','Not Graded'):issues.append('尚未確認品相')
+    if not draft['owned_confirmed'] and not (draft['supply_confirmed'] and draft['source_url'] and draft['dispatch_days']):issues.append('尚未確認供貨與出貨時間')
+    if draft['source_offer_id'] is not None:
+        offer=c.execute('SELECT * FROM sourcing_offers WHERE id=?',(draft['source_offer_id'],)).fetchone()
+        if not offer:issues.append('來源報價不存在')
+        else:
+            if offer['release_id']!=draft['release_id'] or not offer['version_confirmed']:issues.append('來源版本需重新核對')
+            if stale(offer['recorded_at']):issues.append('來源報價已過期，請先更新報價')
+            if offer['recorded_at']>draft['created_at']:issues.append('來源報價已更新，請重新確認草稿')
+            if not draft['owned_confirmed'] and not offer['supply_confirmed']:issues.append('來源已取消供貨確認')
+    return issues
+
 def quicklister_csv(settings,ids,seller_currency):
     """Export selected drafts using the documented Quicklister schema, never publish."""
     if not ids or len(ids)>500 or len(ids)!=len(set(ids)):raise ValueError('請選擇 1 至 500 筆不同草稿')
@@ -148,6 +177,8 @@ def quicklister_csv(settings,ids,seller_currency):
         for draft_id in ids:
             r=c.execute('SELECT d.*,r.artist,r.title,r.catno,r.format,r.year FROM listing_drafts d JOIN releases r USING(release_id) WHERE d.id=?',(draft_id,)).fetchone()
             if not r:raise ValueError('草稿不存在')
+            issues=draft_export_issues(c,r)
+            if issues:raise ValueError(f"草稿 #{draft_id}："+'；'.join(issues))
             if r['currency']!=seller_currency:raise ValueError('選取商品幣別必須與 Discogs 賣家設定相同，請分批匯出')
             description=r['description']
             if r['dispatch_days']:description+=f" Dispatch within {r['dispatch_days']} days after payment."
