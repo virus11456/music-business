@@ -1,3 +1,4 @@
+from decimal import Decimal
 import tempfile,unittest
 from pathlib import Path
 from db import init,connect,now
@@ -37,3 +38,11 @@ class ComparisonTests(unittest.TestCase):
    workflow.save_draft(c,{**self.data,'price':'75'},release_id,currency,required)
    row=c.execute('SELECT * FROM listing_drafts').fetchone()
    self.assertEqual(row['owned_confirmed'],0);self.assertEqual(row['supply_confirmed'],1);self.assertEqual(row['dispatch_days'],7)
+
+ def test_usd_reference_and_missing_rate(self):
+  self.data.update(sale_price='640',sale_currency='TWD');self.save()
+  self.assertEqual(Decimal(comparisons.build(self.s)[0]['sale_usd']),Decimal('20'))
+  with connect(self.s.db_path) as c:c.execute("DELETE FROM fx_rates WHERE currency='USD'")
+  self.assertIsNone(comparisons.build(self.s)[0]['sale_usd'])
+  self.data.update(offer_id='1',sale_price='30',sale_currency='USD');self.save()
+  self.assertEqual(comparisons.build(self.s)[0]['sale_usd'],'30')

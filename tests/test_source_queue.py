@@ -54,3 +54,12 @@ class SourceQueueTests(unittest.TestCase):
    c.execute('INSERT INTO version_searches VALUES(?,?,?,?)',(1,'{}',json.dumps([{'release_id':900000001,'title':target['title']}]),now()))
    c.execute('DELETE FROM fx_rates')
   self.assertIsNone(comparisons.build(self.s)[0]['gross_twd'])
+
+ def test_pending_count_includes_changes_and_expired_results(self):
+  self.assertEqual(source_queue.pending_count(self.s),1)
+  self.cycle([])
+  self.assertEqual(source_queue.pending_count(self.s),0)
+  with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET price='300'")
+  self.assertEqual(source_queue.pending_count(self.s),0)
+  with connect(self.s.db_path) as c:c.execute("UPDATE source_checks SET retry_at='2000-01-01'")
+  self.assertEqual(source_queue.pending_count(self.s),1)

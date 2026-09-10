@@ -55,3 +55,23 @@ class PlatformTests(unittest.TestCase):
   with patch('platforms.time.sleep'):
    result=platforms.search(self.s,'Beatles',['ruten'],fetch)
   self.assertEqual(result['candidates'],1);self.assertEqual(len(calls),2)
+
+ def test_tower_page_url_and_product_pager(self):
+  self.assertTrue(platforms.search_url('tower','The Beatles',2).endswith('?page=2'))
+  modal='querySelector(".common-pagination-modal.artist-name"); const totalPages = Math.ceil(999 / 10)'
+  product='querySelector(".common-pagination"); const totalPages = Math.ceil(25 / 24)'
+  self.assertIsNone(platforms.tower_pages(modal))
+  self.assertEqual(platforms.tower_pages(modal+product),2)
+ def test_tower_non_music_page_keeps_pagination(self):
+  html='<div class="TOL-item-search-result-PC-result-list-display-item"><span class="result-display-contents-category-text">カレンダー</span></div><script>querySelector(".common-pagination"); const totalPages = Math.ceil(49 / 24)</script>'
+  report=platforms.search(self.s,'test',['tower'],lambda _:html,full_page=True)
+  self.assertEqual(report['candidates'],0)
+  self.assertTrue(report['platforms'][0]['has_more'])
+  with patch('platforms.time.sleep'):
+   report=platforms.search(self.s,'test',['tower'],lambda _:html,page=3,full_page=True)
+  self.assertFalse(report['platforms'][0]['has_more'])
+ def test_tower_zero_results_and_unknown_pager(self):
+  empty='<script>querySelector(".common-pagination"); const totalPages = Math.ceil(0 / 24)</script>'
+  self.assertEqual(platforms.parse_tower(empty),[])
+  report=platforms.search(self.s,'test',['tower'],lambda _:'検索結果 0',full_page=True)
+  self.assertEqual(report['failed_platforms'],1)

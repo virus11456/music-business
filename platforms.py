@@ -96,7 +96,7 @@ def parse_yahoo_jp(html):
 
 def parse_tower(html):
  root=Tree(html).root;cards=root.find('div','TOL-item-search-result-PC-result-list-display-item');out=[]
- if not cards and not any(t in html for t in ('該当する商品がありません','検索結果 0')):raise ValueError('搜尋頁結構改變')
+ if not cards and tower_pages(html)!=0 and not any(t in html for t in ('該当する商品がありません','検索結果 0')):raise ValueError('搜尋頁結構改變')
  for card in cards:
   formats=card.find('span','result-display-contents-category-text');fmt=formats[0].text().strip() if formats else ''
   if not re.search(r'CD|SACD|LP|7\"|12\"|10\"|カセット|Cassette|アナログ',fmt,re.I):continue
@@ -109,6 +109,14 @@ def parse_tower(html):
   cat=re.search(r'規格品番：\s*([^|]+)',text)
   out.append(candidate('tower',a.attrs['href'].rsplit('/',1)[-1],title_links[0].text().strip() if title_links else '',amounts[-1] if amounts else None,'listed',status,artists[0].text().strip() if artists else '',fmt,cat[1].strip() if cat else ''))
  return out
+
+def tower_pages(html):
+ # Read the product pager, not the separate artist-name modal's pager.
+ match=re.search(r'querySelector\([\"\']\.common-pagination[\"\']\);\s*const totalPages = Math\.ceil\((\d+)\s*/\s*(\d+)\)',html)
+ if not match:return None
+ total,size=map(int,match.groups())
+ if size<=0:raise ValueError('Tower 分頁資料無效')
+ return (total+size-1)//size
 
 def parse_ruten(raw):
  items=json.loads(raw)
@@ -129,7 +137,7 @@ def search_url(platform,query,page=1):
  if not isinstance(page,int) or not 1<=page<=1000:raise ValueError('搜尋頁數無效')
  return {'yahoo_tw':f'https://tw.bid.yahoo.com/search/auction/product?p={q}'+(f'&pg={page}' if page>1 else ''),
          'yahoo_jp':f'https://auctions.yahoo.co.jp/search/search?p={q}&ei=utf-8'+(f'&b={(page-1)*50+1}&n=50' if page>1 else ''),
-         'tower':f'https://tower.jp/search/item/{q}',
+         'tower':f'https://tower.jp/search/item/{q}'+(f'?page={page}' if page>1 else ''),
          'ruten':f'https://rtapi.ruten.com.tw/api/search/v4/index.php/core/prod?q={q}&type=direct&sort=rnk%2Fdc&limit=40&offset={(page-1)*40+1}'}[platform]
 
 def fetch(url):
@@ -162,6 +170,8 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
      raw=fetcher('https://rtapi.ruten.com.tw/api/prod/v3/index.php/prod?id='+','.join(ids))
     else:raw='[]'
    rows=PARSERS[platform](raw)[:50 if platform=='yahoo_jp' and (page>1 or full_page) else 40]
+   total_pages=tower_pages(raw) if platform=='tower' and full_page else None
+   if platform=='tower' and full_page and total_pages is None:raise ValueError('Tower 分頁結構改變，停止推進頁碼')
    stamp=now()
    with connect(settings.db_path) as c:
     for row in rows:
@@ -170,7 +180,9 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
      c.execute(f"INSERT INTO platform_candidates ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)}) ON CONFLICT(platform,external_id) DO UPDATE SET "+','.join(f'{k}=excluded.{k}' for k in cols if k not in ('platform','external_id')),list(row.values()))
     c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,len(rows),'完成' if rows else '沒有符合商品',stamp))
    total+=len(rows)
-   reports.append({'platform':platform,'count':len(rows),'status':'success' if rows else 'empty'})
+   report={'platform':platform,'count':len(rows),'status':'success' if rows else 'empty'}
+   if total_pages is not None:report.update(has_more=page<total_pages,total_pages=total_pages)
+   reports.append(report)
   except Exception as e:
    status=f'來源拒絕連線（HTTP {e.code}），請人工開啟平台' if isinstance(e,HTTPError) else '讀取失敗或頁面結構改變；請人工開啟平台'
    with connect(settings.db_path) as c:c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,0,status,now()))

@@ -23,6 +23,12 @@ def fingerprint(row):
     values=[row[k] for k in ('title','artist','format','catalog_no')]
     return hashlib.sha256(json.dumps(values,ensure_ascii=False).encode()).hexdigest()
 
+def pending_count(settings):
+    instant=now()
+    with connect(settings.db_path) as c:
+        rows=c.execute('SELECT p.title,p.artist,p.format,p.catalog_no,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
+        return sum(r['saved_fingerprint']!=fingerprint(r) or r['retry_at']<=instant for r in rows)
+
 def state(settings):
     with connect(settings.db_path) as c:
         statuses={r[0]:r[1] for r in c.execute('SELECT status,count(*) FROM source_checks GROUP BY status')}
@@ -44,7 +50,8 @@ def run(settings,query=None,selected=None,limit=20):
             report['candidates']+=batch['candidates'];report['failed_platforms']+=batch['failed_platforms']
             report['platforms'].extend([{**p,'page':page} for p in batch['platforms']])
             if not batch['failed_platforms']:
-                next_page=1 if not batch['candidates'] or platform=='tower' or page>=1000 else page+1
+                has_more=batch['platforms'][0].get('has_more',bool(batch['candidates']))
+                next_page=page+1 if has_more and page<1000 else 1
                 with connect(settings.db_path) as c:c.execute('INSERT OR REPLACE INTO source_pages VALUES(?,?,?)',(query,platform,next_page))
         result['collection']=report
         with connect(settings.db_path) as c:

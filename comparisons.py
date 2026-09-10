@@ -77,6 +77,13 @@ def calculate(c,s,o,source,confirmed_offer):
   except ValueError:
    issues.append(label+'缺有效匯率');return None
  sale=twd(o.get('sale_price') or (snapshot['lowest_price'] if snapshot else None),o.get('sale_currency') if o.get('sale_price') else snapshot['currency'] if snapshot else None,'售價')
+ sale_value=o.get('sale_price') or (snapshot['lowest_price'] if snapshot else None)
+ sale_currency=o.get('sale_currency') if o.get('sale_price') else snapshot['currency'] if snapshot else None
+ row['sale_usd']=None
+ if sale_value is not None and sale_currency=='USD':row['sale_usd']=str(Decimal(str(sale_value)))
+ elif sale is not None:
+  try:row['sale_usd']=str(sale/convert(c,1,'USD',day)[0])
+  except (ValueError,ArithmeticError):pass
  buy=twd(source['price'],source['currency'],'標價') if source else None
  cost=twd(o['amount'],o['currency'],'成本') if o['amount'] is not None else None
  row['cost_basis']='confirmed_total' if o['amount'] is not None else 'source_price'

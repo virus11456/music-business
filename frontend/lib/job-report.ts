@@ -11,6 +11,7 @@ export function jobReport(detail:string|null):string[]{
   for(const raw of list(s.platforms)){
    const p=obj(raw),name=names[String(p.platform)];if(!name)continue;
    const n=count(p.count);
+   if(count(p.page)!==null)lines.push(prefix+name+`：第 ${p.page} 頁${count(p.total_pages)!==null?`／共 ${p.total_pages} 頁`:''}`);
    lines.push(prefix+name+'：'+(p.status==='success'?`取得 ${n??'未知'} 件候選`:p.status==='empty'?'沒有搜尋結果（不代表平台沒有庫存）':'未完成，請至進貨頁檢查平台紀錄或人工查找'));
   }
   if(count(s.possible_matches)!==null)lines.push(prefix+`可能配對 ${s.possible_matches} 件，仍需核對版本`);
@@ -35,6 +36,7 @@ export function jobReport(detail:string|null):string[]{
   }
   if(obj(b.sheet_sync).synced===true)lines.push('Google Sheets 同步完成');
  }
+ if(data.collection_paused===true)lines.push(`先處理已存商品（待反查 ${count(data.pending_before)??'未知'} 件），本輪不新增收集`);
  if(count(data.versions)!==null)lines.push(`本次排程涵蓋 ${data.versions} 個版本`);
  if(Array.isArray(data.batches))for(const b of data.batches)batch(b);else batch(data);
  source(data);

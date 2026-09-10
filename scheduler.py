@@ -43,7 +43,11 @@ class Scheduler:
                 source_queue.init(self.app.settings)
                 with connect(self.app.settings.db_path) as c:
                     topic=c.execute('SELECT * FROM source_topics ORDER BY collected_at LIMIT 1').fetchone()
-                result=source_queue.run(self.app.settings,topic['query'] if topic else None,json.loads(topic['platforms']) if topic else None)
+                pending=source_queue.pending_count(self.app.settings)
+                collect=topic is not None and pending<=20
+                report['collection_paused']=bool(topic) and not collect
+                report['pending_before']=pending
+                result=source_queue.run(self.app.settings,topic['query'] if collect else None,json.loads(topic['platforms']) if collect else None)
                 report['batches'].append(result);report['failed']+=result['failed']
             except Exception:
                 with connect(self.app.settings.db_path) as c:c.execute('UPDATE meta SET value=? WHERE key=?',('failed',slot))
