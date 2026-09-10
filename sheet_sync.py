@@ -30,17 +30,17 @@ def build_tables(settings):
             indices[r['release_id']]=len(market)+1
             market.append([r['release_id'],r['artist'],r['title'],r['format'],float(r['lowest_price']) if r['lowest_price'] is not None else None,
                            r['currency'],r['num_for_sale'],r['captured_at'],f"https://www.discogs.com/release/{r['release_id']}"])
-        sources=[['offer_id','release_id','vendor','cost_total','currency','media_condition','sleeve_condition','version_confirmed','captured_at','source_url']]
+        sources=[['offer_id','release_id','vendor','cost_total','currency','media_condition','sleeve_condition','version_confirmed','captured_at','source_url','預定售價','售價幣別','持有商品','確認供貨','出貨天數']]
         offers=c.execute('SELECT * FROM sourcing_offers ORDER BY id').fetchall()
         for r in offers:
-            sources.append([r['id'],r['release_id'],r['vendor'],float(r['amount']),r['currency'],r['media_cond'],r['sleeve_cond'],bool(r['version_confirmed']),r['recorded_at'],r['source_url']])
+            sources.append([r['id'],r['release_id'],r['vendor'],float(r['amount']),r['currency'],r['media_cond'],r['sleeve_cond'],bool(r['version_confirmed']),r['recorded_at'],r['source_url'],float(r['sale_price']) if r['sale_price'] else None,r['sale_currency'],bool(r['owned_confirmed']),bool(r['supply_confirmed']),r['dispatch_days']])
         inputs=[['參數','數值','說明'],['合計費率',float(settings.fee_pct),'請按實際費用調整'],['淨出貨運費 TWD',float(settings.shipping),'賣家自行承擔部分'],
                 ['包材 TWD',float(settings.packing),'每件包材'],['風險準備 TWD',float(settings.reserve),'每件預留費用'],['最低淨利率',settings.min_margin,'初始篩選門檻'],
                 ['','', ''],['幣別','1 外幣 = TWD','匯率日期 YYYY-MM-DD']]
         for cc in ('TWD','USD','JPY','EUR','GBP'):
             fx=c.execute('SELECT * FROM fx_rates WHERE currency=? ORDER BY rate_date DESC LIMIT 1',(cc,)).fetchone()
             inputs.append([cc,1 if cc=='TWD' else float(fx['twd_per_unit']) if fx else None,now()[:10] if cc=='TWD' else fx['rate_date'] if fx else None])
-        analysis=[['offer_id','release_id','售價 TWD','進貨成本 TWD','費用 TWD','估算淨利 TWD','淨利率','資料檢查','候選結果']]
+        analysis=[['offer_id','release_id','售價 TWD','進貨成本 TWD','費用 TWD','估算淨利 TWD','淨利率','資料檢查','候選結果','毛利 TWD','毛利率','售價依據']]
         formula_positions=set()
         for i,r in enumerate(offers,2):
             mi=indices.get(r['release_id'])
@@ -52,21 +52,33 @@ def build_tables(settings):
                 table=f'{inp}$A$9:$C$13'
                 return f'IF(COUNTIF({inp}$A$9:$A$13,{cc})<>1,"缺匯率",IF(OR(VLOOKUP({cc},{table},2,FALSE)="",VLOOKUP({cc},{table},3,FALSE)=""),"缺匯率",IF(OR(TODAY()-DATEVALUE(VLOOKUP({cc},{table},3,FALSE))>7,TODAY()<DATEVALUE(VLOOKUP({cc},{table},3,FALSE))),"匯率日期無效",VLOOKUP({cc},{table},2,FALSE))))'
             sale=f'IF({m}E{mi}="","缺行情",IF(ISNUMBER({rate_formula(f"{m}F{mi}")}),{m}E{mi}*({rate_formula(f"{m}F{mi}")}),"缺有效匯率"))' if mi else '"缺行情"'
+            sale=f'IF({src}K{i}<>"",IF(ISNUMBER({rate_formula(f"{src}L{i}")}),{src}K{i}*({rate_formula(f"{src}L{i}")}),"缺有效匯率"),{sale})'
             cost=f'IF(ISNUMBER({rate_formula(f"{src}E{i}")}),{src}D{i}*({rate_formula(f"{src}E{i}")}),"缺有效匯率")'
             check=(f'IF({src}H{i}<>TRUE,"待核對版本",IF(OR(TODAY()-DATEVALUE(LEFT({src}I{i},10))>2,TODAY()-DATEVALUE(LEFT({m}H{mi},10))>2),"報價或行情過期",IF(AND(ISNUMBER(C{i}),ISNUMBER(D{i}),C{i}>0,{m}G{mi}>0),"資料齊全","缺有效價格／匯率")))' if mi else '"缺行情"')
             vals=[f'={src}A{i}',f'={src}B{i}','='+sale,'='+cost,
                   f'=IF(ISNUMBER(C{i}),C{i}*{inp}$B$2+SUM({inp}$B$3:$B$5),"待補資料")',
                   f'=IF(AND(ISNUMBER(C{i}),ISNUMBER(D{i}),ISNUMBER(E{i})),C{i}-D{i}-E{i},"待補資料")',
                   f'=IF(AND(ISNUMBER(F{i}),ISNUMBER(C{i}),C{i}>0),F{i}/C{i},"待補資料")','='+check,
-                  f'=IF(H{i}<>"資料齊全",H{i},IF(AND(F{i}>0,G{i}>={inp}$B$6),"候選：仍需核對品相與成交價","暫無空間"))']
+                  f'=IF(H{i}<>"資料齊全",H{i},IF(AND(F{i}>0,G{i}>={inp}$B$6),"候選：仍需核對品相與供貨","暫無空間"))',
+                  f'=IF(AND(ISNUMBER(C{i}),ISNUMBER(D{i})),C{i}-D{i},"待補資料")',
+                  f'=IF(AND(ISNUMBER(J{i}),ISNUMBER(C{i}),C{i}>0),J{i}/C{i},"待補資料")',
+                  f'=IF({src}K{i}<>"","人工預定售價","最低掛牌價（非成交價）")']
             analysis.append(vals)
-            formula_positions.update((i-1,j) for j in range(9))
+            formula_positions.update((i-1,j) for j in range(len(vals)))
     candidates=[['平台','商品編號','搜尋詞','商品名稱','藝人','格式','規格品番','商品標價（未含進貨費用）','幣別','價格類型','庫存狀態','來源連結','擷取時間']]
     with connect(settings.db_path) as c:
         if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_candidates'").fetchone():
             for r in c.execute('SELECT * FROM platform_candidates ORDER BY id'):
                 candidates.append([r['platform'],r['external_id'],r['query'],r['title'],r['artist'],r['format'],r['catalog_no'],float(r['price']) if r['price'] else None,r['currency'],r['price_kind'],r['availability'],r['source_url'],r['captured_at']])
-    return {'PlatformCandidates':candidates,'Discogs':market,'Sources':sources,'Inputs':inputs,'Analysis':analysis},formula_positions
+    import comparisons
+    comparison_rows=[['配對狀態','Discogs 版本','格式','商品','平台','貨源連結','來源標價','來源幣別','參考售價 TWD','總成本 TWD','價差 TWD','毛利 TWD','毛利率','淨利 TWD','淨利率','待確認事項','計算說明']]
+    with connect(settings.db_path) as c:
+        has_platforms=c.execute("SELECT 1 FROM sqlite_master WHERE name='platform_candidates'").fetchone()
+    if has_platforms:
+        for r in comparisons.build(settings):
+            def number(key):return float(r[key]) if r[key] is not None else None
+            comparison_rows.append([r['status'],r['release_id'],r['format'],r['source_title'],r['vendor'],r['source_url'],number('source_price'),r['source_currency'],number('sale_twd'),number('cost_twd'),number('spread_twd'),number('gross_twd'),r['gross_margin'],number('net_twd'),r['net_margin'],'；'.join(r['issues']),'本機計算快照；正式報價公式請看 Analysis，可在 Inputs 調整假設'])
+    return {'Comparisons':comparison_rows,'PlatformCandidates':candidates,'Discogs':market,'Sources':sources,'Inputs':inputs,'Analysis':analysis},formula_positions
 
 def sync(settings,session=None):
     with connect(settings.db_path) as c:

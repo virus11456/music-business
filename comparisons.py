@@ -69,7 +69,7 @@ def calculate(c,s,o,source,confirmed_offer):
  elif stale(snapshot['captured_at']):issues.append('行情超過兩天')
  if stale(o['recorded_at']):issues.append('報價超過兩天')
  if o['media_cond']=='未確認' or o['sleeve_cond']=='未確認':issues.append('待確認品相')
- if not o.get('owned_confirmed'):issues.append('尚未確認持有商品')
+ if not o.get('owned_confirmed') and not o.get('supply_confirmed'):issues.append('待確認可採購庫存與出貨時間')
  if source and not o.get('owned_confirmed'):
   if source['price_kind']=='current_bid':issues.append('拍賣價格尚未確定')
   if source['availability'] in ('現在オンラインショップ取扱なし','予約受付中','お取り寄せ','預購'):issues.append('貨源無現貨或待調貨')

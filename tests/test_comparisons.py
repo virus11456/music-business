@@ -16,7 +16,7 @@ class ComparisonTests(unittest.TestCase):
   self.save();r=comparisons.build(self.s)[0]
   self.assertEqual(r['sale_twd'],'2400.00');self.assertEqual(r['cost_twd'],'990.00');self.assertEqual(r['gross_twd'],'1410.00');self.assertEqual(r['fees_twd'],'938.00');self.assertEqual(r['net_twd'],'472.00');self.assertTrue(r['ready'])
  def test_unowned_cannot_be_ready(self):
-  self.data.pop('owned_confirmed');self.save();r=comparisons.build(self.s)[0];self.assertFalse(r['ready']);self.assertIn('尚未確認持有商品',r['issues'])
+  self.data.pop('owned_confirmed');self.save();r=comparisons.build(self.s)[0];self.assertFalse(r['ready']);self.assertIn('待確認可採購庫存與出貨時間',r['issues'])
  def test_missing_fx_no_fake_profit(self):
   self.save()
   with connect(self.s.db_path) as c:c.execute("DELETE FROM fx_rates WHERE currency='JPY'")
@@ -29,3 +29,11 @@ class ComparisonTests(unittest.TestCase):
   self.assertFalse(comparisons.build(self.s)[0]['ready'])
  def test_missing_sale_confirmation(self):
   self.data.pop('sale_price');self.save();r=comparisons.build(self.s)[0];self.assertEqual(r['net_twd'],'472.00');self.assertFalse(r['ready']);self.assertIn('待確認預定售價',r['issues'])
+
+ def test_confirmed_supplier_does_not_require_ownership(self):
+  self.data.pop('owned_confirmed');self.data.update(supply_confirmed='yes',dispatch_days='7');self.save()
+  self.assertTrue(comparisons.build(self.s)[0]['ready'])
+  with connect(self.s.db_path) as c:
+   workflow.save_draft(c,{**self.data,'price':'75'},release_id,currency,required)
+   row=c.execute('SELECT * FROM listing_drafts').fetchone()
+   self.assertEqual(row['owned_confirmed'],0);self.assertEqual(row['supply_confirmed'],1);self.assertEqual(row['dispatch_days'],7)

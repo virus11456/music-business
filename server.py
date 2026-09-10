@@ -6,9 +6,10 @@ import sqlite3
 import threading
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 
 import analyze
+import pipeline
 import ingest
 import workflow
 import sheet_sync
@@ -95,13 +96,19 @@ class Dashboard:
 
     def mutate(self,path,data):
         s=self.settings
-        if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find'):
+        if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find','/api/pipeline/run'):
             with connect(s.db_path) as c:
                 mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
             if mode and mode[0]=='demo':
                 raise ValueError('示範庫不能抓入真實資料')
             if not s.token:
                 raise ValueError('請先在本機 .env 設定 Discogs token')
+        if path=='/api/pipeline/run':
+            rid=release_id(required(data,'release_id'))
+            selected=data.get('platforms')
+            if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
+            query=required(data,'query',120) if data.get('query') else None
+            return self.start('完整更新與比價同步',lambda:pipeline.run(s,[rid],selected,query))
         if path=='/api/sourcing/find':
             rid=release_id(required(data,'release_id'))
             selected=data.get('platforms')
@@ -229,6 +236,18 @@ def handler(dashboard):
         def do_GET(self):
             if not self.local():
                 return self.respond(403,{'error':'僅允許本機連線'})
+            if urlsplit(self.path).path=='/api/drafts/quicklister':
+                try:
+                    query=parse_qs(urlsplit(self.path).query)
+                    ids=[int(v) for v in query.get('id',[])]
+                    body=workflow.quicklister_csv(dashboard.settings,ids,currency(query.get('currency',[''])[0])).encode()
+                except (ValueError,TypeError):
+                    return self.respond(400,{'error':'請選取草稿，且全部幣別須與你確認的 Discogs 賣家幣別一致'})
+                self.send_response(200)
+                self.send_header('Content-Type','text/csv; charset=utf-8')
+                self.send_header('Content-Disposition','attachment; filename="discogs-quicklister.csv"')
+                self.send_header('Content-Length',str(len(body)))
+                self.end_headers();self.wfile.write(body);return
             if self.path=='/api/drafts/export':
                 body=workflow.review_csv(dashboard.settings).encode()
                 self.send_response(200)

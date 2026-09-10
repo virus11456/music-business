@@ -88,4 +88,27 @@ class DashboardTests(unittest.TestCase):
             def request(self,*a,**k):return Response()
         with self.assertRaises(ValueError):sheet_sync.sync(self.settings,Session())
 
+
+    def test_supplier_offer_to_comparison_draft_and_quicklister(self):
+        import csv,io
+        data={'release_id':900000001,'vendor':'TEST SUPPLIER','source_url':'https://example.com/test-only','amount':'4500','currency':'JPY','media_cond':'Very Good (VG)','sleeve_cond':'Very Good Plus (VG+)','version_confirmed':'yes','supply_confirmed':'yes','dispatch_days':'7','sale_price':'80','sale_currency':'USD'}
+        with self.post('/api/offers',data):pass
+        comparison=self.app.state()['workflow']['comparisons'][0]
+        self.assertTrue(comparison['ready']);self.assertEqual(comparison['net_twd'],'612.80')
+        tables,formulas=sheet_sync.build_tables(self.settings)
+        self.assertEqual(len(tables['Sources'][0]),len(tables['Sources'][1]))
+        self.assertEqual(len(tables['Discogs'][0]),len(tables['Discogs'][1]))
+        self.assertEqual(tables['Sources'][1][10:15],[80.0,'USD',False,True,7])
+        self.assertIn((1,11),formulas)
+        with self.post('/api/drafts',{**data,'price':'80','currency':'USD'}):pass
+        draft=self.app.state()['workflow']['drafts'][0]
+        self.assertEqual(draft['owned_confirmed'],0)
+        with urlopen(self.url+f"/api/drafts/quicklister?currency=USD&id={draft['id']}") as response:
+            rows=list(csv.DictReader(io.StringIO(response.read().decode())))
+        self.assertEqual(len(rows),1);self.assertEqual(rows[0]['price'],'80')
+        self.assertIn('Dispatch within 7 days',rows[0]['comments'])
+        with self.assertRaises(HTTPError) as err:
+            urlopen(self.url+f"/api/drafts/quicklister?currency=JPY&id={draft['id']}")
+        self.assertEqual(err.exception.code,400);err.exception.close()
+
 if __name__=='__main__':unittest.main()
