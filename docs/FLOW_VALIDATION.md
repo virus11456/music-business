@@ -280,3 +280,8 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - #28–#31 消化剩下 63 件（20+20+20+3），均 success 並 synced=true。一次 /api/state 讀取回傳 HTTP 錯誤，客戶端停止續批；確認 #28 已完成後才接續，未重複執行該批。後續讀取正常，尚未確認該次讀取錯誤根因，不宣稱已修復。
 - 最終來源 459、unchecked=0、failed=0；歷史查詢 matched=23、unmatched=436。來源抓取 Yahoo TW 異常仍存在，不等同佇列成功就全平台正常。
 - 靜止回讀 API／Sheet 各 414 筆，來源價格、參考售價、價差、毛利、毛利率、Want 差異 0，格式衝突 0；VPS 三個每日時段排程 enabled=true。
+
+## 2026-09-11 台灣 Yahoo IPv6／IPv4 對照
+- VPS 相同公開搜尋網址、SimplesRecordResearch/0.1 User-Agent：IPv6 404／2067 bytes，IPv4 200／318083 bytes。Mac 同網址 HTTP 200 並解析 38 件。
+- yahoo_transport.py 僅為 Yahoo 的 HTTPSConnection 指定 AF_INET 解析，未改全域 socket、固定 IP 或關閉憑證／主機名驗證；其他 HTTPS 主機仍使用標準 HTTPSConnection。
+- 本機 23 項傳輸／平台／佇列測試通過；VPS 15 項既有回歸通過，備份 /opt/music-business-backups/yahoo-ipv4-20260911T044316。正式程式 fetch＋parser 實測第一頁 PRODUCTS 38／PRICED 38，第二頁 PRODUCTS 0。

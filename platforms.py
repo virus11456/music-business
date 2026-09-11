@@ -142,7 +142,11 @@ def search_url(platform,query,page=1):
 
 def fetch(url):
  req=Request(url,headers={'User-Agent':'SimplesRecordResearch/0.1','Accept':'text/html'})
- with urlopen(req,timeout=25) as response:
+ opener=urlopen
+ if urlsplit(url).hostname=='tw.bid.yahoo.com':
+  from yahoo_transport import open_yahoo
+  opener=open_yahoo
+ with opener(req,timeout=25) as response:
   if urlsplit(response.url).hostname!=urlsplit(url).hostname:raise ValueError('來源重新導向，請人工確認')
   raw=response.read(5_000_001)
   if len(raw)>5_000_000:raise ValueError('搜尋頁過大')
