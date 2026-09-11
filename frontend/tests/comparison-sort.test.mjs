@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -58,4 +58,20 @@ test('48-hour comparison requires both quoted prices and confirmed cost when use
  assert.ok(!hasFreshComparison({...row,source_at:old,cost_basis:'confirmed_total',cost_at:fresh},now));
  assert.ok(!hasFreshComparison({...row,cost_basis:'confirmed_total',cost_at:old},now));
  assert.ok(hasFreshComparison({...row,cost_basis:'confirmed_total',cost_at:fresh},now));
+});
+
+test('positive gross does not pass the after-cost profit filter when fees erase the profit',()=>{
+ const row={gross_twd:'800',net_twd:'-50'};
+ assert.equal(meetsProfit(row,'gross'),true);
+ assert.equal(meetsProfit(row,'net'),false);
+ assert.equal(meetsProfit(row,'all'),true);
+ assert.equal(meetsProfit({...row,net_twd:'0.01'},'net'),true);
+});
+test('profit filters reject break-even and missing or invalid values without mutating rows',()=>{
+ for(const filter of ['gross','net'])for(const value of ['0','-1',null,undefined,'',' ','NaN',Infinity]){
+  const row={gross_twd:value,net_twd:value};
+  assert.equal(meetsProfit(row,filter),false);
+  assert.equal(meetsProfit(row,'all'),true);
+  assert.equal(row.gross_twd,value);
+ }
 });

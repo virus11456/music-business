@@ -54,3 +54,9 @@ export function candidateProfit(row:Pick<Comparison,'gross_twd'|'gross_margin'>,
  const raw=sort==='margin'?row.gross_margin:row.gross_twd;
  return raw!=null&&String(raw).trim()!==''&&Number.isFinite(Number(raw))?Number(raw):-Infinity;
 }
+
+export function meetsProfit(row:Pick<Comparison,'gross_twd'|'net_twd'>,filter:string){
+ if(filter!=='gross'&&filter!=='net')return true;
+ const raw=filter==='net'?row.net_twd:row.gross_twd;
+ return raw!=null&&String(raw).trim()!==''&&Number.isFinite(Number(raw))&&Number(raw)>0;
+}
