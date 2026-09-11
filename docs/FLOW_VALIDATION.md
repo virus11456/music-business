@@ -329,3 +329,4 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 後端全套 141 項成功，含 test_full_workflow 三格式隔離 HTTP 到 Quicklister；未新增真實草稿／刊登。
 - 前端 23 項既有測試及新增 3 項成功（相關 7 項）；型別及建置成功，候選超出 200 件預覽時仍採正確來源幣別。
 - 正式 API／Sheet 2364 筆一致、格式衝突 0；ready/confirmed/offers/drafts 均 0，佇列 747 件 unchecked=0。見 FLOW_AUDIT.md。
+- 正式 Vercel HTTP 200；index-COawbeyC.js／index-C2kNFXHY.css 與已驗證本機建置 SHA-256 一致。
