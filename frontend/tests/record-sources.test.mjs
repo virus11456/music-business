@@ -75,3 +75,8 @@ test('missing and nonfinite margins remain behind losses without becoming zero',
  const html=renderToStaticMarkup(React.createElement(exports.default,{rows,sortBy:'margin'}));
  assert.ok(html.split('<details>')[0].includes('known loss'));
 });
+test('catalog inferred from title is labeled rather than presented as supplied metadata',()=>{
+ const html=render([{...row,source_catalog_no:'AP-8156',source_catalog_from_title:true}]);
+ assert.ok(html.includes('AP-8156'));assert.ok(html.includes('由標題辨識，待核對'));
+ assert.ok(!render([{...row,source_catalog_no:'AP-8156'}]).includes('由標題辨識'));
+});

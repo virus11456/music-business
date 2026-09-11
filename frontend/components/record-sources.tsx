@@ -18,7 +18,7 @@ function Source({row:r,locked,onAction}:{row:Comparison}&Actions){
    <div><b>{names[r.vendor]||r.vendor}</b> <span className="badge media-badge">{formats[r.source_format||'']||'類型待確認'}</span> <span className={'badge '+(sourceAvailability(r)==='stock'?'green':'amber')}>{supplyLabels[sourceAvailability(r)]}</span> <span className={'badge '+(r.listing_status==='listed'?'green':'')}>{r.listing_status==='listed'?'已上架':r.listing_status==='unlisted'?'未上架':'刊登狀態待確認'}</span></div>
    <p>{href?<a href={href} target="_blank" rel="noopener noreferrer">{r.source_title} ↗</a>:r.source_title}</p>
    <small>{matchLabel(r)} · {r.availability}</small>
-   <small>Label：{r.labels||'尚未取得'} · Discogs 編號：{r.catalog_no||'尚未取得'} · 貨源編號：{r.source_catalog_no||'尚未取得'}</small>
+   <small>Label：{r.labels||'尚未取得'} · Discogs 編號：{r.catalog_no||'尚未取得'} · 貨源編號：{r.source_catalog_no||'尚未取得'}{r.source_catalog_from_title?'（由標題辨識，待核對）':''}</small>
   </div>
   <div className="source-financials">
    <div><small>進貨標價</small><b>{r.source_price===null?'價格未取得':`${r.source_currency} ${money(r.source_price)}`}</b><small>{r.price_kind==='current_bid'?'拍賣參考出價':r.price_kind==='range'?'規格價格待確認':'未含運費'}</small><small className={sourceFreshness(quote)==='fresh'?'':'quote-warning'}>貨源 {sourceTimestamp(quote)} · {freshness(sourceFreshness(quote))}</small></div>

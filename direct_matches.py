@@ -1,13 +1,13 @@
 """Cached local cross-matching of already fetched sources and Discogs releases."""
 import hashlib,json,re
 from matching import normalized
-from source_match import evidence
+from source_match import evidence,source_catalog
 
 def pairs(c,sources,targets):
     source_rows=sorted(([s['id'],s['title'],s['artist'],s['format'],s['catalog_no']] for s in sources),key=lambda r:r[0])
     target_rows=sorted(([r['release_id'],r['title'],r['artist'],r['format'],r['catno'],r.get('labels','')] for r in targets),key=lambda r:r[0])
     signature=hashlib.sha256(json.dumps([source_rows,target_rows],ensure_ascii=False).encode()).hexdigest()
-    cached=c.execute("SELECT value FROM meta WHERE key='direct_matches_v2'").fetchone()
+    cached=c.execute("SELECT value FROM meta WHERE key='direct_matches_v3'").fetchone()
     if cached:
         try:
             data=json.loads(cached[0])
@@ -15,7 +15,7 @@ def pairs(c,sources,targets):
         except (ValueError,KeyError,TypeError):pass
     result=[]
     for source in sources:
-        catalog=normalized(source['catalog_no'])
+        catalog=normalized(source_catalog(source))
         known_catalog=catalog not in ('','none','na','未確認')
         text=normalized(source['artist']+' '+source['title'])
         for target in targets:
@@ -26,5 +26,5 @@ def pairs(c,sources,targets):
             if not catalog_match and (len(artist)<2 or artist not in text):continue
             reasons=evidence(source,target)
             if reasons:result.append([source['id'],target['release_id'],reasons+['已抓取資料直接交叉比對']])
-    c.execute("INSERT OR REPLACE INTO meta VALUES('direct_matches_v2',?)",(json.dumps({'signature':signature,'pairs':result},ensure_ascii=False),))
+    c.execute("INSERT OR REPLACE INTO meta VALUES('direct_matches_v3',?)",(json.dumps({'signature':signature,'pairs':result},ensure_ascii=False),))
     return result

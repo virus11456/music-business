@@ -1,5 +1,5 @@
 import unittest
-from source_match import evidence
+from source_match import evidence,source_catalog
 
 class SourceEvidenceTests(unittest.TestCase):
  def setUp(self):
@@ -35,3 +35,14 @@ class SourceEvidenceTests(unittest.TestCase):
   release={**self.release,'labels':'Parlophone'}
   self.assertTrue(any('Label' in x for x in evidence(source,release)))
   self.assertFalse(evidence({**source,'catalog_no':'OTHER123'},release))
+
+ def test_title_catalog_rejects_a_different_pressing(self):
+  source={**self.source,'title':'The Beatles Rubber Soul LP AP-8156'}
+  self.assertEqual(source_catalog(source),'AP-8156')
+  self.assertFalse(evidence(source,self.release))
+  self.assertTrue(evidence(source,{**self.release,'catno':'AP 8156'}))
+ def test_title_catalog_is_conservative_and_normalizes_fullwidth(self):
+  for title in ['Rubber Soul 2015 180g LP','Rubber Soul CD-123','Rubber Soul AP-8156 PCS-3075','Rubber Soul AP-8156-2','Rubber Soul XAP-8156B']:
+   self.assertEqual(source_catalog({**self.source,'title':title}),'')
+  self.assertEqual(source_catalog({**self.source,'title':'Rubber Soul ＡＰ－８１５６'}),'AP-8156')
+  self.assertEqual(source_catalog({**self.source,'title':'AP-8156','catalog_no':'PCS 3075'}),'PCS 3075')

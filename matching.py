@@ -30,12 +30,14 @@ def search(settings,candidate_id,query=None,client=None):
  with connect(settings.db_path) as c:
   row=c.execute('SELECT * FROM platform_candidates WHERE id=?',(candidate_id,)).fetchone()
  if not row:raise ValueError('找不到來源商品')
+ from source_match import source_catalog
+ catalog=source_catalog(row)
  params={'type':'release','per_page':10,'page':1}
  if query:
   if not isinstance(query,str) or not 1<=len(query.strip())<=160:raise ValueError('搜尋詞最多 160 字')
   params['q']=query.strip()
- elif row['catalog_no']:
-  params['catno']=row['catalog_no']
+ elif catalog:
+  params['catno']=catalog
   if row['artist']:params['artist']=row['artist']
  else:params['q']=search_title(row['title']) or row['title'][:160]
  # Share the strict title/metadata rule with comparison admission.
@@ -55,7 +57,7 @@ def search(settings,candidate_id,query=None,client=None):
   formats=r.get('format',[])
   if not isinstance(formats,list):formats=[]
   evidence=[]
-  if row['catalog_no'] and normalized(cat)==normalized(row['catalog_no']):evidence.append('規格品番一致，仍需核對壓片')
+  if catalog and normalized(cat)==normalized(catalog):evidence.append('規格品番一致，仍需核對壓片')
   if fmt and fmt in formats:evidence.append('格式一致')
   results.append({'release_id':rid,'title':str(r.get('title',''))[:500],'country':str(r.get('country','未提供')),
                   'year':str(r.get('year','未提供')),'format':', '.join(map(str,formats)),

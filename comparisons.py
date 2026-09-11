@@ -5,7 +5,7 @@ from decimal import Decimal
 from db import connect
 from fx import convert,business_day
 from matching import media
-from source_match import evidence as match_evidence,identified_format
+from source_match import evidence as match_evidence,identified_format,source_catalog
 
 def amount(v):return str(v.quantize(Decimal('.01'))) if v is not None else None
 def stale(stamp):
@@ -79,7 +79,7 @@ def calculate(c,s,o,source,confirmed_offer):
  row={'key':f"offer-{o['id']}" if confirmed_offer else f"candidate-{source['id']}-{o['release_id']}",'offer':o if confirmed_offer else None,
       'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
       'format':identified_format(release['format']) if release else None,'source_format':identified_format(source['format'],source['title']) if source else None,
-      'catalog_no':release['catno'] if release else '', 'source_catalog_no':source['catalog_no'] if source else '',
+      'catalog_no':release['catno'] if release else '', 'source_catalog_no':source_catalog(source) if source else '', 'source_catalog_from_title':bool(source and source_catalog(source) and source_catalog(source)!=str(source['catalog_no'] or '').strip()),
       'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
       'source_at':source['captured_at'] if source else None,'cost_at':o['recorded_at'],
       'source_price':source['price'] if source else None,'source_currency':source['currency'] if source else o['currency'],
