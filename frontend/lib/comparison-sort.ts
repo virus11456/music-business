@@ -45,3 +45,7 @@ export function hasDemandAndSource(row:Comparison){
  let validLink=false;try{validLink=['https:','http:'].includes(new URL(row.source_url).protocol)}catch{}
  return !!row.format&&row.format===row.source_format&&!row.excluded&&row.has_market&&positive(row.want)&&positive(row.market_price)&&positive(row.source_price)&&!!row.market_currency&&!!row.source_currency&&validLink;
 }
+
+export function hasFreshComparison(row:Comparison,now=Date.now()){
+ return marketFreshness(row,now)==='fresh'&&sourceFreshness({...row,cost_basis:'source_price'},now)==='fresh'&&sourceFreshness(row,now)==='fresh';
+}

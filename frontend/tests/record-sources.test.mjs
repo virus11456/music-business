@@ -9,7 +9,8 @@ const source=await readFile(new URL('../components/record-sources.tsx',import.me
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const supplySource=await readFile(new URL('../lib/source-availability.ts',import.meta.url),'utf8');
 const supply={};new Function('exports',ts.transpileModule(supplySource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(supply);
-const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:createRequire(import.meta.url)(id),exports);
+const prices={};new Function('exports',ts.transpileModule(await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(prices);
+const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:id==='@/lib/comparison-sort'?prices:createRequire(import.meta.url)(id),exports);
 const row={source_url:'https://www.ruten.com.tw/item/show?123',vendor:'ruten',source_title:'Album A',source_price:'350',source_currency:'TWD',price_kind:'listed',gross_twd:'120',availability:'來源標示有庫存'};
 const render=rows=>renderToStaticMarkup(React.createElement(exports.default,{rows}));
 test('record source cards show actual quote, destination and candidate status',()=>{
@@ -43,4 +44,11 @@ test('source action shows readiness and disables while locked or market missing'
 
 test('stock, auction and unavailable offers are visibly distinguished',()=>{
  for(const [extra,label] of [[{availability:'來源標示有庫存'},'來源標示現貨'],[{availability:'未確認'},'供貨待確認'],[{price_kind:'current_bid'},'拍賣未結標'],[{availability:'現在オンラインショップ取扱なし'},'缺貨／預購／待調貨']])assert.ok(render([{...row,...extra}]).includes(label));
+});
+
+test('quote dates keep source fetch separate from newer confirmed cost',()=>{
+ const now=new Date().toISOString();
+ const html=render([{...row,has_market:true,market_at:now,source_at:'2020-01-01T00:00:00Z',cost_at:now,cost_basis:'confirmed_total'}]);
+ assert.ok(html.includes('超過 48 小時'));assert.ok(html.includes('採已確認總成本'));assert.ok(html.includes('48 小時內'));
+ const missing=render([{...row,has_market:true,market_at:now}]);assert.ok(missing.includes('貨源 時間未取得'));
 });
