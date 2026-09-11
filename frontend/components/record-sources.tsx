@@ -10,6 +10,7 @@ type Actions={locked?:boolean;onAction?:(row:Comparison)=>void};
 function Source({row:r,locked,onAction}:{row:Comparison}&Actions){
  let href:string|undefined;try{const url=new URL(r.source_url);if(['https:','http:'].includes(url.protocol))href=url.href}catch{/* Invalid links stay plain text. */}
  const margin=r.gross_margin, known=margin!=null&&Number.isFinite(margin), loss=known&&margin<0;
+ const netKnown=r.net_twd!=null&&Number.isFinite(Number(r.net_twd)),netLoss=netKnown&&Number(r.net_twd)<0;
  const quote={...r,cost_basis:'source_price'};
  const freshness=(value:string)=>value==='fresh'?'48 小時內':value==='stale'?'超過 48 小時':'時間待確認';
  const width=known?Math.min(100,Math.abs(margin)*100)/2:0;
@@ -26,7 +27,7 @@ function Source({row:r,locked,onAction}:{row:Comparison}&Actions){
    <div className={loss?'profit negative':'profit positive'}><small>價差／毛利</small><b>{r.gross_twd==null?'尚無估算':`NT$ ${money(r.gross_twd)}`}</b><small>{r.cost_basis==='confirmed_total'?'售價 − 已確認總成本':'售價 − 貨源標價（同幣別）'}</small></div>
    <div className={loss?'profit negative':'profit positive'}><small>毛利率</small><b>{known?`${(margin*100).toFixed(1)}%`:'—'}</b><div className="profit-bar" role="img" aria-label={known?`預估毛利率 ${(margin*100).toFixed(1)}%，${loss?'虧損':'正毛利'}`:'毛利率尚未取得'}><i style={{left:`${loss?50-width:50}%`,width:`${width}%`}}/></div></div>
   </div>
-  <div className="source-card-footer"><small className="source-cost-note">{r.cost_basis==='confirmed_total'?`採已確認總成本（${sourceTimestamp(r)} · ${freshness(sourceFreshness(r))}）`:'尚未扣除進貨運費'}；毛利尚未扣除平台費等營運費用</small>{onAction&&<button type="button" className="btn secondary" disabled={locked||!r.has_market} onClick={()=>onAction(r)}>{r.ready?'建立草稿':'核對貨源'}</button>}</div>
+  <div className="source-card-footer"><div className="source-cost-summary"><small className={netLoss?'net-summary loss':'net-summary'}>{netKnown?`扣已設定費用後：NT$ ${money(r.net_twd)}${netLoss?' · 估算虧損':''}`:'扣費後金額待取得'}</small><small className="source-cost-note">{r.cost_basis==='confirmed_total'?`採已確認總成本（${sourceTimestamp(r)} · ${freshness(sourceFreshness(r))}）`:'尚未扣除進貨運費'}；毛利尚未扣除平台費等營運費用</small></div>{onAction&&<button type="button" className="btn secondary" disabled={locked||!r.has_market} onClick={()=>onAction(r)}>{r.ready?'建立草稿':'核對貨源'}</button>}</div>
  </div>;
 }
 export default function RecordSources({rows,locked,onAction}:{rows:Comparison[]}&Actions){

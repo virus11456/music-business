@@ -31,3 +31,5 @@
 .record-filter-controls{display:flex;flex-wrap:wrap;gap:12px;padding:0 24px 12px}.record-filter-controls .field{flex:1 1 180px;margin:6px 0}.record-filter-controls input,.record-filter-controls select{padding:9px}.source-identity>div:first-child{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 .record-filter-controls .freshness-toggle{flex:1 1 100%;font-size:12px;margin:0 0 4px}.source-financials .quote-warning{color:#94672d}
+
+.source-cost-summary{min-width:0}.source-cost-summary .net-summary{font-size:12px;font-weight:600;color:var(--ink)}.source-cost-summary .net-summary.loss{color:#a44339}

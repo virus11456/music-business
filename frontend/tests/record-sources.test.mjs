@@ -53,3 +53,10 @@ test('quote dates keep source fetch separate from newer confirmed cost',()=>{
  assert.ok(html.includes('超過 48 小時'));assert.ok(html.includes('採已確認總成本'));assert.ok(html.includes('48 小時內'));
  const missing=render([{...row,has_market:true,market_at:now}]);assert.ok(missing.includes('貨源 時間未取得'));
 });
+
+test('positive gross never hides a loss after configured costs',()=>{
+ const html=render([{...row,gross_twd:'1100.91',net_twd:'-979.22'}]);
+ assert.ok(html.includes('NT$ 1,100.91'));assert.ok(html.includes('扣已設定費用後：NT$ -979.22 · 估算虧損'));
+ assert.ok(render([{...row,net_twd:null}]).includes('扣費後金額待取得'));
+ assert.ok(!render([{...row,net_twd:null}]).includes('NT$ 0'));
+});
