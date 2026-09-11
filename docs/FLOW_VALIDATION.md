@@ -323,3 +323,4 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - Rubber Soul 收集 36 筆、去重新增 35 件：Yahoo TW page2=0、Yahoo JP page6=32、Ruten page6=0、Tower page5=4（has_more=false）。空結果與錯誤分開，failed_platforms=0。
 - checked=20+15、matched=3+0；兩批 success、sheet_sync.synced=true，無錯誤。累計來源 747、unchecked=0，歷史 matched=52、unmatched=695，無 failed。
 - API／Sheet 候選組合各 2364 筆；價格、價差、毛利、毛利率、Want 回讀差異 0，格式衝突 0。三時段 VPS 排程保持啟用，當前主題仍是 The Beatles Rubber Soul。
+- 合併決策頁正式部署已回讀：Vercel HTTP 200，index-CM0RcInE.js／index-Dff_GX6U.css 與本機建置 SHA-256 一致；未執行登入後瀏覽器視覺驗證。
