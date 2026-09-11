@@ -1,3 +1,4 @@
+import {matchLabel} from '@/lib/match-evidence';
 import {sourceAvailability,supplyLabels} from '@/lib/source-availability';
 import {marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp} from '@/lib/comparison-sort';
 import type {Comparison} from '@/components/comparison-table';
@@ -16,7 +17,7 @@ function Source({row:r,locked,onAction}:{row:Comparison}&Actions){
   <div className="source-identity">
    <div><b>{names[r.vendor]||r.vendor}</b> <span className="badge media-badge">{formats[r.source_format||'']||'類型待確認'}</span> <span className={'badge '+(sourceAvailability(r)==='stock'?'green':'amber')}>{supplyLabels[sourceAvailability(r)]}</span></div>
    <p>{href?<a href={href} target="_blank" rel="noopener noreferrer">{r.source_title} ↗</a>:r.source_title}</p>
-   <small>{r.version_confirmed?'已核對版本':'可能配對，版本待核對'} · {r.availability}</small>
+   <small>{matchLabel(r)} · {r.availability}</small>
    <small>Label：{r.labels||'尚未取得'} · Discogs 編號：{r.catalog_no||'尚未取得'} · 貨源編號：{r.source_catalog_no||'尚未取得'}</small>
   </div>
   <div className="source-financials">

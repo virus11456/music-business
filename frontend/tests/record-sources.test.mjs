@@ -10,7 +10,8 @@ const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.Common
 const supplySource=await readFile(new URL('../lib/source-availability.ts',import.meta.url),'utf8');
 const supply={};new Function('exports',ts.transpileModule(supplySource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(supply);
 const prices={};new Function('exports',ts.transpileModule(await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(prices);
-const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:id==='@/lib/comparison-sort'?prices:createRequire(import.meta.url)(id),exports);
+const evidence={};new Function('exports',ts.transpileModule(await readFile(new URL('../lib/match-evidence.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(evidence);
+const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:id==='@/lib/comparison-sort'?prices:id==='@/lib/match-evidence'?evidence:createRequire(import.meta.url)(id),exports);
 const row={source_url:'https://www.ruten.com.tw/item/show?123',vendor:'ruten',source_title:'Album A',source_price:'350',source_currency:'TWD',price_kind:'listed',gross_twd:'120',availability:'來源標示有庫存'};
 const render=rows=>renderToStaticMarkup(React.createElement(exports.default,{rows}));
 test('record source cards show actual quote, destination and candidate status',()=>{
