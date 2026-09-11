@@ -19,6 +19,13 @@ def media(value):
  if any(x in value for x in ['VINYL','LP','黑膠','アナログ']):return 'Vinyl'
  return None
 
+# Only remove explicit sales boilerplate; never guess translated album names.
+def search_title(value):
+ text=unicodedata.normalize('NFKC',str(value))
+ text=re.sub(r'[<【\[](?:快速出貨|實在賣場|現貨|免運|促銷)[>】\]]',' ',text)
+ text=re.sub(r'滿[額额][免冕]運|可?開發票|可?开发票|快速出貨|快速出货|官方正版|關芳正版',' ',text)
+ return re.sub(r'\s+',' ',text).strip()[:160]
+
 def search(settings,candidate_id,query=None,client=None):
  with connect(settings.db_path) as c:
   row=c.execute('SELECT * FROM platform_candidates WHERE id=?',(candidate_id,)).fetchone()
@@ -30,12 +37,15 @@ def search(settings,candidate_id,query=None,client=None):
  elif row['catalog_no']:
   params['catno']=row['catalog_no']
   if row['artist']:params['artist']=row['artist']
- else:params['q']=row['title'][:160]
+ else:params['q']=search_title(row['title']) or row['title'][:160]
  # Share the strict title/metadata rule with comparison admission.
- from source_match import identified_format
+ from source_match import identified_format,MERCH
  fmt=identified_format(row['format'],row['title'])
  if fmt:params['format']=fmt
- response=(client or DiscogsClient(settings)).get('/database/search',params)
+ if MERCH.search(row['title']):
+  params['skip_reason']='明確周邊商品，不查唱片版本'
+  response={'results':[]}
+ else:response=(client or DiscogsClient(settings)).get('/database/search',params)
  if not isinstance(response.get('results'),list):raise APIError('Discogs 搜尋結構不符')
  results=[]
  for r in response['results'][:10]:

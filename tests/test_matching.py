@@ -38,3 +38,24 @@ class MatchingTests(unittest.TestCase):
    with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET title=?,format='未確認' WHERE id=1",(title,))
    matching.search(self.s,1,client=Client())
    self.assertEqual(seen.get('format'),expected)
+
+ def test_merchandise_is_cached_without_api_call(self):
+  class Client:
+   def get(self,*args):raise AssertionError('Merchandise must not consume API quota')
+  with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET title='The Beatles T恤' WHERE id=1")
+  matching.search(self.s,1,client=Client())
+  saved=matching.state(self.s)['1']
+  self.assertEqual(saved['results'],[])
+  self.assertIn('skip_reason',saved['query'])
+ def test_sales_boilerplate_removed_but_identity_preserved(self):
+  title='<快速出貨>Rubber Soul PCS-3075 黑膠 LP 滿額免運 可開發票'
+  self.assertEqual(matching.search_title(title),'Rubber Soul PCS-3075 黑膠 LP')
+  for title in ['送料無料という曲','免運這張專輯','特典ポスター付き CD','The Beatles 1962-1966']:
+   self.assertEqual(matching.search_title(title),title)
+ def test_cleaned_title_used_only_without_catalog_or_manual_query(self):
+  seen={}
+  class Client:
+   def get(self,path,params):seen.clear();seen.update(params);return {'results':[]}
+  with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET catalog_no='',title='<快速出貨>Rubber Soul CD 可開發票' WHERE id=1")
+  matching.search(self.s,1,client=Client());self.assertEqual(seen['q'],'Rubber Soul CD')
+  matching.search(self.s,1,query='原樣手動搜尋 可開發票',client=Client());self.assertEqual(seen['q'],'原樣手動搜尋 可開發票')
