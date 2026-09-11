@@ -49,3 +49,8 @@ export function hasDemandAndSource(row:Comparison){
 export function hasFreshComparison(row:Comparison,now=Date.now()){
  return marketFreshness(row,now)==='fresh'&&sourceFreshness({...row,cost_basis:'source_price'},now)==='fresh'&&sourceFreshness(row,now)==='fresh';
 }
+
+export function candidateProfit(row:Pick<Comparison,'gross_twd'|'gross_margin'>,sort:'gross'|'margin'='gross'):number{
+ const raw=sort==='margin'?row.gross_margin:row.gross_twd;
+ return raw!=null&&String(raw).trim()!==''&&Number.isFinite(Number(raw))?Number(raw):-Infinity;
+}

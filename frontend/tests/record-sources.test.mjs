@@ -60,3 +60,18 @@ test('positive gross never hides a loss after configured costs',()=>{
  assert.ok(render([{...row,net_twd:null}]).includes('扣費後金額待取得'));
  assert.ok(!render([{...row,net_twd:null}]).includes('NT$ 0'));
 });
+
+test('margin sorting promotes the highest percentage, not the largest gross amount',()=>{
+ const rows=[{...row,source_title:'large amount',gross_twd:'500',gross_margin:0.1},{...row,source_url:'https://example.com/rate',source_title:'best percentage',gross_twd:'100',gross_margin:0.5}];
+ const html=renderToStaticMarkup(React.createElement(exports.default,{rows,sortBy:'margin'}));
+ const [visible,collapsed]=html.split('<details>');
+ assert.ok(visible.includes('best percentage'));assert.ok(!visible.includes('large amount'));assert.ok(collapsed.includes('large amount'));
+ assert.ok(visible.includes('預估毛利率由高到低'));
+ assert.ok(render(rows).split('<details>')[0].includes('large amount'));
+});
+test('missing and nonfinite margins remain behind losses without becoming zero',()=>{
+ for(const value of [null,undefined,NaN,Infinity,''])assert.equal(prices.candidateProfit({...row,gross_margin:value},'margin'),-Infinity);
+ const rows=[{...row,source_title:'unknown',gross_margin:null},{...row,source_url:'https://example.com/negative',source_title:'known loss',gross_margin:-0.3}];
+ const html=renderToStaticMarkup(React.createElement(exports.default,{rows,sortBy:'margin'}));
+ assert.ok(html.split('<details>')[0].includes('known loss'));
+});
