@@ -33,6 +33,8 @@ def build(settings):
      target=dict(target)
      label=c.execute('SELECT value FROM meta WHERE key=?',(f"release_labels_{r['release_id']}",)).fetchone()
      target['labels']=label[0] if label else r.get('labels','')
+     if not label and target['labels']:
+      c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(f"release_labels_{r['release_id']}",target['labels']))
      reasons=match_evidence(source,target)
      excluded=c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(source['source_url'],r['release_id'])).fetchone()
      if not reasons and not excluded:continue
