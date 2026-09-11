@@ -63,3 +63,12 @@ class SourceQueueTests(unittest.TestCase):
   self.assertEqual(source_queue.pending_count(self.s),0)
   with connect(self.s.db_path) as c:c.execute("UPDATE source_checks SET retry_at='2000-01-01'")
   self.assertEqual(source_queue.pending_count(self.s),1)
+
+ def test_cached_identity_still_refreshes_old_market_without_research(self):
+  self.cycle([])
+  with connect(self.s.db_path) as c:c.execute("UPDATE snapshots SET captured_at='2020-01-01T00:00:00+00:00'")
+  with patch('source_queue.matching.search') as search,patch('source_queue.ingest.fetch_one') as fetch,patch('source_queue.analyze.run'),patch('source_queue.sheet_sync.sync',return_value={'synced':True}),patch('fx.refresh_reference',return_value={'cached':True}):
+   report=source_queue.run(self.s)
+  search.assert_not_called();self.assertGreater(fetch.call_count,0)
+  self.assertEqual(report['market_updated'],fetch.call_count);self.assertEqual(report['cached'],1)
+  self.assertTrue(report['sheet_sync']['synced'])

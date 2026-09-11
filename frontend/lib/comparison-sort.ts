@@ -17,3 +17,14 @@ export function meetsMinimumUsd(row:Comparison,minimum:string){
  if(!Number.isFinite(threshold)||threshold<=0)return true;
  const price=referenceUsd(row);return price!==null&&price>=threshold;
 }
+
+export function marketFreshness(row:Comparison,now=Date.now()):'fresh'|'stale'|'unknown'{
+ if(!row.has_market||!row.market_at)return 'unknown';
+ const age=now-Date.parse(row.market_at);
+ if(!Number.isFinite(age)||age<0)return 'unknown';
+ return age<=48*60*60*1000?'fresh':'stale';
+}
+export function marketTimestamp(row:Comparison){
+ if(!row.market_at||!Number.isFinite(Date.parse(row.market_at)))return '時間未取得';
+ return new Date(row.market_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}

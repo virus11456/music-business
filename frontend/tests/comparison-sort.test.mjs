@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {sortComparisons,referenceUsd,meetsMinimumUsd}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -23,4 +23,13 @@ test('USD minimum is inclusive, excludes missing prices and respects sale curren
  assert.equal(referenceUsd({market_price:'3000',market_currency:'JPY'}),null);
  assert.equal(referenceUsd({offer:{sale_price:'10',sale_currency:'USD'},market_price:'50',market_currency:'USD'}),10);
  assert.equal(referenceUsd({offer:{sale_price:'3000',sale_currency:'JPY'},market_price:'50',market_currency:'USD'}),null);
+});
+
+test('market freshness handles boundary, missing, invalid and future timestamps',()=>{
+ const now=Date.parse('2026-09-11T10:00:00+08:00');
+ const row={has_market:true,market_at:new Date(now-48*3600000).toISOString()};
+ assert.equal(marketFreshness(row,now),'fresh');
+ assert.equal(marketFreshness({...row,market_at:new Date(now-48*3600000-1).toISOString()},now),'stale');
+ for(const market_at of [null,'','invalid',new Date(now+1).toISOString()])assert.equal(marketFreshness({...row,market_at},now),'unknown');
+ assert.equal(marketFreshness({...row,has_market:false},now),'unknown');
 });
