@@ -24,7 +24,10 @@ def build(settings):
    source=candidates.get(o['source_url']);covered.add((o['source_url'],o['release_id']))
    rows.append(calculate(c,settings,o,source,True))
   if c.execute("SELECT 1 FROM sqlite_master WHERE name='version_searches'").fetchone():
-   for search in c.execute('SELECT v.*,p.source_url FROM version_searches v JOIN platform_candidates p ON p.id=v.candidate_id'):
+   # Finish the read cursor before optional label/cache writes. In WAL mode,
+   # a concurrent commit would otherwise make this cursor's snapshot unwritable.
+   searches=c.execute('SELECT v.*,p.source_url FROM version_searches v JOIN platform_candidates p ON p.id=v.candidate_id').fetchall()
+   for search in searches:
     source=candidates[search['source_url']]
     for r in json.loads(search['results']):
      target=c.execute('SELECT * FROM releases WHERE release_id=?',(r['release_id'],)).fetchone()

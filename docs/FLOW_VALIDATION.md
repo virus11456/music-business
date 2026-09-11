@@ -358,3 +358,11 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 貨源卡片保留原四個價格欄位，底部新增「扣已設定費用後」；負數顯示估算虧損，缺值不冒充零。仍依既有費用假設，不代表所有實際費用已取得。
 - 8 項貨源卡片相關測試、型別與 Vercel 建置通過，含正毛利但扣費後為負數的案例。
 - 正式 Vercel HTTP 200；index-Cx4rDPr-.js／index-BFTwfQKH.css 與本機建置 SHA-256 一致，部署完成。
+
+### 2026-09-11 背景寫入與比較讀取衝突修正
+- 成功重現：讀取 version_searches 的游標尚未結束，另一連線提交資料後，讀取流程補寫 Label 快取會觸發 SQLite database is locked。
+- 比較流程先讀完搜尋列，再處理 Label／身份快取，避免帶著舊的讀取快照升級寫入；保留既有配對、價格與快取規則。
+- 新回歸測試修正前失敗、修正後成功；本機後端全套 142 項通過。正式 VPS 已套用，檔案 SHA-256 與本機一致，主機既有 7 項比較測試通過。
+- 正式 #50 更新與 Sheets 同步成功；連續 20 次 API 讀取均 HTTP 200，其中 2 次與背景工作重疊。
+- VPS 備份 /opt/music-business-backups/comparison-read-20260911T070409；comparisons.py SHA-256 d6c6b5dd0f4be41dfb9be458b0e4702de290a5b3139bea4c35ee0c37c16806e5。首次部署驗證引用主機不存在的 test_direct_matches，自動還原並重啟；改用主機現有 test_comparisons 後成功，未重啟整台 VPS。
+- 正式 #50 checked=0、pending=0、errors=[]、sheet_sync.synced=true、market_rows=86。本次為既有資料更新，不宣稱新增貨源。
