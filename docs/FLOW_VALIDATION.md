@@ -286,3 +286,9 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - yahoo_transport.py 僅為 Yahoo 的 HTTPSConnection 指定 AF_INET 解析，未改全域 socket、固定 IP 或關閉憑證／主機名驗證；其他 HTTPS 主機仍使用標準 HTTPSConnection。
 - 本機 23 項傳輸／平台／佇列測試通過；VPS 15 項既有回歸通過，備份 /opt/music-business-backups/yahoo-ipv4-20260911T044316。正式程式 fetch＋parser 實測第一頁 PRODUCTS 38／PRICED 38，第二頁 PRODUCTS 0。
 - 正式 #32 跨平台搜尋（本次只選 Yahoo TW）success、candidates=38、failed_platforms=0；platform_runs #74「完成」。商品皆為既有資料更新，因此 unchecked=0，未重置身份快取；API Yahoo 候選配對 110 筆。
+
+## 2026-09-11 使用者要求開始抓取比對
+- #34 依既有主題 The Beatles Rubber Soul 抓 Yahoo TW page1=38、Yahoo JP page3=50、Ruten page3=36、Tower page2=10；failed_platforms=0，全部來源成功。
+- #34–#38 checked=20+20+20+20+13，共 93 件新資料；matched=2+1+1+0+0。全數 success、sheet_sync.synced=true，最後 market_rows=50。
+- 累計來源 552，unchecked=0、failed=0；歷史查詢 matched=27、unmatched=525，不作當前完整版本確認數使用。
+- 完成後靜止回讀 API 與 SIMPLES_Comparisons 各 655 筆；來源價格、售價、價差、毛利、毛利率及 Want 差異 0，來源／Discogs 格式衝突 0。每日 VPS 排程保持 enabled=true。
