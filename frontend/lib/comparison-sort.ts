@@ -43,5 +43,5 @@ export function sourceTimestamp(row:Comparison){
 export function hasDemandAndSource(row:Comparison){
  const positive=(v:unknown)=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0;
  let validLink=false;try{validLink=['https:','http:'].includes(new URL(row.source_url).protocol)}catch{}
- return !row.excluded&&row.has_market&&positive(row.want)&&positive(row.market_price)&&positive(row.source_price)&&!!row.market_currency&&!!row.source_currency&&validLink;
+ return !!row.format&&row.format===row.source_format&&!row.excluded&&row.has_market&&positive(row.want)&&positive(row.market_price)&&positive(row.source_price)&&!!row.market_currency&&!!row.source_currency&&validLink;
 }

@@ -19,3 +19,19 @@ class SourceEvidenceTests(unittest.TestCase):
   self.assertTrue(evidence({**self.source,'title':'披頭四 橡皮靈魂','catalog_no':'PCS-3075'},self.release))
  def test_short_title_does_not_match_everything(self):
   self.assertFalse(evidence(self.source,{**self.release,'title':'1'}))
+ def test_unknown_metadata_uses_title_and_rejects_cross_format(self):
+  vinyl={**self.source,'format':'未確認','title':'披頭士黑膠唱片 TheBeatles RubberSoul LP'}
+  self.assertTrue(evidence(vinyl,self.release))
+  self.assertFalse(evidence(vinyl,{**self.release,'format':'CD'}))
+ def test_unknown_and_mixed_formats_are_not_admitted(self):
+  for title in ['Rubber Soul','Rubber Soul CD + LP','Rubber Soul 卡帶 CD']:
+   self.assertFalse(evidence({**self.source,'format':'未確認','title':title},self.release))
+ def test_cassette_only_pairs_with_cassette(self):
+  source={**self.source,'format':'未確認','title':'Rubber Soul 卡帶'}
+  self.assertTrue(evidence(source,{**self.release,'format':'Cassette'}))
+  self.assertFalse(evidence(source,{**self.release,'format':'CD'}))
+ def test_label_supports_but_never_overrides_wrong_catalog(self):
+  source={**self.source,'title':'Rubber Soul Parlophone LP','catalog_no':'PCS 3075'}
+  release={**self.release,'labels':'Parlophone'}
+  self.assertTrue(any('Label' in x for x in evidence(source,release)))
+  self.assertFalse(evidence({**source,'catalog_no':'OTHER123'},release))

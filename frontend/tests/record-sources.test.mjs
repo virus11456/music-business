@@ -19,3 +19,8 @@ test('excluded and duplicate sources do not inflate listings and invalid links c
  const invalid=render([{...row,source_url:'javascript:alert(1)'}]);assert.ok(!invalid.includes('href='));
  assert.ok(render([]).includes('尚未找到對應貨源'));
 });
+test('profit chart preserves signed percentage and separates sale price from spread',()=>{
+ const html=render([{...row,source_format:'CD',market_currency:'USD',market_price:'30',sale_twd:'900',spread_twd:'550',gross_margin:-1.25,gross_twd:'-1125'}]);
+ for(const value of ['價差','毛利率','-125.0%','NT$ -1,125','USD','CD','虧損','left:0%','width:50%'])assert.ok(html.includes(value),value);
+ const missing=render([{...row,gross_margin:null}]);assert.ok(missing.includes('毛利率尚未取得'));assert.ok(!missing.includes('NaN'));
+});

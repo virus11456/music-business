@@ -44,7 +44,7 @@ test('source freshness never borrows Discogs or unrelated source timestamps',()=
 });
 
 test('main list requires demand, both prices and a source link',()=>{
- const row={want:20,has_market:true,market_price:'30',market_currency:'USD',source_price:'500',source_currency:'TWD',source_url:'https://www.ruten.com.tw/item/show?123',gross_twd:'-5'};
+ const row={format:"CD",source_format:"CD",want:20,has_market:true,market_price:'30',market_currency:'USD',source_price:'500',source_currency:'TWD',source_url:'https://www.ruten.com.tw/item/show?123',gross_twd:'-5'};
  assert.equal(hasDemandAndSource(row),true);
  for(const change of [{want:0},{want:null},{has_market:false},{market_price:null},{source_price:null},{source_price:'NaN'},{excluded:true},{source_url:'javascript:alert(1)'}])assert.equal(hasDemandAndSource({...row,...change}),false);
 });

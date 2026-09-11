@@ -5,7 +5,7 @@ from decimal import Decimal
 from db import connect
 from fx import convert,business_day
 from matching import media
-from source_match import evidence as match_evidence
+from source_match import evidence as match_evidence,identified_format
 
 def amount(v):return str(v.quantize(Decimal('.01'))) if v is not None else None
 def stale(stamp):
@@ -30,6 +30,9 @@ def build(settings):
      target=c.execute('SELECT * FROM releases WHERE release_id=?',(r['release_id'],)).fetchone()
      if not target:
       target={'title':r['title'].split(' - ',1)[-1],'format':r.get('format',''),'catno':r.get('catno','')}
+     target=dict(target)
+     label=c.execute('SELECT value FROM meta WHERE key=?',(f"release_labels_{r['release_id']}",)).fetchone()
+     target['labels']=label[0] if label else r.get('labels','')
      reasons=match_evidence(source,target)
      excluded=c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(source['source_url'],r['release_id'])).fetchone()
      if not reasons and not excluded:continue
@@ -40,6 +43,20 @@ def build(settings):
         'amount':None,'currency':source['currency'],'media_cond':'未確認','sleeve_cond':'未確認','recorded_at':source['captured_at']}
      row=calculate(c,settings,o,source,False);row['evidence']=r['evidence'];rows.append(row)
   present={(r['source_url'],r['release_id']) for r in rows}
+  import direct_matches
+  targets={r['release_id']:dict(r) for r in c.execute('SELECT * FROM releases')}
+  for rid,target in targets.items():
+   label=c.execute('SELECT value FROM meta WHERE key=?',(f'release_labels_{rid}',)).fetchone()
+   target['labels']=label[0] if label else ''
+  sources_by_id={s['id']:s for s in candidates.values()}
+  for sid,rid,reasons in direct_matches.pairs(c,list(candidates.values()),list(targets.values())):
+   source=sources_by_id[sid];target=targets[rid]
+   if (source['source_url'],rid) in present:continue
+   o={'id':None,'release_id':rid,'title':target['title'],'artist':target['artist'],'vendor':source['platform'],
+      'source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,'sale_price':None,'sale_currency':None,
+      'amount':None,'currency':source['currency'],'media_cond':'未確認','sleeve_cond':'未確認','recorded_at':source['captured_at']}
+   row=calculate(c,settings,o,source,False);row['evidence']=reasons;rows.append(row)
+   present.add((source['source_url'],rid))
   for excluded in c.execute('SELECT * FROM excluded_matches'):
    if (excluded['source_url'],excluded['release_id']) in present:continue
    source=candidates.get(excluded['source_url'])
@@ -52,11 +69,12 @@ def build(settings):
  return rows
 
 def calculate(c,s,o,source,confirmed_offer):
- release=c.execute('SELECT format FROM releases WHERE release_id=?',(o['release_id'],)).fetchone()
+ release=c.execute('SELECT format,catno FROM releases WHERE release_id=?',(o['release_id'],)).fetchone()
  snapshot=c.execute('SELECT * FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 1',(o['release_id'],)).fetchone()
  row={'key':f"offer-{o['id']}" if confirmed_offer else f"candidate-{source['id']}-{o['release_id']}",'offer':o if confirmed_offer else None,
       'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
-      'format':media(release['format']) if release else None,'source_format':media(source['format']) if source else None,
+      'format':identified_format(release['format']) if release else None,'source_format':identified_format(source['format'],source['title']) if source else None,
+      'catalog_no':release['catno'] if release else '', 'source_catalog_no':source['catalog_no'] if source else '',
       'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
       'source_at':source['captured_at'] if source else None,'cost_at':o['recorded_at'],
       'source_price':source['price'] if source else None,'source_currency':source['currency'] if source else o['currency'],
@@ -67,6 +85,8 @@ def calculate(c,s,o,source,confirmed_offer):
       'sale_basis':'人工預定售價' if o.get('sale_price') else 'Discogs 最低掛牌價（非成交價）',
       'sale_twd':None,'source_twd':None,'cost_twd':None,'spread_twd':None,'gross_twd':None,'gross_margin':None,
       'fees_twd':None,'net_twd':None,'net_margin':None,'ready':False,'issues':[]}
+ label=c.execute('SELECT value FROM meta WHERE key=?',(f"release_labels_{o['release_id']}",)).fetchone()
+ row['labels']=label[0] if label else ''
  row['excluded']=bool(c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(o['source_url'],o['release_id'])).fetchone())
  issues=row['issues']
  if row['excluded']:issues.append('已人工排除此配對')
