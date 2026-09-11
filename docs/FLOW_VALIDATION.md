@@ -373,3 +373,9 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 狀態仍依後端既有人工登錄資料，並非新增 Discogs 自動查詢；未知的單筆貨源狀態不冒充未上架。
 - 10 項相關前端測試、型別檢查及 Vercel 建置通過；正式庫未新增或修改任何刊登。
 - 本輪 GitHub 推送失敗：執行環境回報 Could not resolve host: github.com；本機提交 44f30e7 已保留。尚未觸發或驗證 Vercel 部署，不能宣稱正式網站已有刊登狀態修正。
+
+### 2026-09-11 GitHub 同步與上架狀態部署恢復
+- Chrome 已登入並確認 GitHub 正常；本機命令列 DNS 失敗時，改用已連接的 GitHub 工具提交，不使用強制推送。
+- 遠端 aa6825e8fc31537fed483232fe67fe58f929810e 的完整 tree 與本機 1c8cb51 一致（cb19e88f6d59979f24694223fbab02fe882dcc6e），包含 8 個程式／測試／文件檔案。
+- Chrome 的 Vercel 部署頁確認 DDKyrgY8qvHgsMB9tFPL7oaLzb1a 為 Ready、Production Current，來源 aa6825e，網域 music-business.vercel.app；此前「尚未同步／部署」狀態已解除。
+- 本機與遠端提交歷史不同、內容相同；命令列網路恢復後先 fetch 並合併遠端歷史，再進行一般 push，不可 force push。
