@@ -10,3 +10,11 @@ test('listing aggregation uses recorded listings even when offer is excluded or 
  const ids=exports.listedReleaseIds([{release_id:1,listing_status:'listed',excluded:true,availability:'缺貨'},{release_id:1,listing_status:'unlisted'},{release_id:2,listing_status:'unlisted'},{release_id:3}]);
  assert.deepEqual([...ids],[1]);
 });
+
+test('unlisted filter excludes a release even if another supplier is unlisted',()=>{
+ const ids=exports.listedReleaseIds([{release_id:1,listing_status:'listed',excluded:true},{release_id:1,listing_status:'unlisted'},{release_id:2,listing_status:'unlisted'}]);
+ const releases=[1,2];
+ assert.deepEqual(releases.filter(id=>exports.matchesListingStatus(id,ids,'unlisted')),[2]);
+ assert.deepEqual(releases.filter(id=>exports.matchesListingStatus(id,ids,'listed')),[1]);
+ assert.deepEqual(releases.filter(id=>exports.matchesListingStatus(id,ids,'all')),[1,2]);
+});

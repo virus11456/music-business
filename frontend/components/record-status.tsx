@@ -6,3 +6,7 @@ const decisions:Record<string,string>={want:'要進貨',watch:'觀察中',skip:'
 export default function RecordStatus({listed,decision}:{listed:boolean;decision?:string}){
  return <span className="record-state"><span className={'badge '+(listed?'green':'')}>{listed?'已上架':'未上架'}</span>{decision&&decisions[decision]&&<small>{decisions[decision]}</small>}</span>;
 }
+
+export function matchesListingStatus(releaseId:number,listedIds:Set<number>,filter:string){
+ return filter==='listed'?listedIds.has(releaseId):filter==='unlisted'?!listedIds.has(releaseId):true;
+}
