@@ -60,3 +60,16 @@ export function meetsProfit(row:Pick<Comparison,'gross_twd'|'net_twd'>,filter:st
  const raw=filter==='net'?row.net_twd:row.gross_twd;
  return raw!=null&&String(raw).trim()!==''&&Number.isFinite(Number(raw))&&Number(raw)>0;
 }
+
+export function buildRecordIndex(rows:Comparison[],accept:(row:Comparison)=>boolean){
+ const index=new Map<number,{rows:Comparison[];bestGross:number;bestMargin:number}>();
+ for(const row of rows){
+  if(!hasDemandAndSource(row)||!accept(row))continue;
+  let entry=index.get(row.release_id);
+  if(!entry){entry={rows:[],bestGross:-Infinity,bestMargin:-Infinity};index.set(row.release_id,entry)}
+  entry.rows.push(row);
+  entry.bestGross=Math.max(entry.bestGross,candidateProfit(row));
+  entry.bestMargin=Math.max(entry.bestMargin,candidateProfit(row,'margin'));
+ }
+ return index;
+}

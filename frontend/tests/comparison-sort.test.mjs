@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -74,4 +74,20 @@ test('profit filters reject break-even and missing or invalid values without mut
   assert.equal(meetsProfit(row,'all'),true);
   assert.equal(row.gross_twd,value);
  }
+});
+
+test('record index shares one filtering pass and preserves release-specific matches and profit',()=>{
+ const base={format:'CD',source_format:'CD',has_market:true,want:20,market_price:'30',source_price:'10',market_currency:'USD',source_currency:'USD',source_url:'https://example.com/one',gross_twd:'100',gross_margin:0.3};
+ const items=Array.from({length:10000},(_,i)=>({...base,release_id:i%100,gross_twd:String(i),gross_margin:i/10000}));
+ let checks=0;
+ const index=buildRecordIndex(items,r=>{checks++;return r.release_id%2===0});
+ assert.equal(checks,10000);assert.equal(index.size,50);
+ for(let i=0;i<100;i++){
+  const expected=items.filter(r=>r.release_id===i&&r.release_id%2===0);
+  assert.deepEqual(index.get(i)?.rows||[],expected);
+  if(expected.length){assert.equal(index.get(i).bestGross,Math.max(...expected.map(r=>Number(r.gross_twd))));assert.equal(index.get(i).bestMargin,Math.max(...expected.map(r=>r.gross_margin)))}
+ }
+ assert.equal(checks,10000);assert.equal(items.length,10000);
+ const mixed=buildRecordIndex([{...base,release_id:1,gross_twd:null,gross_margin:null},{...base,release_id:1,gross_twd:'-10',gross_margin:-0.1},{...base,release_id:2,source_format:'Vinyl'},{...base,release_id:3,excluded:true}],()=>true);
+ assert.equal(mixed.size,1);assert.equal(mixed.get(1).bestGross,-10);assert.equal(mixed.get(1).bestMargin,-0.1);
 });

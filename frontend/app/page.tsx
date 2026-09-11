@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { ArrowUpRight, Check, ChevronRight, CircleAlert, Disc3, Inbox, LayoutDashboard, LoaderCircle, Plus, Radar, RefreshCw, Search, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {apiFetch,apiOrigin,setAccessCode,accessRevision,hosted} from '@/lib/api';
-import {meetsProfit,candidateProfit,hasDemandAndSource,meetsMinimumUsd,hasFreshComparison} from '@/lib/comparison-sort';
+import {buildRecordIndex,meetsProfit,meetsMinimumUsd,hasFreshComparison} from '@/lib/comparison-sort';
 import {hasStrongMatch} from '@/lib/match-evidence';
 import {meetsSupply} from '@/lib/source-availability';
 import {usePriceFilter} from '@/lib/use-price-filter';
@@ -47,10 +47,11 @@ export default function Home(){
  const {pricePreset,setPricePreset,customMinimum,setCustomMinimum,minimum}=usePriceFilter();
  const [listingFilter,setListingFilter]=useState('all'),[profitFilter,setProfitFilter]=useState('all');
  const [supplyFilter,setSupplyFilter]=useState('regular'),[freshOnly,setFreshOnly]=useState(false),[strongOnly,setStrongOnly]=useState(false);
- const matchedFor=(r:RecordRow)=>(state?.workflow.comparisons||[]).filter(c=>c.release_id===r.release_id&&hasDemandAndSource(c)&&meetsMinimumUsd(c,minimum)&&meetsSupply(c,supplyFilter)&&meetsProfit(c,profitFilter)&&(!freshOnly||hasFreshComparison(c))&&(!strongOnly||hasStrongMatch(c)));
+ const comparisonIndex=buildRecordIndex(state?.workflow.comparisons||[],c=>meetsMinimumUsd(c,minimum)&&meetsSupply(c,supplyFilter)&&meetsProfit(c,profitFilter)&&(!freshOnly||hasFreshComparison(c))&&(!strongOnly||hasStrongMatch(c)));
+ const matchedFor=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.rows||[];
  const listedIds=listedReleaseIds(state?.workflow.comparisons||[]);
- const bestGross=(r:RecordRow)=>Math.max(-Infinity,...matchedFor(r).map(c=>candidateProfit(c)));
- const bestMargin=(r:RecordRow)=>Math.max(-Infinity,...matchedFor(r).map(c=>candidateProfit(c,'margin')));
+ const bestGross=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.bestGross??-Infinity;
+ const bestMargin=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.bestMargin??-Infinity;
  const records=state?.records||[], pairedRecords=records.filter(r=>matchedFor(r).length>0&&matchesListingStatus(r.release_id,listedIds,listingFilter)), ranked=[...pairedRecords].sort((a,b)=>recordSort==='margin'?(bestMargin(b)-bestMargin(a)||a.release_id-b.release_id):recordSort==='gross'?bestGross(b)-bestGross(a):recordSort==='score'?(b.analysis?.score||0)-(a.analysis?.score||0):(b.snapshot?.want??-1)-(a.snapshot?.want??-1));
  const pending=ranked.filter(r=>r.analysis?.rules.length&&!r.decision), want=pairedRecords.filter(r=>r.decision?.decision==='want');
  const matching=ranked.filter(r=>(mediaFilter==='all'||matchedFor(r).some(c=>c.format===mediaFilter))&&(r.artist+' '+r.title+' '+r.release_id).toLowerCase().includes(query.toLowerCase())&&(filter==='all'||(filter==='priority'?!!r.analysis?.rules.length&&!r.decision:filter==='pending'?!r.decision:r.decision?.decision===filter)));
