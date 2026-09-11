@@ -268,3 +268,7 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 ## 2026-09-11 搜尋格式參數
 - 本機 23 項相關測試通過；新增測試確認未知規格標題中的 LP、SHM-CD、卡帶分別送 Vinyl／CD／Cassette，混合 CD+LP 不猜測。
 - VPS Web Console 回傳 SEARCH_FORMAT_OK，9 項既有伺服器測試通過。接續處理已保存的 256 件初始貨源，每次 20 件，失敗即停並保留工作進度。
+- 初始佇列正式工作 #14–#26：12 批各 20 次＋最後 17 次，共 257 次（256 件首次查詢、1 件舊失敗重試）。13 批 success，Sheets 每批 synced=true；第 5 批新增 1 件候選，最終 unchecked=0、failed=0、pending=0。
+- 最終 376 件來源的歷史查詢狀態 matched=22、unmatched=354；歷史 matched 不是當前有需求可上架數。當前嚴格配對 289 筆；同一貨源可有多個待核對版本。
+- 靜止狀態回讀 API 與 SIMPLES_Comparisons，各 289 筆。依 Discogs ID＋來源 URL 對照來源價格、售價 TWD、價差、毛利、毛利率、Want，差異 0；來源／目標格式衝突 0。
+- VPS 排程 enabled=true，最近 10:00 complete，下一次 16:00。這次初始佇列接續為一次性執行；沒有增加 Codex 或 Mac 的持續排程。
