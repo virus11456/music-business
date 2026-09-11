@@ -33,3 +33,5 @@
 .record-filter-controls .freshness-toggle{flex:1 1 100%;font-size:12px;margin:0 0 4px}.source-financials .quote-warning{color:#94672d}
 
 .source-cost-summary{min-width:0}.source-cost-summary .net-summary{font-size:12px;font-weight:600;color:var(--ink)}.source-cost-summary .net-summary.loss{color:#a44339}
+
+.record-state{display:flex;flex-direction:column;align-items:flex-start;gap:5px}.record-state>small{font-size:11px;line-height:1.5}.drawer>.record-state{margin:12px 0}

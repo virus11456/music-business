@@ -16,7 +16,7 @@ function Source({row:r,locked,onAction}:{row:Comparison}&Actions){
  const width=known?Math.min(100,Math.abs(margin)*100)/2:0;
  return <div className="record-source">
   <div className="source-identity">
-   <div><b>{names[r.vendor]||r.vendor}</b> <span className="badge media-badge">{formats[r.source_format||'']||'類型待確認'}</span> <span className={'badge '+(sourceAvailability(r)==='stock'?'green':'amber')}>{supplyLabels[sourceAvailability(r)]}</span></div>
+   <div><b>{names[r.vendor]||r.vendor}</b> <span className="badge media-badge">{formats[r.source_format||'']||'類型待確認'}</span> <span className={'badge '+(sourceAvailability(r)==='stock'?'green':'amber')}>{supplyLabels[sourceAvailability(r)]}</span> <span className={'badge '+(r.listing_status==='listed'?'green':'')}>{r.listing_status==='listed'?'已上架':r.listing_status==='unlisted'?'未上架':'刊登狀態待確認'}</span></div>
    <p>{href?<a href={href} target="_blank" rel="noopener noreferrer">{r.source_title} ↗</a>:r.source_title}</p>
    <small>{matchLabel(r)} · {r.availability}</small>
    <small>Label：{r.labels||'尚未取得'} · Discogs 編號：{r.catalog_no||'尚未取得'} · 貨源編號：{r.source_catalog_no||'尚未取得'}</small>

@@ -366,3 +366,10 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 正式 #50 更新與 Sheets 同步成功；連續 20 次 API 讀取均 HTTP 200，其中 2 次與背景工作重疊。
 - VPS 備份 /opt/music-business-backups/comparison-read-20260911T070409；comparisons.py SHA-256 d6c6b5dd0f4be41dfb9be458b0e4702de290a5b3139bea4c35ee0c37c16806e5。首次部署驗證引用主機不存在的 test_direct_matches，自動還原並重啟；改用主機現有 test_comparisons 後成功，未重啟整台 VPS。
 - 正式 #50 checked=0、pending=0、errors=[]、sheet_sync.synced=true、market_rows=86。本次為既有資料更新，不宣稱新增貨源。
+
+### 2026-09-11 刊登狀態與決策分開
+- 主清單及詳情固定顯示「已上架／未上架」，要進貨、觀察、跳過另行顯示，不再覆蓋刊登狀態。
+- 專輯是否已有刊登採全部已登錄配對，避免已刊登貨源被售價、供貨或時效篩選隱藏後誤顯示未上架；每筆貨源另列自己的刊登狀態。
+- 狀態仍依後端既有人工登錄資料，並非新增 Discogs 自動查詢；未知的單筆貨源狀態不冒充未上架。
+- 10 項相關前端測試、型別檢查及 Vercel 建置通過；正式庫未新增或修改任何刊登。
+- 本輪 GitHub 推送失敗：執行環境回報 Could not resolve host: github.com；本機提交 44f30e7 已保留。尚未觸發或驗證 Vercel 部署，不能宣稱正式網站已有刊登狀態修正。
