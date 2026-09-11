@@ -31,7 +31,9 @@ def search(settings,candidate_id,query=None,client=None):
   params['catno']=row['catalog_no']
   if row['artist']:params['artist']=row['artist']
  else:params['q']=row['title'][:160]
- fmt=media(row['format'])
+ # Share the strict title/metadata rule with comparison admission.
+ from source_match import identified_format
+ fmt=identified_format(row['format'],row['title'])
  if fmt:params['format']=fmt
  response=(client or DiscogsClient(settings)).get('/database/search',params)
  if not isinstance(response.get('results'),list):raise APIError('Discogs 搜尋結構不符')

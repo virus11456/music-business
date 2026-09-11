@@ -29,3 +29,12 @@ class MatchingTests(unittest.TestCase):
   with self.assertRaises(ValueError):matching.search(self.s,999)
  def test_media_unknown_not_guessed(self):
   self.assertIsNone(matching.media('未確認'));self.assertEqual(matching.media('LP'),'Vinyl')
+
+ def test_title_format_limits_api_search_without_guessing_mixed_sets(self):
+  seen={}
+  class Client:
+   def get(self,path,params):seen.clear();seen.update(params);return {'results':[]}
+  for title,expected in [('Rubber Soul 黑膠 LP','Vinyl'),('Rubber Soul 卡帶','Cassette'),('Rubber Soul SHM-CD','CD'),('Rubber Soul CD + LP',None)]:
+   with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET title=?,format='未確認' WHERE id=1",(title,))
+   matching.search(self.s,1,client=Client())
+   self.assertEqual(seen.get('format'),expected)
