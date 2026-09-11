@@ -313,3 +313,13 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 桌面採商品資訊與四個價格欄位並排，縮小留白；窄容器改為上下排列、手機價格兩欄，保留 Label、編號及成本說明。
 - 前端型別檢查、Vercel 建置及 4 項來源卡片測試通過；含僅最高毛利在折疊區外、全負毛利排序、未知毛利置後與百分比獨立欄。正式資產回讀待部署完成後記錄。
 - 正式 Vercel 回讀 HTTP 200，index-CyVbnakM.js 與 index-yGvtprwm.css 均與本機成功建置內容 SHA-256 一致；正式資產更新已確認。未執行登入後瀏覽器視覺驗證。
+
+### 2026-09-11 合併決策與唱片清單
+- 移除獨立「決策收件匣」頁面與導覽，改在唱片清單使用「優先評估」篩選（命中至少一项選品規則且尚未決策）；保留全部、未決策、要進貨、觀察、已跳過。
+- 總覽「優先評估」直接開啟對應清單並清除搜尋、類型篩選，顯示數量與入口一致。既有決策資料及商品詳情操作保留，未新增額外流程。
+- 前端型別檢查與正式建置通過；這次未更改後端資料結構。
+
+## 2026-09-11 資料批次 #48–#49
+- Rubber Soul 收集 36 筆、去重新增 35 件：Yahoo TW page2=0、Yahoo JP page6=32、Ruten page6=0、Tower page5=4（has_more=false）。空結果與錯誤分開，failed_platforms=0。
+- checked=20+15、matched=3+0；兩批 success、sheet_sync.synced=true，無錯誤。累計來源 747、unchecked=0，歷史 matched=52、unmatched=695，無 failed。
+- API／Sheet 候選組合各 2364 筆；價格、價差、毛利、毛利率、Want 回讀差異 0，格式衝突 0。三時段 VPS 排程保持啟用，當前主題仍是 The Beatles Rubber Soul。
