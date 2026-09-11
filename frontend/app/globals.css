@@ -27,3 +27,5 @@
 .list-tools .tabs{flex-wrap:wrap}
 
 .source-card-footer{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:6px}.source-card-footer .source-cost-note{border:0;padding:0}.source-card-footer .btn{height:30px!important;padding:0 10px!important;flex-shrink:0}
+
+.record-filter-controls{display:flex;flex-wrap:wrap;gap:12px;padding:0 24px 12px}.record-filter-controls .field{flex:1 1 180px;margin:6px 0}.record-filter-controls input,.record-filter-controls select{padding:9px}.source-identity>div:first-child{display:flex;align-items:center;gap:6px;flex-wrap:wrap}

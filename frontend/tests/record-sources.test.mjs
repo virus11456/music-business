@@ -7,7 +7,9 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 const source=await readFile(new URL('../components/record-sources.tsx',import.meta.url),'utf8');
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const exports={};new Function('require','exports',js)(createRequire(import.meta.url),exports);
+const supplySource=await readFile(new URL('../lib/source-availability.ts',import.meta.url),'utf8');
+const supply={};new Function('exports',ts.transpileModule(supplySource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(supply);
+const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:createRequire(import.meta.url)(id),exports);
 const row={source_url:'https://www.ruten.com.tw/item/show?123',vendor:'ruten',source_title:'Album A',source_price:'350',source_currency:'TWD',price_kind:'listed',gross_twd:'120',availability:'來源標示有庫存'};
 const render=rows=>renderToStaticMarkup(React.createElement(exports.default,{rows}));
 test('record source cards show actual quote, destination and candidate status',()=>{
@@ -37,4 +39,8 @@ test('source action shows readiness and disables while locked or market missing'
  assert.ok(action({has_market:true,ready:true}).includes('建立草稿'));
  assert.ok(action({has_market:true,ready:true},true).includes('disabled=""'));
  assert.ok(action({has_market:false}).includes('disabled=""'));
+});
+
+test('stock, auction and unavailable offers are visibly distinguished',()=>{
+ for(const [extra,label] of [[{availability:'來源標示有庫存'},'來源標示現貨'],[{availability:'未確認'},'供貨待確認'],[{price_kind:'current_bid'},'拍賣未結標'],[{availability:'現在オンラインショップ取扱なし'},'缺貨／預購／待調貨']])assert.ok(render([{...row,...extra}]).includes(label));
 });
