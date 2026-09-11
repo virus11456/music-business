@@ -126,6 +126,7 @@ def save_draft(c,data,parse_id,parse_currency,required):
     if offer_id is not None:
         offer=c.execute('SELECT * FROM sourcing_offers WHERE id=?',(offer_id,)).fetchone()
         if not offer or offer['release_id']!=rid:raise ValueError('草稿與來源報價版本不一致')
+        if web_url(str(data.get('source_url','')))!=offer['source_url']:raise ValueError('草稿與來源報價連結不一致，請重新選取目前貨源')
     draft_id=int(data['draft_id']) if data.get('draft_id') else None
     if draft_id is not None:
         previous=c.execute('SELECT * FROM listing_drafts WHERE id=?',(draft_id,)).fetchone()
@@ -171,6 +172,7 @@ def draft_export_issues(c,draft):
         if not offer:issues.append('來源報價不存在')
         else:
             if offer['release_id']!=draft['release_id'] or not offer['version_confirmed']:issues.append('來源版本需重新核對')
+            if offer['source_url']!=draft['source_url']:issues.append('來源報價連結已變更，請重新確認草稿貨源')
             if stale(offer['recorded_at']):issues.append('來源報價已過期，請先更新報價')
             if offer['recorded_at']>draft['created_at']:issues.append('來源報價已更新，請重新確認草稿')
             if not draft['owned_confirmed'] and not offer['supply_confirmed']:issues.append('來源已取消供貨確認')

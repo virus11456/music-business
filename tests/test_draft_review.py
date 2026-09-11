@@ -42,3 +42,23 @@ class DraftReviewTests(unittest.TestCase):
   older=(datetime.now(timezone.utc)-timedelta(hours=1)).isoformat()
   with connect(self.s.db_path) as c:c.execute('UPDATE listing_drafts SET created_at=?',(older,))
   with self.assertRaisesRegex(ValueError,'報價已更新'):self.export()
+
+ def test_different_source_url_cannot_be_saved(self):
+  with connect(self.s.db_path) as c:
+   with self.assertRaisesRegex(ValueError,'連結不一致'):
+    workflow.save_draft(c,{**self.data,'draft_id':self.id,'source_url':'https://example.com/other'},release_id,currency,required)
+  self.assertIn('80,',self.export())
+ def test_changed_source_url_blocks_export_even_after_timestamp_refresh(self):
+  with connect(self.s.db_path) as c:
+   c.execute("UPDATE sourcing_offers SET source_url='https://example.com/new'")
+  with self.assertRaisesRegex(ValueError,'連結已變更'):self.export()
+  self.assertEqual(workflow.export_history(self.s),[])
+  with connect(self.s.db_path) as c:
+   workflow.save_draft(c,{**self.data,'draft_id':self.id,'source_url':'https://example.com/new'},release_id,currency,required)
+  self.assertIn('80,',self.export())
+ def test_excluded_pair_remains_blocked_after_redrafting(self):
+  with connect(self.s.db_path) as c:
+   c.execute('INSERT INTO excluded_matches VALUES(?,?,?)',(self.data['source_url'],900000001,workflow.now()))
+   workflow.save_draft(c,{**self.data,'draft_id':self.id},release_id,currency,required)
+  with self.assertRaisesRegex(ValueError,'配對已被排除'):self.export()
+  self.assertEqual(workflow.export_history(self.s),[])
