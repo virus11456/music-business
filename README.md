@@ -488,3 +488,8 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 - VPS 14 項既有草稿／批次／匯出／三格式流程測試通過（測試資料庫與模擬外部服務）；首次測試因繼承正式 Origin 回 403，已回復後隔離測試環境重跑，正式認證設定未改。
 - 已部署 workflow.py，SHA256 40817accdf3daabd41ad5e97d5430a38471a05de8106d6647a8e415412fb8535 與本機一致；備份 /opt/music-business-backups/draft-link-20260911T154351。
 - 部署後正式 API 正常、2249 筆候選組合、無執行中工作。排程已完成 9/11 22:00，enabled=true，下次 9/12 10:00（Asia/Taipei）。本次未進行正式上架或另觸發 Sheets 同步。
+
+### 2026-09-11 爬蟲專案 Skill
+- 新增 `.agents/skills/record-source-crawlers/SKILL.md`，提供四個已實作平台、Discogs 反查、快取／排程與 Sheets 同步的共用操作入口；平台與資料流程細節分為兩份 reference。
+- 引用現有 Python 實作，不複製爬蟲、不變更正式排程。AGENTS.md 記錄後續爬蟲修改須同步維護 skill；可從本專案使用 `$record-source-crawlers`。此為專案技能，未安裝到全域技能目錄。
+- 已以 Ruby YAML 解析驗證 frontmatter 與介面設定，檢查 reference 連結、測試路徑及未完成標記。內建 quick_validate.py 因本機缺 PyYAML 未能執行，未宣稱其驗證通過。本次僅技能與文件更新，未重跑正式抓取或部署後端。

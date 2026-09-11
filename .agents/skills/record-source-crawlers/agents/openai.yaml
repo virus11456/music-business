@@ -1,0 +1,6 @@
+interface:
+  display_name: "唱片資料抓取"
+  short_description: "維護四個進貨平台爬蟲、Discogs 反查與定時批次同步流程"
+  default_prompt: "使用 $record-source-crawlers 檢查指定平台的抓取、分批比對與同步結果。"
+policy:
+  allow_implicit_invocation: true
