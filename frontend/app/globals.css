@@ -25,3 +25,5 @@
 @container(max-width:520px){.source-financials,.drawer .source-financials,.overview-grid .source-financials{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}.source-financials b{font-size:15px}.record-source{padding:10px 12px}}
 
 .list-tools .tabs{flex-wrap:wrap}
+
+.source-card-footer{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:6px}.source-card-footer .source-cost-note{border:0;padding:0}.source-card-footer .btn{height:30px!important;padding:0 10px!important;flex-shrink:0}

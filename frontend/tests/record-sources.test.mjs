@@ -31,3 +31,10 @@ test('only highest known gross is outside collapsed sources, even when all offer
  assert.ok(collapsed.includes('展開其餘 2 個賣場'));assert.ok(collapsed.indexOf('larger loss')<collapsed.indexOf('unknown'));
  assert.ok(visible.includes('價差／毛利'));assert.ok(visible.includes('<small>毛利率</small><b>—</b>'));
 });
+test('source action shows readiness and disables while locked or market missing',()=>{
+ const action=(extra,locked=false)=>renderToStaticMarkup(React.createElement(exports.default,{rows:[{...row,...extra}],locked,onAction:()=>{}}));
+ assert.ok(action({has_market:true,ready:false}).includes('核對貨源'));
+ assert.ok(action({has_market:true,ready:true}).includes('建立草稿'));
+ assert.ok(action({has_market:true,ready:true},true).includes('disabled=""'));
+ assert.ok(action({has_market:false}).includes('disabled=""'));
+});

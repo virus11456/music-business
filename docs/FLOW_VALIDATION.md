@@ -324,3 +324,8 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - checked=20+15、matched=3+0；兩批 success、sheet_sync.synced=true，無錯誤。累計來源 747、unchecked=0，歷史 matched=52、unmatched=695，無 failed。
 - API／Sheet 候選組合各 2364 筆；價格、價差、毛利、毛利率、Want 回讀差異 0，格式衝突 0。三時段 VPS 排程保持啟用，當前主題仍是 The Beatles Rubber Soul。
 - 合併決策頁正式部署已回讀：Vercel HTTP 200，index-CM0RcInE.js／index-Dff_GX6U.css 與本機建置 SHA-256 一致；未執行登入後瀏覽器視覺驗證。
+
+## 2026-09-11 全流程檢查
+- 後端全套 141 項成功，含 test_full_workflow 三格式隔離 HTTP 到 Quicklister；未新增真實草稿／刊登。
+- 前端 23 項既有測試及新增 3 項成功（相關 7 項）；型別及建置成功，候選超出 200 件預覽時仍採正確來源幣別。
+- 正式 API／Sheet 2364 筆一致、格式衝突 0；ready/confirmed/offers/drafts 均 0，佇列 747 件 unchecked=0。見 FLOW_AUDIT.md。
