@@ -39,3 +39,9 @@ export function sourceTimestamp(row:Comparison){
  const stamp=row.cost_basis==='confirmed_total'?row.cost_at:row.source_at;
  return stamp&&Number.isFinite(Date.parse(stamp))?new Date(stamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'時間未取得';
 }
+
+export function hasDemandAndSource(row:Comparison){
+ const positive=(v:unknown)=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>0;
+ let validLink=false;try{validLink=['https:','http:'].includes(new URL(row.source_url).protocol)}catch{}
+ return !row.excluded&&row.has_market&&positive(row.want)&&positive(row.market_price)&&positive(row.source_price)&&!!row.market_currency&&!!row.source_currency&&validLink;
+}

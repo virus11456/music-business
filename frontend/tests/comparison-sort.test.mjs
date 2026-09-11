@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -41,4 +41,10 @@ test('source freshness never borrows Discogs or unrelated source timestamps',()=
  assert.equal(sourceFreshness({source_at:old,cost_at:fresh,cost_basis:'confirmed_total'},now),'fresh');
  for(const source_at of [undefined,'bad',new Date(now+1).toISOString()])assert.equal(sourceFreshness({source_at},now),'unknown');
  assert.equal(sourceFreshness({source_at:new Date(now-48*3600000).toISOString()},now),'fresh');
+});
+
+test('main list requires demand, both prices and a source link',()=>{
+ const row={want:20,has_market:true,market_price:'30',market_currency:'USD',source_price:'500',source_currency:'TWD',source_url:'https://www.ruten.com.tw/item/show?123',gross_twd:'-5'};
+ assert.equal(hasDemandAndSource(row),true);
+ for(const change of [{want:0},{want:null},{has_market:false},{market_price:null},{source_price:null},{source_price:'NaN'},{excluded:true},{source_url:'javascript:alert(1)'}])assert.equal(hasDemandAndSource({...row,...change}),false);
 });
