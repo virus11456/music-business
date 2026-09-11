@@ -19,6 +19,8 @@ export function jobReport(detail:string|null):string[]{
  }
  function batch(value:unknown){
   const b=obj(value);
+  const quotes=obj(b.source_refresh);
+  if(quotes.platform==='ruten')lines.push(`露天已存報價：檢查 ${count(quotes.attempted)??0} 件 · 更新 ${count(quotes.updated)??0} 件 · 未回傳 ${count(quotes.missing)??0} 件 · 失敗 ${count(quotes.failed)??0} 件`);
   if(b.flow==='source_first'){
    source(b.collection);
    lines.push(`反查 ${count(b.checked)??0} 件 · 有配對 ${count(b.matched)??0} 件 · 留待配對 ${count(b.unmatched)??0} 件 · 沿用快取 ${count(b.cached)??0} 件 · 待處理 ${count(b.pending)??0} 件`);
@@ -31,7 +33,7 @@ export function jobReport(detail:string|null):string[]{
   }
   for(const raw of list(b.errors)){
    const e=obj(raw),id=count(e.release_id);
-   const steps:Record<string,string>={market:'Discogs 行情',sourcing:'找貨',sheets:'Google Sheets 同步',fx:'參考匯率',reverse_match:'反查版本'};
+   const steps:Record<string,string>={market:'Discogs 行情',sourcing:'找貨',sheets:'Google Sheets 同步',fx:'參考匯率',reverse_match:'反查版本',source_refresh:'貨源報價刷新'};
    if(steps[String(e.step)])lines.push(`${id===null?'':`版本 #${id} · `}${steps[String(e.step)]}未完成；請檢查該服務的連線與設定後重試`);
   }
   if(obj(b.sheet_sync).synced===true)lines.push('Google Sheets 同步完成');
