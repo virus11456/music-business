@@ -58,6 +58,7 @@ def calculate(c,s,o,source,confirmed_offer):
       'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
       'format':media(release['format']) if release else None,'source_format':media(source['format']) if source else None,
       'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
+      'source_at':source['captured_at'] if source else None,'cost_at':o['recorded_at'],
       'source_price':source['price'] if source else None,'source_currency':source['currency'] if source else o['currency'],
       'price_kind':source['price_kind'] if source else 'manual','availability':source['availability'] if source else '人工報價',
       'version_confirmed':bool(o['version_confirmed']),'has_market':bool(snapshot),'market_price':snapshot['lowest_price'] if snapshot else None,

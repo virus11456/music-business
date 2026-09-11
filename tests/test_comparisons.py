@@ -46,3 +46,7 @@ class ComparisonTests(unittest.TestCase):
   self.assertIsNone(comparisons.build(self.s)[0]['sale_usd'])
   self.data.update(offer_id='1',sale_price='30',sale_currency='USD');self.save()
   self.assertEqual(comparisons.build(self.s)[0]['sale_usd'],'30')
+
+ def test_manual_cost_timestamp_is_distinct_from_missing_source(self):
+  self.save();r=comparisons.build(self.s)[0]
+  self.assertIsNone(r['source_at']);self.assertEqual(r['cost_at'],r['offer']['recorded_at'])

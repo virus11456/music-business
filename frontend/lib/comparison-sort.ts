@@ -28,3 +28,14 @@ export function marketTimestamp(row:Comparison){
  if(!row.market_at||!Number.isFinite(Date.parse(row.market_at)))return '時間未取得';
  return new Date(row.market_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
+
+export function sourceFreshness(row:Comparison,now=Date.now()):'fresh'|'stale'|'unknown'{
+ const stamp=row.cost_basis==='confirmed_total'?row.cost_at:row.source_at;
+ if(!stamp)return 'unknown';
+ const age=now-Date.parse(stamp);
+ return !Number.isFinite(age)||age<0?'unknown':age<=48*3600000?'fresh':'stale';
+}
+export function sourceTimestamp(row:Comparison){
+ const stamp=row.cost_basis==='confirmed_total'?row.cost_at:row.source_at;
+ return stamp&&Number.isFinite(Date.parse(stamp))?new Date(stamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'時間未取得';
+}
