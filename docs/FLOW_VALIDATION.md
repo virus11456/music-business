@@ -299,3 +299,16 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - 累計 source_queue.total=638、unchecked=0，statuses matched=39／unmatched=599，無 failed。matched 為歷史搜尋狀態，不當作精確版本已確認數。
 - 靜止回讀 API／SIMPLES_Comparisons 各 1796 筆；來源價格、售價、價差、毛利、毛利率、Want 差異 0；格式衝突 0。數量為商品與候選版本組合，並非唯一商品數。
 - VPS scheduler enabled=true、Asia/Taipei 10:00/16:00/22:00；回讀 last_run=2026-09-11T10:00:00+08:00 complete，next_run=2026-09-11T16:00:00+08:00。當前搜尋範圍仍是 The Beatles Rubber Soul。
+
+## 2026-09-11 接續分頁 #44–#47
+- #44 collection.candidates=112、failed_platforms=0；Yahoo TW page1=38、Yahoo JP page5=50、Ruten page5=1、Tower page4=23（has_more=true、total_pages=5）。主題仍為 The Beatles Rubber Soul。
+- checked=20+20+20+14、matched=6+3+0+1；四批全數 success、errors=[]、sheet_sync.synced=true，最後 market_rows=80。
+- source_queue.total=712、unchecked=0，歷史 statuses matched=49／unmatched=663，無 failed。
+- 靜止回讀 API／SIMPLES_Comparisons 各 2297 筆；來源價格、售價、價差、毛利、毛利率、Want 差異 0，格式衝突 0。這是來源與候選版本組合數，尚非精確壓片或可獲利商品確認。
+- 排程 enabled=true；last_run=2026-09-11T10:00:00+08:00 complete，next_run=2026-09-11T16:00:00+08:00。
+
+### 2026-09-11 貨源卡片緊湊顯示
+- 「價差／毛利」集中顯示預估毛利金額；「毛利率」獨立顯示百分比與正負長條，避免重複金額。已確認總成本仍沿用原估算依據。
+- 預設僅顯示預估毛利最高的一件，同 URL 去重、排除項目不顯示，其餘賣場折疊；缺毛利排序最後，虧損保留負值。商品標題可直接開啟賣場。
+- 桌面採商品資訊與四個價格欄位並排，縮小留白；窄容器改為上下排列、手機價格兩欄，保留 Label、編號及成本說明。
+- 前端型別檢查、Vercel 建置及 4 項來源卡片測試通過；含僅最高毛利在折疊區外、全負毛利排序、未知毛利置後與百分比獨立欄。正式資產回讀待部署完成後記錄。
