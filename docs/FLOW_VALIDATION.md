@@ -285,3 +285,4 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - VPS 相同公開搜尋網址、SimplesRecordResearch/0.1 User-Agent：IPv6 404／2067 bytes，IPv4 200／318083 bytes。Mac 同網址 HTTP 200 並解析 38 件。
 - yahoo_transport.py 僅為 Yahoo 的 HTTPSConnection 指定 AF_INET 解析，未改全域 socket、固定 IP 或關閉憑證／主機名驗證；其他 HTTPS 主機仍使用標準 HTTPSConnection。
 - 本機 23 項傳輸／平台／佇列測試通過；VPS 15 項既有回歸通過，備份 /opt/music-business-backups/yahoo-ipv4-20260911T044316。正式程式 fetch＋parser 實測第一頁 PRODUCTS 38／PRICED 38，第二頁 PRODUCTS 0。
+- 正式 #32 跨平台搜尋（本次只選 Yahoo TW）success、candidates=38、failed_platforms=0；platform_runs #74「完成」。商品皆為既有資料更新，因此 unchecked=0，未重置身份快取；API Yahoo 候選配對 110 筆。

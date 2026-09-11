@@ -362,3 +362,4 @@ Quicklister 匯出只包含勾選的草稿，要求全部幣別與賣家設定�
 - VPS 實測相同 Yahoo 搜尋網址／User-Agent：IPv6 HTTP 404，IPv4 HTTP 200。程式只對 tw.bid.yahoo.com 使用正常 DNS 解析的 IPv4 連線，保留原網域、SNI 與 HTTPS 憑證驗證；不固定 IP、不改 VPS 全域網路或其他平台。
 - 正式程式已能解析 Rubber Soul 第一頁 38 件有價格商品，第二頁正常空結果；來源無商品與 HTTP 錯誤仍分開記錄。
 - 本機 23 項相關測試通過，VPS 15 項既有平台／佇列回歸通過。資料入庫與同步驗證記錄於 FLOW_VALIDATION。
+- 正式工作 #32 台灣 Yahoo 搜尋 success：38 件入庫更新、failed_platforms=0；現有 Yahoo 候選配對 110 筆，身份快取沿用而不重跑。四平台原有定時收集設定保留。
