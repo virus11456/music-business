@@ -292,3 +292,10 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 - #34–#38 checked=20+20+20+20+13，共 93 件新資料；matched=2+1+1+0+0。全數 success、sheet_sync.synced=true，最後 market_rows=50。
 - 累計來源 552，unchecked=0、failed=0；歷史查詢 matched=27、unmatched=525，不作當前完整版本確認數使用。
 - 完成後靜止回讀 API 與 SIMPLES_Comparisons 各 655 筆；來源價格、售價、價差、毛利、毛利率及 Want 差異 0，來源／Discogs 格式衝突 0。每日 VPS 排程保持 enabled=true。
+
+## 2026-09-11 接續分頁與完整消化 #39–#43
+- #39 collection.candidates=86、failed_platforms=0：Yahoo TW page2=0（empty）、Yahoo JP page4=50、Ruten page4=17、Tower page3=19（has_more=true、total_pages=5）。原四平台主題設定保留。
+- checked=20+20+20+20+6，matched=10+0+1+1+0；五批全數 success、errors=[]、sheet_sync.synced=true。最後 market_rows=66。
+- 累計 source_queue.total=638、unchecked=0，statuses matched=39／unmatched=599，無 failed。matched 為歷史搜尋狀態，不當作精確版本已確認數。
+- 靜止回讀 API／SIMPLES_Comparisons 各 1796 筆；來源價格、售價、價差、毛利、毛利率、Want 差異 0；格式衝突 0。數量為商品與候選版本組合，並非唯一商品數。
+- VPS scheduler enabled=true、Asia/Taipei 10:00/16:00/22:00；回讀 last_run=2026-09-11T10:00:00+08:00 complete，next_run=2026-09-11T16:00:00+08:00。當前搜尋範圍仍是 The Beatles Rubber Soul。
