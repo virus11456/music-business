@@ -276,3 +276,7 @@ HTTPS API：未帶存取碼 401、錯誤 Origin 403、正確存取碼與 Vercel 
 ## 2026-09-11 搜尋詞清理與周邊排除
 - 新增測試確認 T 恤不呼叫 API、促銷詞移除後仍保留專輯與唱片編號、日文與非樣板文字不刪除、人工搜尋詞原樣保留。
 - 本機相關測試 26 項通過，VPS 9 項既有回歸通過並回傳 SEARCH_CLEAN_OK。matching.py SHA-256：b8061ee6a2b49581077307102151054a1230bc2760751deba85c643845439b15，正式與本機一致。
+- 正式 #27：收集 106 筆（Yahoo JP page2=50、Ruten page2=40、Tower page1=16），去重新增 83 件；Yahoo TW page1 HTTP 404，整體 partial，其他比對及 Sheets 成功，新增 1 件候選、更新 4 個行情版本。
+- #28–#31 消化剩下 63 件（20+20+20+3），均 success 並 synced=true。一次 /api/state 讀取回傳 HTTP 錯誤，客戶端停止續批；確認 #28 已完成後才接續，未重複執行該批。後續讀取正常，尚未確認該次讀取錯誤根因，不宣稱已修復。
+- 最終來源 459、unchecked=0、failed=0；歷史查詢 matched=23、unmatched=436。來源抓取 Yahoo TW 異常仍存在，不等同佇列成功就全平台正常。
+- 靜止回讀 API／Sheet 各 414 筆，來源價格、參考售價、價差、毛利、毛利率、Want 差異 0，格式衝突 0；VPS 三個每日時段排程 enabled=true。
