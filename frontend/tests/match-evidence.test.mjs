@@ -13,3 +13,10 @@ test('missing, conflicting, partial identifiers and cross-format candidates are 
  assert.equal(matchLevel({...row,catalog_no:''}),'candidate');
  assert.ok(!hasStrongMatch({...row,source_catalog_no:''}));
 });
+
+test('title-derived identifiers never strengthen an unverified match and conflicts override old confirmation',()=>{
+ assert.equal(matchLevel({...row,source_catalog_from_title:true}),'candidate');
+ assert.equal(matchLevel({...row,version_confirmed:true,source_format:'Vinyl'}),'candidate');
+ assert.equal(matchLevel({...row,version_confirmed:true,source_catalog_no:'OTHER-1'}),'candidate');
+ assert.match(matchLabel({...row,version_confirmed:true,source_format:'Cassette'}),/格式衝突/);
+});
