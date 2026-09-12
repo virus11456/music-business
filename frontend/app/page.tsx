@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowUpRight, Check, ChevronRight, CircleAlert, Disc3, Inbox, LayoutDashboard, LoaderCircle, Plus, Radar, RefreshCw, Search, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {createRefreshQueue} from '@/lib/refresh-queue';
 import {apiFetch,apiOrigin,setAccessCode,accessRevision,hosted} from '@/lib/api';
 import {hasPositiveMargin,buildRecordIndex,meetsProfit,meetsMinimumUsd,hasFreshComparison} from '@/lib/comparison-sort';
 import {hasStrongMatch} from '@/lib/match-evidence';
@@ -40,13 +41,29 @@ export default function Home(){
  const [needsLogin,setNeedsLogin]=useState(false);
  const dialog=useRef<HTMLDialogElement>(null);
  const detailDialog=useRef<HTMLDialogElement>(null);
- const loading=useRef(false);
- const load=useCallback(async()=>{if(loading.current)return;loading.current=true;const revision=accessRevision();if(hostedFrontend&&!apiOrigin){setError('線上前端尚未設定資料服務位址，請檢查部署設定。');loading.current=false;return;}try{const r=await apiFetch('/api/state');if(revision!==accessRevision())return;if(r.status===401){setState(null);setSourceReview(null);setNeedsLogin(true);setError('請輸入管理者存取碼登入工作室');return;}if(!r.ok)throw Error(hostedFrontend?'資料服務未連線，請確認後端狀態':'資料服務未連線，請確認本機服務已啟動');const next=await r.json() as State;if(revision!==accessRevision())return;setState(next);setNeedsLogin(false);setError('');}catch(e){if(revision===accessRevision())setError(e instanceof Error&&e.name==='AbortError'?'連線逾時，請稍後重試':e instanceof Error?e.message:'讀取失敗');}finally{loading.current=false;}},[]);
+ type StateRead={revision:number;next?:State;error?:string;unauthorized?:boolean};
+ const refreshQueue=useRef<ReturnType<typeof createRefreshQueue<StateRead>>|null>(null);
+ if(!refreshQueue.current)refreshQueue.current=createRefreshQueue<StateRead>(async()=>{
+  const revision=accessRevision();
+  if(hostedFrontend&&!apiOrigin)return {revision,error:'線上前端尚未設定資料服務位址，請檢查部署設定。'};
+  try{
+   const r=await apiFetch('/api/state');
+   if(r.status===401)return {revision,unauthorized:true};
+   if(!r.ok)throw Error(hostedFrontend?'資料服務未連線，請確認後端狀態':'資料服務未連線，請確認本機服務已啟動');
+   return {revision,next:await r.json() as State};
+  }catch(e){return {revision,error:e instanceof Error&&e.name==='AbortError'?'連線逾時，請稍後重試':e instanceof Error?e.message:'讀取失敗'}}
+ },result=>{
+  if(result.revision!==accessRevision())return;
+  if(result.unauthorized){setState(null);setSourceReview(null);setNeedsLogin(true);setError('請輸入管理者存取碼登入工作室')}
+  else if(result.error)setError(result.error);
+  else if(result.next){setState(result.next);setNeedsLogin(false);setError('')}
+ });
+ const load=useCallback((force=false)=>refreshQueue.current!.refresh(force),[]);
  useEffect(()=>{void load();if(hostedFrontend&&!apiOrigin)return;const id=setInterval(()=>{if(document.visibilityState==='visible')void load()},4000);return()=>clearInterval(id)},[load]);
  useEffect(()=>{if(selected)detailDialog.current?.showModal();else detailDialog.current?.close()},[selected]);
  useEffect(()=>{if(modal){dialog.current?.showModal();}else{dialog.current?.close();}},[modal]);
  useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(''),6500);return()=>clearTimeout(t)},[notice]);
- const send=async(path:string,data:object,onError?:(message:string)=>void)=>{if(!state||error){onError?.(error||'請先登入工作室');return false;}const revision=accessRevision();setBusy(true);try{const r=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:JSON.stringify(data)});const body=await r.json() as {error?:string;message?:string};if(revision!==accessRevision())return false;if(r.status===401){setAccessCode('');setState(null);setNeedsLogin(true);setError('登入已失效，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}if(!r.ok)throw Error(body.error||"操作未完成");setNotice(body.message||'已儲存');await load();return true;}catch(e){const message=e instanceof Error&&e.name==='AbortError'?'操作逾時，請先檢查工作紀錄再重試':e instanceof Error?e.message:'儲存失敗';if(revision===accessRevision()){setNotice(message);onError?.(message)}return false;}finally{setBusy(false)}};
+ const send=async(path:string,data:object,onError?:(message:string)=>void)=>{if(!state||error){onError?.(error||'請先登入工作室');return false;}const revision=accessRevision();setBusy(true);try{const r=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:JSON.stringify(data)});const body=await r.json() as {error?:string;message?:string};if(revision!==accessRevision())return false;if(r.status===401){setAccessCode('');setState(null);setNeedsLogin(true);setError('登入已失效，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}if(!r.ok)throw Error(body.error||"操作未完成");setNotice(body.message||'已儲存');await load(true);return true;}catch(e){const message=e instanceof Error&&e.name==='AbortError'?'操作逾時，請先檢查工作紀錄再重試':e instanceof Error?e.message:'儲存失敗';if(revision===accessRevision()){setNotice(message);onError?.(message)}return false;}finally{setBusy(false)}};
  const submit=async(e:FormEvent<HTMLFormElement>)=>{
   e.preventDefault();if(!modal||modalInFlight.current||busy||!state||error||state.active)return;
   const data=Object.fromEntries(new FormData(e.currentTarget));const paths={add:'/api/releases',cost:'/api/costs',watch:'/api/decisions',fx:'/api/fx',target:'/api/targets'};
@@ -77,7 +94,7 @@ export default function Home(){
   <aside className="sidebar"><a className="brand" href="/" aria-label="SIMPLES 首頁"><Disc3 size={30}/><span>SIMPLES<small>RECORD BUSINESS</small></span></a><div className="workspace-label">我的唱片工作室</div><nav>{([[ 'overview',LayoutDashboard],['records',Disc3],['sourcing',Radar],['listing',Disc3],['settings',Settings2]] as const).map(([id,Icon])=><button key={id} className={view===id?'nav active':'nav'} onClick={()=>{setView(id);setFilter('all');setQuery('')}}><Icon size={19}/>{names[id]}</button>)}</nav><div className="sidebar-bottom"><span className="dot"/> {hostedFrontend?'線上前端':'本機工作區'}<small>{hostedFrontend?connectionLabel:'資料儲存在這台 Mac'}</small><div className="profile"><span className="avatar">F</span><span>Frank<small>SIMPLES 管理者</small></span></div></div></aside>
   <main><header className="topbar"><div className="breadcrumb">工作室 <ChevronRight size={14}/> {names[view]}</div><span className="local-status"><span className="dot"/>{!state||error?connectionLabel:state.configured.discogs?'Discogs 已設定':'Discogs 尚未設定'}</span></header>
    <div className="content"><UpdateNotice/><div className="page-heading"><div><p className="eyebrow">YOUR RECORD DESK</p><h1>{names[view]}</h1><p>{view==='overview'?'先看機會，再決定下一張唱片。':view==='records'?'只列出 Discogs 有需求與行情、且平台已找到對應報價的專輯。':view==='sourcing'?'行情與進貨報價，集中到 Google Sheets 比較。':view==='listing'?'整理已確認貨源的唱片，準備批次上架。':'管理選品範圍、比較匯率與工作紀錄。'}</p></div><div className="heading-actions"><Button className="btn secondary" disabled={locked||!state} onClick={()=>void send('/api/refresh',{})}><RefreshCw size={16} className={state?.active?'spin':''}/>更新行情</Button><Button className="btn primary" onClick={()=>setModal({kind:'add'})} disabled={locked}><Plus size={17}/>加入唱片</Button></div></div>
-   {needsLogin&&<form className="panel" onSubmit={e=>{e.preventDefault();setAccessCode(String(new FormData(e.currentTarget).get('access_code')||''));e.currentTarget.reset();void load();}}><label className="field"><span>管理者存取碼</span><input name="access_code" type="password" autoComplete="current-password" required/></label><Button type="submit" className="btn primary">登入工作室</Button><p>存取碼只保留在本次頁面記憶體，重新整理後需重新登入。</p></form>}{state&&apiOrigin&&<Button className="btn secondary" onClick={()=>{setAccessCode('');setState(null);setNeedsLogin(true);setError('已登出，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}}>登出</Button>}{error&&<div className="alert" role="alert"><CircleAlert size={18}/>{error}<button onClick={()=>void load()}>重試</button></div>}
+   {needsLogin&&<form className="panel" onSubmit={e=>{e.preventDefault();setAccessCode(String(new FormData(e.currentTarget).get('access_code')||''));e.currentTarget.reset();void load(true);}}><label className="field"><span>管理者存取碼</span><input name="access_code" type="password" autoComplete="current-password" required/></label><Button type="submit" className="btn primary">登入工作室</Button><p>存取碼只保留在本次頁面記憶體，重新整理後需重新登入。</p></form>}{state&&apiOrigin&&<Button className="btn secondary" onClick={()=>{setAccessCode('');setState(null);setNeedsLogin(true);setError('已登出，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}}>登出</Button>}{error&&<div className="alert" role="alert"><CircleAlert size={18}/>{error}<button onClick={()=>void load()}>重試</button></div>}
    {state?.mode==='demo'&&<div className="alert">目前為示範資料，請勿作為進貨依據。</div>}
    {state?.active&&<div className="activity" role="status"><LoaderCircle size={17} className="spin"/>{state.active.name}中，完成後會自動更新。你可以繼續查看資料。</div>}
    {!state&&!error&&<div className="empty"><LoaderCircle className="spin"/><p>正在讀取你的唱片資料…</p></div>}
