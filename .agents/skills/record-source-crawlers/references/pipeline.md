@@ -42,3 +42,7 @@ HTTP 完整流程測試在允許 localhost bind 的隔離測試環境執行；�
 診斷前端最近工作時，失敗 detail 可能只是例外名稱，執行中可能為 null。`frontend/lib/collection-job.ts` 同時辨識收集／排程工作名稱及 JSON detail，不能只找最近成功 JSON。完整待開發項目見根目錄 `docs/IMPLEMENTATION_STATUS.md`。
 
 庫存讀回新模組 `inventory_sync.py` 與端點、分頁及關聯規則見根目錄 `docs/INVENTORY_SYNC.md`；此為開發中功能，勿將既有行情 API 成功視為庫存端點已驗收。
+
+### 2026-09-12 觀察目標價紀錄
+
+新增 watch_alerts.py：analyze.run 在既有行情更新／評分流程中檢查最新 watch 決策，不受一般機會分數門檻影響。同幣別直接比較，跨幣別需有效匯率；只接受設定目標之後取得、未過期、非未來、價格為正且有人在售的行情。每次觀察決策僅留一次達標紀錄於 meta，重設觀察目標可再觸發，停止觀察後不觸發；通知設定頁列出最近 100 次目標的首次命中。這是 Discogs 最低掛牌價低於或等於目標的歷史紀錄，不是貨源降價、成交或買家需求保證。沒有新增 Telegram 發送。5 項目標價測試及型別檢查通過；VPS 尚待部署，部署前不會產生正式到價紀錄。

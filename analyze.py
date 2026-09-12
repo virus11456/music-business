@@ -71,12 +71,14 @@ def message(release, s, result):
             + '\n'.join(result['warnings']))[:3800]
 
 def run(settings):
-    count = queued = 0
+    count = queued = watch_hits = 0
     with connect(settings.db_path) as c:
         for r in c.execute('SELECT * FROM releases').fetchall():
             s = c.execute('SELECT * FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 1',(r['release_id'],)).fetchone()
             if not s:
                 continue
+            import watch_alerts
+            watch_hits += int(watch_alerts.record(c,r,s,settings))
             result = evaluate(c,s,settings)
             c.execute('INSERT INTO scores(release_id,snapshot_id,scored_at,opportunity_score,components) VALUES(?,?,?,?,?)',
                       (r['release_id'],s['id'],now(),result['score'],json.dumps(result,ensure_ascii=False)))
@@ -107,4 +109,4 @@ def run(settings):
               message=excluded.message,urgent=excluded.urgent,score=excluded.score,price=excluded.price,
               currency=excluded.currency,status='pending',updated_at=excluded.updated_at''',values)
             queued += 1
-    return {'scored':count,'queued':queued}
+    return {'scored':count,'queued':queued,'watch_hits':watch_hits}

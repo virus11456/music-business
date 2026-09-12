@@ -5,7 +5,9 @@ def state(settings):
     with connect(settings.db_path) as c:
         counts = dict(c.execute('SELECT status,count(*) FROM outbox GROUP BY status').fetchall())
         rows = [dict(r) for r in c.execute('SELECT id,release_id,status,message,updated_at FROM outbox ORDER BY updated_at DESC,id DESC LIMIT 100')]
-    return {'counts':counts,'rows':rows,'limit':100}
+        import watch_alerts
+        hits=watch_alerts.rows(c)
+    return {'counts':counts,'rows':rows,'limit':100,'watch_hits':hits}
 
 def resolve(settings, item_id, outcome):
     if type(item_id) is not int or item_id < 1 or outcome not in ('sent','cancelled'):
