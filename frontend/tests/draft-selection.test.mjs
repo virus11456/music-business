@@ -28,3 +28,11 @@ test('enforces batch limit and normalizes duplicate selections',()=>{
  assert.equal(draftSelection(rows,rows.slice(0,500).map(d=>d.id),'USD').canExport,true);
  assert.deepEqual(draftSelection(rows,[1,1],'USD').selected,[1]);
 });
+test('a newly listed draft is blocked even when its old export review says ready',()=>{
+ const before=draftSelection([draft(1,{listing_status:'unlisted'})],[1],'USD');
+ assert.equal(before.canExport,true);
+ const after=draftSelection([draft(1,{listing_status:'listed'})],[1],'USD');
+ assert.equal(after.canExport,false);
+ assert.deepEqual(after.eligible,[]);
+ assert.match(after.blocked[0].issues.join(' '),/已登錄上架/);
+});

@@ -29,3 +29,10 @@ test('profit ordering keeps losses above missing values and does not mutate inpu
  assert.deepEqual(filterDrafts(rows,{...filters,sort:'profit'},'USD').map(d=>d.id),[3,2,1]);
  assert.deepEqual(rows.map(d=>d.id),[1,2,3]);
 });
+test('listing filter separates registered listings from unlisted and unknown records',()=>{
+ const rows=[row(1,{listing_status:'listed'}),row(2,{listing_status:'unlisted'}),row(3)];
+ assert.deepEqual(filterDrafts(rows,{...filters,listing:'unlisted'},'USD').map(d=>d.id),[2]);
+ assert.deepEqual(filterDrafts(rows,{...filters,listing:'listed'},'USD').map(d=>d.id),[1]);
+ assert.deepEqual(filterDrafts(rows,{...filters,listing:'all'},'USD').map(d=>d.id),[3,2,1]);
+ assert.deepEqual(filterDrafts(rows,{...filters,listing:'listed',status:'ready'},'USD'),[]);
+});

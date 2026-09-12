@@ -1,6 +1,6 @@
-export type ExportDraft={id:number;currency:string;export_issues?:string[];profit_review?:{ready:boolean}};
+export type ExportDraft={listing_status?:string;id:number;currency:string;export_issues?:string[];profit_review?:{ready:boolean}};
 export function exportIssues(draft:ExportDraft,currency:string):string[]{
- return [...(draft.export_issues??['尚未取得匯出檢查']),...(draft.currency===currency?[]:['幣別與賣家設定不同'])];
+ return [...new Set([...(draft.listing_status==='listed'?['此貨源版本已登錄上架，避免重複匯出']:[]),...(draft.export_issues??['尚未取得匯出檢查']),...(draft.currency===currency?[]:['幣別與賣家設定不同'])])];
 }
 export function draftSelection(drafts:ExportDraft[],ids:number[],currency:string){
  const byId=new Map(drafts.map(d=>[d.id,d]));
