@@ -1,6 +1,8 @@
 # Discogs 刊登讀回
 
-目前為已實作、隔離測試通過，待 VPS 部署與真實帳號驗收。開發文件頁本次回應 403，故庫存 API 契約尚需實測確認，不能將 fixture 成功當作正式讀回。
+2026-09-12 已部署 VPS，服務重新啟動並通過 `/api/state` 檢查。真實 `/oauth/identity` 成功，但庫存端點回傳 HTTP 403：`You are currently suspended and not allowed to access this resource.` 此為 Discogs 回覆的帳號限制；需要解除限制後重新驗收，不能將已部署或 fixture 成功當作正式讀回成功。
+
+正式工作 #55 已記錄失敗，未建立庫存快照、未更動 Discogs 刊登。部署前已備份程式及資料庫至 VPS 的 `/opt/music-business-backups/inventory-20260912T035222`。API 欄位契約及真實刊登關聯仍待成功取得資料後驗證。
 
 - `POST /api/inventory/sync`：使用目前 token 的 `/oauth/identity` 確定帳號，再 GET `/users/{username}/inventory`，每次一頁／100 件，上限 100 頁。共用既有節流 client，不寫入 Discogs。
 - 中間頁保存於 meta 的 `discogs_inventory_pending`；讀完且筆數一致才更新 `discogs_inventory_snapshot`。重複 ID、頁數變更、空白中間頁、格式錯誤或帳號變更時停止，不覆寫完整快照。
