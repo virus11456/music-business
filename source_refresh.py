@@ -34,15 +34,15 @@ def failure_item(row,reason):
     return {'external_id':str(row['external_id']),'reason':reason}
 
 
-def _ruten(settings,fetcher=None,limit=20):
+def _ruten(settings,fetcher=None,limit=20,priorities=None):
     if not isinstance(limit,int) or not 1<=limit<=40:raise ValueError('每批刷新 1 至 40 件')
     instant=datetime.now(timezone.utc)
     cutoff=(instant-timedelta(hours=6)).isoformat()
     retry=(instant-timedelta(hours=1)).isoformat()
     with connect(settings.db_path) as c:
         c.execute('CREATE TABLE IF NOT EXISTS source_refresh_attempts(candidate_id INTEGER PRIMARY KEY,attempted_at TEXT NOT NULL,status TEXT NOT NULL)')
-        rows=[dict(r) for r in c.execute("SELECT p.* FROM platform_candidates p LEFT JOIN source_refresh_attempts a ON a.candidate_id=p.id WHERE p.platform='ruten' AND p.captured_at<=? AND (a.attempted_at IS NULL OR a.attempted_at<=?) ORDER BY coalesce(a.attempted_at,''),p.captured_at,p.id LIMIT ?",(cutoff,retry,limit))]
-    report={'platform':'ruten','attempted':len(rows),'updated':0,'missing':0,'failed':0,'failures':[]}
+        rows,selection=__import__('refresh_priority').select(c,'ruten',limit,priorities or {})
+    report={'platform':'ruten','attempted':len(rows),'updated':0,'missing':0,'failed':0,'failures':[],'selection':selection}
     if not rows:return report
     stamp=now()
     try:
@@ -80,15 +80,16 @@ def run(settings,fetcher=None,limit=20,detail_limit=2,sleeper=None):
         raise ValueError('各平台商品頁刷新 0 至 5 件')
     import time
     import source_details
-    report=_ruten(settings,fetcher,limit)
+    priorities=__import__('refresh_priority').scores(settings)
+    report=_ruten(settings,fetcher,limit,priorities)
     reports=[dict(report)]
     instant=datetime.now(timezone.utc)
     cutoff=(instant-timedelta(hours=6)).isoformat()
     retry=(instant-timedelta(hours=1)).isoformat()
     for platform in ('yahoo_tw','yahoo_jp','tower'):
         with connect(settings.db_path) as c:
-            rows=[dict(r) for r in c.execute("SELECT p.* FROM platform_candidates p LEFT JOIN source_refresh_attempts a ON a.candidate_id=p.id WHERE p.platform=? AND p.captured_at<=? AND (a.attempted_at IS NULL OR a.attempted_at<=?) ORDER BY coalesce(a.attempted_at,''),p.captured_at,p.id LIMIT ?",(platform,cutoff,retry,detail_limit))]
-        part={'platform':platform,'attempted':len(rows),'updated':0,'missing':0,'failed':0,'failures':[]}
+            rows,selection=__import__('refresh_priority').select(c,platform,detail_limit,priorities)
+        part={'platform':platform,'attempted':len(rows),'updated':0,'missing':0,'failed':0,'failures':[],'selection':selection}
         for row in rows:
             # Keep a gap from collection requests and between detail requests.
             (sleeper or time.sleep)(3)
@@ -106,6 +107,7 @@ def run(settings,fetcher=None,limit=20,detail_limit=2,sleeper=None):
                 with connect(settings.db_path) as c:
                     c.execute('UPDATE platform_candidates SET price=?,currency=?,price_kind=?,availability=?,captured_at=? WHERE id=?',
                         (item['price'],item['currency'],item['price_kind'],item['availability'],stamp,row['id']))
+                    __import__('identity_data').save_source(c,row,item)
                 status='updated';part['updated']+=1
             except Exception as error:
                 part['failed']+=1

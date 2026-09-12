@@ -20,3 +20,8 @@ test('title-derived identifiers never strengthen an unverified match and conflic
  assert.equal(matchLevel({...row,version_confirmed:true,source_catalog_no:'OTHER-1'}),'candidate');
  assert.match(matchLabel({...row,version_confirmed:true,source_format:'Cassette'}),/格式衝突/);
 });
+
+test('barcode conflict overrides confirmation and a match remains a pressing candidate',()=>{
+ assert.ok(matchLabel({...row,barcodes:['00036000291452'],source_barcodes:['04006381333931'],version_confirmed:true}).includes('條碼衝突'));
+ assert.ok(matchLabel({...row,barcodes:['00036000291452'],source_barcodes:['00036000291452']}).includes('壓片仍待核對'));
+});

@@ -17,7 +17,7 @@ def stale(stamp):
 def build(settings):
  rows=[]
  with connect(settings.db_path) as c:
-  candidates={r['source_url']:dict(r) for r in c.execute('SELECT * FROM platform_candidates')}
+  candidates={r['source_url']:__import__('identity_data').enrich(c,r) for r in c.execute('SELECT * FROM platform_candidates').fetchall()}
   offers=[dict(r) for r in c.execute('SELECT o.*,r.title,r.artist FROM sourcing_offers o JOIN releases r USING(release_id) ORDER BY o.id DESC')]
   covered=set()
   for o in offers:
@@ -35,6 +35,7 @@ def build(settings):
       target={'title':r['title'].split(' - ',1)[-1],'format':r.get('format',''),'catno':r.get('catno','')}
      target=dict(target)
      label=c.execute('SELECT value FROM meta WHERE key=?',(f"release_labels_{r['release_id']}",)).fetchone()
+     target['barcodes']=__import__('identity_data').release_codes(c,r['release_id']) or r.get('barcodes',[])
      target['labels']=label[0] if label else r.get('labels','')
      if not label and target['labels']:
       c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(f"release_labels_{r['release_id']}",target['labels']))
@@ -52,6 +53,7 @@ def build(settings):
   targets={r['release_id']:dict(r) for r in c.execute('SELECT * FROM releases')}
   for rid,target in targets.items():
    label=c.execute('SELECT value FROM meta WHERE key=?',(f'release_labels_{rid}',)).fetchone()
+   target['barcodes']=__import__('identity_data').release_codes(c,rid)
    target['labels']=label[0] if label else ''
   sources_by_id={s['id']:s for s in candidates.values()}
   for sid,rid,reasons in direct_matches.pairs(c,list(candidates.values()),list(targets.values())):
@@ -79,6 +81,7 @@ def calculate(c,s,o,source,confirmed_offer):
  row={'key':f"offer-{o['id']}" if confirmed_offer else f"candidate-{source['id']}-{o['release_id']}",'offer':o if confirmed_offer else None,
       'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
       'format':identified_format(release['format']) if release else None,'source_format':identified_format(source['format'],source['title']) if source else None,
+      'barcodes':__import__('identity_data').release_codes(c,o['release_id']),'source_barcodes':__import__('identity_data').source_codes(source) if source else [],
       'catalog_no':release['catno'] if release else '', 'source_catalog_no':source_catalog(source) if source else '', 'source_catalog_from_title':bool(source and source_catalog(source) and source_catalog(source)!=str(source['catalog_no'] or '').strip()),
       'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
       'source_at':source['captured_at'] if source else None,'cost_at':o['recorded_at'],
@@ -94,6 +97,7 @@ def calculate(c,s,o,source,confirmed_offer):
  row['labels']=label[0] if label else ''
  row['excluded']=bool(c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(o['source_url'],o['release_id'])).fetchone())
  issues=row['issues']
+ if row['barcodes'] and row['source_barcodes'] and not set(row['barcodes'])&set(row['source_barcodes']):issues.append('來源與 Discogs 條碼不一致')
  if row['excluded']:issues.append('已人工排除此配對')
  if row['format'] and row['source_format'] and row['format']!=row['source_format']:issues.append('來源與 Discogs 格式不一致')
  day=business_day()

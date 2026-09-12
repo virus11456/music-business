@@ -42,6 +42,7 @@ export function jobReport(detail:string|null):string[]{
   const quoteParts=list(quotes.platforms).length?list(quotes.platforms):quotes.platform==='ruten'?[quotes]:[];
   for(const raw of quoteParts){
    const q=obj(raw),name=names[String(q.platform)];if(!name)continue;
+   if(count(obj(q.selection).rotation)!==null)lines.push(`${name}刷新排序：優先商品 ${count(obj(q.selection).priority)??0} 件 · 舊資料保留名額 ${count(obj(q.selection).rotation)??0} 件`);
    lines.push(`${name}已存報價：檢查 ${count(q.attempted)??0} 件 · 更新 ${count(q.updated)??0} 件 · 未回傳 ${count(q.missing)??0} 件 · 失敗 ${count(q.failed)??0} 件`);
   }
   if(b.flow==='source_first'){

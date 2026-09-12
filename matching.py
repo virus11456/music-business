@@ -29,6 +29,7 @@ def search_title(value):
 def search(settings,candidate_id,query=None,client=None):
  with connect(settings.db_path) as c:
   row=c.execute('SELECT * FROM platform_candidates WHERE id=?',(candidate_id,)).fetchone()
+  if row:row=__import__('identity_data').enrich(c,row)
  if not row:raise ValueError('找不到來源商品')
  from source_match import source_catalog
  catalog=source_catalog(row)
@@ -36,6 +37,9 @@ def search(settings,candidate_id,query=None,client=None):
  if query:
   if not isinstance(query,str) or not 1<=len(query.strip())<=160:raise ValueError('搜尋詞最多 160 字')
   params['q']=query.strip()
+ elif __import__('identity_data').source_codes(dict(row)):
+  code=__import__('identity_data').source_codes(dict(row))[0]
+  params['q']=code[1:] if code.startswith('0') else code
  elif catalog:
   params['catno']=catalog
   if row['artist']:params['artist']=row['artist']
@@ -61,6 +65,7 @@ def search(settings,candidate_id,query=None,client=None):
   if fmt and fmt in formats:evidence.append('格式一致')
   results.append({'release_id':rid,'title':str(r.get('title',''))[:500],'country':str(r.get('country','未提供')),
                   'year':str(r.get('year','未提供')),'format':', '.join(map(str,formats)),
+                  'barcodes':__import__('identity_data').barcodes(r.get('barcode',[])),
                   'catno':cat,'labels':', '.join(map(str,r.get('label',[]) or []))[:300],
                   'evidence':evidence or ['僅搜尋相關，版本未確認'], 'url':f'https://www.discogs.com/release/{rid}'})
  with connect(settings.db_path) as c:

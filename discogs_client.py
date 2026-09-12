@@ -94,6 +94,7 @@ def parse_release(data, expected_id):
             'artist':', '.join(a['name'] for a in data.get('artists',[]) if isinstance(a,dict) and isinstance(a.get('name'),str)),
             'year':integer(data.get('year'),'year'),'country':data.get('country'),
             'format':', '.join(f['name'] for f in data.get('formats',[]) if isinstance(f,dict) and isinstance(f.get('name'),str)),
+            'barcodes':__import__('identity_data').barcodes([v.get('value') for v in (data.get('identifiers') or []) if isinstance(v,dict) and v.get('type')=='Barcode']),
             'labels':', '.join(l['name'] for l in data.get('labels',[]) if isinstance(l,dict) and isinstance(l.get('name'),str)),
             'catno':', '.join(l['catno'] for l in data.get('labels',[]) if isinstance(l,dict) and isinstance(l.get('catno'),str)),
             'have':integer(community.get('have'),'have'),'want':integer(community.get('want'),'want')}

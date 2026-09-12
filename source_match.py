@@ -27,7 +27,11 @@ def evidence(source,release):
     if MERCH.search(title):return []
     source_format=identified_format(source['format'],title);target_format=identified_format(release['format'])
     if not source_format or source_format!=target_format:return []
+    from identity_data import source_codes,barcodes
+    source_barcodes=source_codes(source);target_barcodes=barcodes(release.get('barcodes',[]) if hasattr(release,'get') else [])
+    if source_barcodes and target_barcodes and not set(source_barcodes)&set(target_barcodes):return []
     reasons=[]
+    if set(source_barcodes)&set(target_barcodes):reasons.append('有效條碼一致，仍需核對壓片')
     catalog=normalized(source_catalog(source))
     if catalog and catalog not in ('none','na') and catalog in [normalized(x) for x in release['catno'].split(',')]:
         reasons.append('規格品番一致，仍需核對壓片')
@@ -42,6 +46,8 @@ def evidence(source,release):
     if not reasons:return []
     if source_format and source_format==target_format:reasons.append('格式一致')
     label=release['labels'] if 'labels' in release.keys() else ''
+    explicit_labels=source.get('labels','') if hasattr(source,'get') else ''
+    if set(normalized(x) for x in explicit_labels.split(',') if x.strip())&set(normalized(x) for x in label.split(',') if x.strip()):reasons.append('來源 Label 一致，僅作輔助證據')
     if any(len(normalized(x))>=4 and normalized(x) in source_title for x in label.split(',')):
         reasons.append('標題含相同 Label，僅作輔助證據')
     return reasons

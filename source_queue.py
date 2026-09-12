@@ -21,13 +21,14 @@ def init(settings):
 def fingerprint(row):
     # Price/stock changes recalculate profit but do not change a version identity.
     values=[row[k] for k in ('title','artist','format','catalog_no')]
+    if isinstance(row,dict) and (row.get('barcodes') or row.get('labels')):values.extend([row.get('barcodes',[]),row.get('labels','')])
     return hashlib.sha256(json.dumps(values,ensure_ascii=False).encode()).hexdigest()
 
 def pending_count(settings):
     instant=now()
     with connect(settings.db_path) as c:
-        rows=c.execute('SELECT p.title,p.artist,p.format,p.catalog_no,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
-        return sum(r['saved_fingerprint']!=fingerprint(r) or r['retry_at']<=instant for r in rows)
+        rows=c.execute('SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
+        return sum(r['saved_fingerprint']!=fingerprint(__import__('identity_data').enrich(c,r)) or r['retry_at']<=instant for r in rows)
 
 def state(settings):
     with connect(settings.db_path) as c:
@@ -62,7 +63,7 @@ def run(settings,query=None,selected=None,limit=20):
         result['errors'].append({'step':'source_refresh','error':'部分平台報價未刷新'})
     instant=datetime.now(timezone.utc)
     with connect(settings.db_path) as c:
-        candidates=[dict(r) for r in c.execute("SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY (s.checked_at IS NOT NULL),CASE WHEN trim(lower(p.catalog_no)) NOT IN ('','none','未確認') THEN 0 ELSE 1 END,coalesce(s.checked_at,''),p.id")]
+        candidates=[__import__('identity_data').enrich(c,r) for r in c.execute("SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY (s.checked_at IS NOT NULL),CASE WHEN trim(lower(p.catalog_no)) NOT IN ('','none','未確認') THEN 0 ELSE 1 END,coalesce(s.checked_at,''),p.id")]
     due=[]
     for row in candidates:
         if row['saved_fingerprint']==fingerprint(row) and row['retry_at']>instant.isoformat():

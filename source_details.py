@@ -25,7 +25,7 @@ def parse(platform, external_id, raw):
         nodes=[n for n in root.find('script') if n.attrs.get('id')==sid]
         if len(nodes)!=1:raise ValueError('商品頁結構改變')
         return json.loads(nodes[0].text())
-    fmt=None
+    fmt=None;identity={}
     if platform=='yahoo_tw':
         item=script('isoredux-data')['item']
         if str(item.get('id'))!=str(external_id) or item.get('type')!=1 or item.get('status')!=2:
@@ -58,6 +58,9 @@ def parse(platform, external_id, raw):
         kind='listed'
         if platform=='tower':
             fmt=item.get('itemVariant')
+            from identity_data import barcodes
+            brand=item.get('brand')
+            identity={'barcodes':barcodes([item.get(k) for k in ('gtin','gtin8','gtin12','gtin13','gtin14','sku')]),'labels':brand.get('name','') if isinstance(brand,dict) and isinstance(brand.get('name'),str) else ''}
             # Tower's Product name omits edition suffixes present in its visible
             # product heading. Retain those suffixes for the saved-title check.
             headings=root.find('h1','PC-item-info-title')
@@ -80,4 +83,4 @@ def parse(platform, external_id, raw):
                 elif availability not in ('無現貨','售完'):availability='拍賣中／需確認結標'
             elif availability not in ('無現貨','售完'):availability='拍賣中／需確認結標'
     if not isinstance(title,str) or not title.strip() or amount is None:raise ValueError('商品名稱或價格缺失')
-    return {'title':text(title),'format':fmt,'price':amount,'currency':currency,'price_kind':kind,'availability':availability}
+    return {**identity,'title':text(title),'format':fmt,'price':amount,'currency':currency,'price_kind':kind,'availability':availability}

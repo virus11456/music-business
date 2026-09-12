@@ -110,6 +110,8 @@ class Dashboard:
             if mode and mode[0]=='demo':raise ValueError('示範庫不能同步正式庫存')
             import inventory_sync
             return self.start('讀回 Discogs 刊登狀態',lambda:inventory_sync.run(s))
+        if path=='/api/purchase-priority':
+            return __import__('refresh_priority').set_purchases(s,data.get('source_urls'),data.get('enabled'))
         if path=='/api/sourcing/reverse':
             if not s.token:raise ValueError('尚未設定 Discogs')
             with connect(s.db_path) as c:

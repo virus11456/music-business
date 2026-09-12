@@ -3,6 +3,7 @@ from db import connect, snapshot, now
 from discogs_client import DiscogsClient, parse_release, parse_stats, APIError
 
 def save_release(c, r, theme=None):
+    if 'barcodes' in r:c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(f"release_barcodes_{r['release_id']}",json.dumps(r['barcodes'])))
     if 'labels' in r:c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(f"release_labels_{r['release_id']}",r['labels']))
     c.execute('''INSERT INTO releases(release_id,title,artist,year,country,format,catno,source_theme,added_at)
       VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(release_id) DO UPDATE SET title=excluded.title,
