@@ -20,3 +20,12 @@ test('default scope hides unavailable and auctions without declaring unknown sup
  assert.ok(meetsSupply({availability:'預購'},'all'));
  assert.ok(meetsSupply({price_kind:'current_bid'},'auction'));
 });
+
+test('explicit ordering restrictions in real source titles override unknown or reported stock',()=>{
+ for(const source_title of ['[ 沐耳 ] 披頭四 The Beatles （待補貨，勿下標） 65 年經典第六張專輯 Rubber Soul 黑膠唱片','CD 已售出','預購商品 卡帶']){
+  assert.equal(sourceAvailability({source_title,availability:'來源標示有庫存'}),'unavailable');
+  assert.equal(meetsSupply({source_title,availability:'未確認'},'regular'),false);
+ }
+ assert.equal(sourceAvailability({source_title:'Album Sold Out CD',availability:'未確認'}),'unknown');
+ assert.equal(sourceAvailability({source_title:'現貨 CD',availability:'未確認'}),'unknown');
+});

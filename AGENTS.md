@@ -11,3 +11,5 @@
 - 若 GitHub 同步受阻，保留本機變更，說明確切阻礙。
 
 - 爬蟲與資料收集操作使用 [.agents/skills/record-source-crawlers/SKILL.md](.agents/skills/record-source-crawlers/SKILL.md)；新增或修改平台抓取、分批反查、排程、同步時，必須同步更新對應 skill reference。skill 隨專案版本管理，定時執行仍由程式負責。
+
+- 使用者要求以正式網站操作搭配正式 API／資料庫資料回讀驗收；單元測試與本機建置只能補充，不能冒稱正式流程已驗證。驗收寫入使用已授權真實業務資料，避免將示範商品混入正式庫；明確記錄唯讀、寫入及未實測的範圍。
