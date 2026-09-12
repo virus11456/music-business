@@ -52,3 +52,5 @@ HTTP 完整流程測試在允許 localhost bind 的隔離測試環境執行；�
 ### 2026-09-12 正式主題擴充
 
 使用者已確認擴充至六個搜尋主題；平台範圍與首批結果見 docs/SEARCH_TOPICS.md（專案根目錄）。新主題為黑膠唱片、レコード、CD、卡帶、カセット；各自在正式 source_topics 保存，不寫死到排程。#58–62 均完成，325 件待反查，維持每輪 20 件與 10/16/22 時段，後續優先消化佇列。matched 僅表示版本候選，不能稱作已確認套利商品。
+
+前端 CollectionProgress 顯示 source_queue 首次反查進度；unchecked 只指沒有 source_checks，不含所有到期／身份改變項目。completed=total-unchecked 包含 failed 和 unmatched，不能當成成功匹配；匹配數更不能當成正毛利商品數。
