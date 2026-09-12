@@ -8,7 +8,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const require=createRequire(import.meta.url),cache={};
 function load(name){if(cache[name])return cache[name];const out=cache[name]={};const source=readFileSync(new URL('../'+name,import.meta.url),'utf8');
  new Function('require','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>id.startsWith('@/')?load(id.slice(2)+'.ts'):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id),out);return out;}
-const {parsePicks,purchaseRows,purchaseGroups,purchaseTotals,purchaseCsv}=load('lib/purchase-list.ts');
+const {purchaseSupply,purchaseSupplyLabel,parsePicks,purchaseRows,purchaseGroups,purchaseTotals,purchaseCsv}=load('lib/purchase-list.ts');
 const now=Date.parse('2026-09-12T12:00:00Z'),stamp=new Date(now).toISOString();
 const row={key:'candidate-1',release_id:1,source_url:'https://example.com/item/1',source_title:'Test album',format:'CD',source_format:'CD',version_confirmed:true,source_catalog_no:'ABC-1',catalog_no:'ABC 1',source_price:'500',source_currency:'TWD',has_market:true,want:20,market_price:'30',market_currency:'USD',source_at:stamp,market_at:stamp,cost_basis:'source_price',source_twd:'500',gross_twd:'400',gross_margin:0.44,availability:'來源標示有庫存',vendor:'ruten'};
 const pick={key:row.key,release_id:1,source_url:row.source_url,title:row.source_title,seller:''};
@@ -68,4 +68,19 @@ test('purchase review action shows timestamps and is disabled for missing or loc
  assert.match(missing,/<button[^>]*disabled=""[^>]*>核對貨源／成本/);
  const locked=renderToStaticMarkup(React.createElement(View,{...props,locked:true}));
  assert.match(locked,/<button[^>]*disabled=""[^>]*>核對貨源／成本/);
+});
+
+
+test('fresh matching manual supply confirmation resolves unknown supply but cannot override conflicts or newer data',()=>{
+ const offer={release_id:1,source_url:row.source_url,supply_confirmed:1,owned_confirmed:0};
+ const verified={...row,availability:'未確認',offer,cost_at:stamp};
+ assert.equal(purchaseSupply(verified,now),'confirmed');
+ assert.match(purchaseSupplyLabel(verified,now),/人工確認/);
+ assert.equal(purchaseTotals(purchaseRows([pick],[verified],now)).count,1);
+ for(const patch of [{availability:'售完'},{price_kind:'current_bid'},{cost_at:null},{cost_at:'2020-01-01T00:00:00Z'},{cost_at:'2099-01-01T00:00:00Z'},{source_at:new Date(now+1).toISOString()},{offer:{...offer,release_id:2}},{offer:{...offer,source_url:'https://example.com/other'}},{offer:{...offer,supply_confirmed:0}}]){
+  assert.equal(purchaseSupply({...verified,...patch},now),'unknown',JSON.stringify(patch));
+ }
+ assert.equal(purchaseSupply({...verified,source_at:stamp,cost_at:new Date(now-1000).toISOString()},now),'unknown');
+ const owned=purchaseRows([pick],[{...verified,offer:{...offer,owned_confirmed:1}}],now);
+ assert.equal(purchaseTotals(owned).count,0);assert.match(owned[0].issues.join(' '),/已持有/);
 });
