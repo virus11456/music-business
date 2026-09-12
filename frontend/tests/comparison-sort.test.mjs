@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {hasPositiveMargin,buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -90,4 +90,14 @@ test('record index shares one filtering pass and preserves release-specific matc
  assert.equal(checks,10000);assert.equal(items.length,10000);
  const mixed=buildRecordIndex([{...base,release_id:1,gross_twd:null,gross_margin:null},{...base,release_id:1,gross_twd:'-10',gross_margin:-0.1},{...base,release_id:2,source_format:'Vinyl'},{...base,release_id:3,excluded:true}],()=>true);
  assert.equal(mixed.size,1);assert.equal(mixed.get(1).bestGross,-10);assert.equal(mixed.get(1).bestMargin,-0.1);
+});
+
+test('positive-margin shortlist excludes losses zero and missing values before ranking',()=>{
+ const base={release_id:1,format:'CD',source_format:'CD',has_market:true,market_price:'30',market_currency:'USD',source_price:'10',source_currency:'USD',source_url:'https://example.com/item',want:4,gross_twd:'100',gross_margin:.2};
+ assert.equal(hasPositiveMargin(base),true);
+ for(const gross_margin of [-.1,0,null,undefined,NaN,Infinity,''])assert.equal(hasPositiveMargin({...base,gross_margin}),false);
+ assert.equal(hasPositiveMargin({...base,gross_twd:'-1'}),false);
+ const rows=[base,{...base,release_id:2,gross_twd:'200',gross_margin:.1},{...base,release_id:3,gross_twd:'300',gross_margin:-.1}];
+ const index=buildRecordIndex(rows,hasPositiveMargin);
+ assert.deepEqual([...index.keys()].sort((a,b)=>index.get(b).bestGross-index.get(a).bestGross),[2,1]);
 });

@@ -73,3 +73,7 @@ export function buildRecordIndex(rows:Comparison[],accept:(row:Comparison)=>bool
  }
  return index;
 }
+
+export function hasPositiveMargin(row:Pick<Comparison,'gross_twd'|'gross_margin'>):boolean{
+ return candidateProfit(row,'margin')>0&&candidateProfit(row,'gross')>0;
+}
