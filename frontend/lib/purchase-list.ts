@@ -21,9 +21,11 @@ export function purchaseIssues(row:Comparison|undefined,now=Date.now()):string[]
  return [...new Set(issues)];
 }
 export function purchaseRows(picks:PurchasePick[],rows:Comparison[],now=Date.now()){
- const index=new Map(rows.map(row=>[row.key,row]));
- return picks.map(pick=>{const found=index.get(pick.key);const row=found?.release_id===pick.release_id&&found?.source_url===pick.source_url?found:undefined;
- const issues=purchaseIssues(row,now);
+ const identity=(release:number,url:string)=>JSON.stringify([release,url]);
+ const index=new Map<string,Comparison[]>();
+ for(const row of rows){const id=identity(row.release_id,row.source_url);index.set(id,[...(index.get(id)||[]),row])}
+ return picks.map(pick=>{const matches=index.get(identity(pick.release_id,pick.source_url))||[];const row=matches.length===1?matches[0]:undefined;
+ const issues=matches.length>1?['同一商品與版本存在多筆報價，請先核對後再計算']:purchaseIssues(row,now);
  if(picks.some(other=>other.key!==pick.key&&other.source_url===pick.source_url))issues.push('同一貨源選到多個版本，請保留正確的一筆');
  return {pick,row,issues};});
 }

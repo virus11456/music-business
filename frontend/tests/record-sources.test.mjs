@@ -80,3 +80,10 @@ test('catalog inferred from title is labeled rather than presented as supplied m
  assert.ok(html.includes('AP-8156'));assert.ok(html.includes('由標題辨識，待核對'));
  assert.ok(!render([{...row,source_catalog_no:'AP-8156'}]).includes('由標題辨識'));
 });
+
+
+test('a full purchase list blocks adding without disabling source review',()=>{
+ const html=renderToStaticMarkup(React.createElement(exports.default,{rows:[{...row,has_market:true}],onAction:()=>{},onPurchase:()=>{},purchaseLocked:true}));
+ assert.match(html,/<button[^>]*disabled=""[^>]*>加入採購清單/);
+ assert.match(html,/<button type="button" class="btn secondary">核對貨源/);
+});

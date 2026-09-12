@@ -47,3 +47,25 @@ test('same source matched to multiple releases is not counted as multiple availa
  const items=purchaseRows([pick,second],[row,{...row,key:'2',release_id:2}],now);
  assert.equal(purchaseTotals(items).count,0);assert.ok(items.every(i=>i.issues.some(x=>x.includes('多個版本'))));
 });
+
+
+test('reviewed offer replaces candidate without losing selection or seller grouping',()=>{
+ const reviewed={...row,key:'offer-42',cost_basis:'confirmed_total',cost_twd:'650',cost_at:stamp,gross_twd:'250'};
+ const items=purchaseRows([{...pick,seller:'Saved seller'}],[reviewed],now);
+ assert.equal(items[0].row,reviewed);assert.equal(items[0].pick.seller,'Saved seller');
+ assert.deepEqual(purchaseTotals(items),{count:1,cost:650,gross:250});
+ for(const patch of [{source_url:'https://example.com/other'},{release_id:99}])assert.equal(purchaseRows([pick],[{...reviewed,...patch}],now)[0].row,undefined);
+ const duplicate=purchaseRows([pick],[row,reviewed],now);
+ assert.equal(duplicate[0].row,undefined);assert.match(duplicate[0].issues[0],/多筆報價/);assert.equal(purchaseTotals(duplicate).count,0);
+});
+
+test('purchase review action shows timestamps and is disabled for missing or locked data',()=>{
+ const View=load('components/purchase-list.tsx').default;
+ const props={picks:[pick],rows:[row],onChange:()=>{},storageError:'',onReview:()=>{}};
+ const html=renderToStaticMarkup(React.createElement(View,props));
+ for(const text of ['核對貨源／成本','貨源','行情','https://www.discogs.com/release/1'])assert.ok(html.includes(text));
+ const missing=renderToStaticMarkup(React.createElement(View,{...props,rows:[]}));
+ assert.match(missing,/<button[^>]*disabled=""[^>]*>核對貨源／成本/);
+ const locked=renderToStaticMarkup(React.createElement(View,{...props,locked:true}));
+ assert.match(locked,/<button[^>]*disabled=""[^>]*>核對貨源／成本/);
+});
