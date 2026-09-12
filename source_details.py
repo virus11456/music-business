@@ -8,7 +8,7 @@ import platforms
 
 
 def text(value):
-    return ' '.join(unescape(str(value)).split())
+    return ' '.join(unescape(str(value)).replace('\u200e','').split())
 
 
 def detail_url(platform, external_id):

@@ -42,8 +42,20 @@ class DetailTests(unittest.TestCase):
                 eid=url.rsplit('/',1)[-1];calls.append(eid)
                 return product(eid=eid,fmt='LP' if eid=='2' else 'CD')
             report=source_refresh.run(s,fetch,detail_limit=2,sleeper=lambda _:None)
-            self.assertEqual((report['attempted'],report['updated'],report['failed']),(2,1,1));self.assertEqual(calls,['1','2'])
+            self.assertEqual((report['attempted'],report['updated'],report['failed']),(2,1,1));self.assertEqual(calls,['1','2']);self.assertEqual(report['platforms'][-1]['failures'],[{'external_id':'2','reason':'format_changed'}])
             with connect(s.db_path) as c:
                 rows=c.execute('SELECT * FROM platform_candidates ORDER BY id').fetchall()
                 self.assertEqual(rows[0]['price'],'5790');self.assertEqual(rows[0]['catalog_no'],'CAT');self.assertTrue(rows[1]['captured_at'].startswith('2020'))
             source_refresh.run(s,fetch,detail_limit=2,sleeper=lambda _:None);self.assertEqual(calls,['1','2','3'])
+
+    def test_diagnostics_are_safe_and_distinguish_identity(self):
+        from urllib.error import HTTPError,URLError
+        self.assertEqual(source_refresh.failure_reason(HTTPError('https://example.invalid',403,'SECRET',{},None)),'http_403')
+        self.assertEqual(source_refresh.failure_reason(URLError('SECRET')),'connection')
+        self.assertEqual(source_refresh.failure_reason(ValueError('SECRET')),'unclassified')
+        self.assertEqual(source_refresh.failure_reason(ValueError('商品格式變更，待重新配對')),'format_changed')
+        self.assertEqual(source_refresh.failure_reason(KeyError('SECRET')),'missing_field')
+
+    def test_direction_marker_is_not_an_edition_change(self):
+        self.assertEqual(source_details.text('The Beatles \u200e– Rarities'),source_details.text('The Beatles – Rarities'))
+        self.assertNotEqual(source_details.text('Album＜初回限定盤＞'),source_details.text('Album'))
