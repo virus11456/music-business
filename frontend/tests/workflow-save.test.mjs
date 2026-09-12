@@ -72,3 +72,29 @@ test('CSV export blocks rapid repeats and unlocks after failure for an explicit 
  click();assert.equal(calls,2);
  rejectDownload(Error('匯出失敗'));await new Promise(resolve=>setImmediate(resolve));
 });
+
+
+test('successful download refreshes records and keeps export locked until refresh finishes',async()=>{
+ let calls=0,refreshes=0,finishRefresh;
+ const h=harness(async()=>true,async()=>{calls++});
+ h.props.view='listing';h.props.initialReview=undefined;h.props.workflow.drafts=[{id:1}];
+ h.props.onRefresh=()=>{refreshes++;return new Promise(resolve=>{finishRefresh=resolve})};
+ const click=find(h.render(),'button').props.onClick;click();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(refreshes,1);assert.equal(find(h.render(),'button').props.disabled,true);
+ assert.equal(find(h.render(),'p').props.role,'status');
+ assert.match(find(h.render(),'p').props.children,/已啟動檔案下載/);
+ click();assert.equal(calls,1);finishRefresh();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(find(h.render(),'button').props.disabled,false);
+});
+
+test('failed download still refreshes records without automatically exporting again',async()=>{
+ let calls=0,refreshes=0;
+ const h=harness(async()=>true,async()=>{calls++;throw Error('連線中斷')});
+ h.props.view='listing';h.props.initialReview=undefined;h.props.workflow.drafts=[{id:1}];
+ h.props.onRefresh=async()=>{refreshes++};
+ find(h.render(),'button').props.onClick();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(calls,1);assert.equal(refreshes,1);
+ assert.match(find(h.render(),'p').props.children,/先核對下方匯出紀錄/);
+ assert.equal(find(h.render(),'button').props.disabled,false);
+});
