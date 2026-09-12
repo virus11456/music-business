@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 const require=createRequire(import.meta.url),cache={};
 function load(name){if(cache[name])return cache[name];const out=cache[name]={};new Function('require','exports',ts.transpileModule(readFileSync(new URL('../'+name,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>id==='@/components/ui/button'?{Button:props=>React.createElement('button',props)}:id.startsWith('@/')?load(id.slice(2)+'.ts'):require(id),out);return out;}
 const View=load('components/comparison-table.tsx').default;
-const row={want:10,format:'CD',source_format:'CD',gross_twd:'100',gross_margin:0.2,source_price:'500',source_currency:'TWD',market_price:'20',market_currency:'USD',issues:[],version_confirmed:false,has_market:true,offer:null,listing_status:'unlisted'};
+const row={market_at:new Date().toISOString(),source_at:new Date().toISOString(),want:10,format:'CD',source_format:'CD',gross_twd:'100',gross_margin:0.2,source_price:'500',source_currency:'TWD',market_price:'20',market_currency:'USD',issues:[],version_confirmed:false,has_market:true,offer:null,listing_status:'unlisted'};
 const render=n=>renderToStaticMarkup(React.createElement(View,{rows:Array.from({length:n},(_,i)=>({...row,key:String(i).padStart(4,'0'),source_title:'item-'+i,release_title:'Album',source_url:'https://example.com/'+i,release_id:i+1})),locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
 test('large comparison sets render at most 50 rows while preserving the total and pagination',()=>{
  const html=render(121),tbody=html.split('<tbody>')[1].split('</tbody>')[0];
@@ -20,4 +20,13 @@ test('profitable view excludes conflicting identity and missing demand or usable
  const rows=[base,...variants.map((patch,i)=>({...base,...patch,key:'bad-'+i,source_title:'bad-source-'+i}))];
  const html=renderToStaticMarkup(React.createElement(View,{rows,locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
  assert.ok(html.includes('符合條件 1 筆'));assert.ok(html.includes('valid-source'));assert.ok(!html.includes('bad-source-'));
+});
+
+test('default view hides old or unknown timestamps and unavailable supply while labeling unknown stock honestly',()=>{
+ const base={...row,key:'fresh',source_title:'fresh-source',release_title:'Album',source_url:'https://example.com/item',release_id:1};
+ const old=new Date(Date.now()-49*3600000).toISOString();
+ const variants=[{market_at:old},{source_at:old},{source_at:null},{market_at:null},{availability:'售完'},{availability:'預購'},{price_kind:'current_bid'},{cost_basis:'confirmed_total',cost_at:old},{source_at:old,cost_basis:'confirmed_total',cost_at:new Date().toISOString()}];
+ const rows=[base,...variants.map((patch,i)=>({...base,...patch,key:'stale-'+i,source_title:'hidden-source-'+i}))];
+ const html=renderToStaticMarkup(React.createElement(View,{rows,locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
+ assert.ok(html.includes('符合條件 1 筆'));assert.ok(html.includes('fresh-source'));assert.ok(!html.includes('hidden-source-'));assert.ok(html.includes('供貨待確認'));
 });
