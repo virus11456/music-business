@@ -14,7 +14,10 @@ export async function apiFetch(path:string,options:RequestInit={}){
  finally{clearTimeout(timeout);pending.delete(controller);}
 }
 export async function downloadCsv(path:string,filename:string){
+ const startedRevision=accessRevision();
  const response=await apiFetch(path);
  if(!response.ok){let message='匯出失敗，請確認登入及所選商品幣別';try{const body=await response.json() as {error?:unknown};if(typeof body.error==='string')message=body.error;}catch{}throw Error(message);}
- const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const blob=await response.blob();
+ if(startedRevision!==accessRevision())throw Error('登入狀態已變更，已取消下載；請重新登入後核對匯出紀錄。');
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

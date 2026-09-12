@@ -6,12 +6,13 @@ import ts from 'typescript';
 const source=await readFile(new URL('../components/workflow.tsx',import.meta.url),'utf8');
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const realRequire=createRequire(import.meta.url);
-function harness(send){
+function harness(send,downloadCsv){
  const slots=[];let cursor=0,closed=0;
  const hooks={useEffect:()=>{},useRef:value=>{const i=cursor++;return slots[i]??= {current:value}},useState:value=>{const i=cursor++;if(!(i in slots))slots[i]=typeof value==='function'?value():value;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next}]}};
  const exports={};
  new Function('require','exports',js)(id=>{
   if(id==='react')return hooks;
+  if(id==='@/lib/api')return {downloadCsv};
   if(id==='@/lib/draft-filter')return {filterDrafts:()=>[]};
   if(id==='@/lib/draft-selection')return {draftSelection:()=>({}),exportIssues:()=>[]};
   if(id.startsWith('@/'))return {default:()=>null,Button:()=>null};
@@ -19,7 +20,7 @@ function harness(send){
  },exports);
  const props={view:'review',initialReview:{key:'source-17',release_id:42,ready:false,offer:{id:17,amount:'350',currency:'TWD'}},workflow:{platforms:{candidates:[]},drafts:[],grades:[]},records:[],jobs:[],locked:false,onClose:()=>closed++,send};
  const render=()=>{cursor=0;return exports.default(props)};
- return {render,get closed(){return closed}};
+ return {render,props,get closed(){return closed}};
 }
 function find(node,type){
  if(!node)return;
@@ -57,4 +58,17 @@ test('server validation reason is shown inside the still-open form',async()=>{
  await find(h.render(),'form').props.onSubmit(event());
  assert.equal(find(h.render(),'form').props.children[0].props.children,'草稿與來源報價版本不一致');
  assert.equal(h.closed,0);
+});
+
+
+test('CSV export blocks rapid repeats and unlocks after failure for an explicit retry',async()=>{
+ let rejectDownload,calls=0;
+ const h=harness(async()=>true,()=>{calls++;return new Promise((_resolve,reject)=>{rejectDownload=reject})});
+ h.props.view='listing';h.props.initialReview=undefined;h.props.workflow.drafts=[{id:1}];
+ const click=find(h.render(),'button').props.onClick;
+ click();click();assert.equal(calls,1);
+ rejectDownload(Error('匯出失敗'));await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(find(h.render(),'p').props.role,'alert');
+ click();assert.equal(calls,2);
+ rejectDownload(Error('匯出失敗'));await new Promise(resolve=>setImmediate(resolve));
 });

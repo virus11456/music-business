@@ -26,3 +26,16 @@ test('logout cancels in-flight requests and changes session revision',async()=>{
   api.setAccessCode('');await rejected;assert.ok(api.accessRevision()>before);
  }finally{globalThis.fetch=original;}
 });
+
+
+test('logout after response headers prevents a delayed CSV body from downloading',async()=>{
+ const original=globalThis.fetch;let resolveBody;
+ try{
+  api.setAccessCode('test-session');
+  globalThis.fetch=async()=>({ok:true,blob:()=>new Promise(resolve=>{resolveBody=resolve})});
+  const downloading=api.downloadCsv('/api/drafts/export','review.csv');
+  await new Promise(resolve=>setImmediate(resolve));
+  api.setAccessCode('');resolveBody(new Blob(['private,csv']));
+  await assert.rejects(downloading,/登入狀態已變更/);
+ }finally{globalThis.fetch=original;api.setAccessCode('');}
+});

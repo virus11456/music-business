@@ -25,7 +25,8 @@ export default function Workflow({csrf,aiConfigured=false,workflow:w,records,she
  const [saveError,setSaveError]=useState('');
  const saveInFlight=useRef(false);
  const [exporting,setExporting]=useState(false);
- async function exportFile(path:string,name:string){try{setExporting(true);setExportError('');await downloadCsv(path,name)}catch(e){setExportError(e instanceof Error?e.message:'匯出失敗')}finally{setExporting(false)}}
+ const exportInFlight=useRef(false);
+ async function exportFile(path:string,name:string){if(exportInFlight.current||locked)return;exportInFlight.current=true;try{setExporting(true);setExportError('');await downloadCsv(path,name)}catch(e){setExportError(e instanceof Error?e.message:'匯出失敗')}finally{exportInFlight.current=false;setExporting(false)}}
  const [modal,setModal]=useState<'offer'|'sheet'|'draft'|null>(initialReview?(initialReview.ready?'draft':'offer'):null),[saving,setSaving]=useState(false);
  const findDraft=(r:Comparison)=>r.offer?.id?w.drafts.find(d=>d.source_offer_id===r.offer!.id)||null:null;
  const [editing,setEditing]=useState<Draft|null>(()=>initialReview?.ready?findDraft(initialReview):null);
