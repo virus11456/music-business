@@ -408,3 +408,9 @@
 - 新增 `.agents/skills/record-source-crawlers/SKILL.md`，提供四個已實作平台、Discogs 反查、快取／排程與 Sheets 同步的共用操作入口；平台與資料流程細節分為兩份 reference。
 - 引用現有 Python 實作，不複製爬蟲、不變更正式排程。AGENTS.md 記錄後續爬蟲修改須同步維護 skill；可從本專案使用 `$record-source-crawlers`。此為專案技能，未安裝到全域技能目錄。
 - 已以 Ruby YAML 解析驗證 frontmatter 與介面設定，檢查 reference 連結、測試路徑及未完成標記。內建 quick_validate.py 因本機缺 PyYAML 未能執行，未宣稱其驗證通過。本次僅技能與文件更新，未重跑正式抓取或部署後端。
+
+### 2026-09-12 爬蟲 Skill 唯讀診斷工具
+- 新增 skill scripts/inspect_crawlers.py，明確指定既有 SQLite 路徑，使用 mode=ro、query_only 與一致快照；不初始化資料庫、不呼叫爬蟲或網路。
+- 報告各平台最近收集結果、過期／未知報價、未反查、快取、到期／身份改變與無效重試時間，以及最近排程歷史。資料庫無法證明執行緒存活，enabled 回 null，要求另查正式 API。
+- 三項隔離測試通過：不存在檔案不建立、缺 schema 不初始化、身份變更與快取／異常時間統計、檔案內容不變且不輸出其他 meta。CLI help 已驗證。
+- 本次為工具與技能文件更新，未重新抓取正式平台、未變更 VPS 排程或前端。

@@ -15,6 +15,16 @@ description: 維護或執行 SIMPLES 唱片進貨資料抓取，涵蓋台灣 Yah
 - 批次反查、快取、排程、Sheets 或比價結果：讀 [資料流程](references/pipeline.md)。
 - 新增來源：依平台介面的擴充步驟處理。CATALOG 中 `supported=false` 只是通路名錄，不代表已接通。
 
+## 唯讀診斷
+
+使用 [scripts/inspect_crawlers.py](scripts/inspect_crawlers.py) 檢查既有資料庫：
+
+```bash
+python3 .agents/skills/record-source-crawlers/scripts/inspect_crawlers.py --db /path/to/existing.sqlite3
+```
+
+路徑必須由目前部署設定確認，不能猜測或建立新庫。工具以 SQLite read-only/query-only 開啟一致快照，輸出各平台最近收集、48 小時過期／未知報價、未反查、到期或身份改變數與排程歷史；不連網、不開始工作、不讀取憑證。`due` 將損壞重試時間列為待診斷，不代表現行排程一定能正常處理它。資料庫歷史不能證明排程程序仍存活，enabled 固定為 null，須另查正式 `/api/state`。
+
 ## 執行邊界
 
 本專案以 VPS 為唯一正式資料庫與排程。維護前讀取 `/api/state` 的 active、jobs、schedule、source_queue；不要在 Mac 啟動第二套正式後端。程式測試用臨時資料庫，不能往正式庫塞示範商品。
