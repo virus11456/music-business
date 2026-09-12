@@ -78,7 +78,7 @@ class Dashboard:
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
         return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
-            'configured':{'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
+            'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
@@ -182,6 +182,9 @@ class Dashboard:
         if not self.lock.acquire(blocking=False):
             raise ValueError('行情工作執行中，請完成後再儲存')
         try:
+            if path=='/api/drafts/suggest-note':
+                import ai_listing
+                return ai_listing.suggest(s,release_id(required(data,'draft_id')))
             if path=='/api/assumptions':
                 from config import business_values
                 values=business_values(data)
