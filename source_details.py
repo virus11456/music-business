@@ -8,7 +8,7 @@ import platforms
 
 
 def text(value):
-    return ' '.join(unescape(str(value)).replace('\u200e','').split())
+    return ' '.join(unescape(str(value)).replace('\u200e','').translate(str.maketrans('［］','[]')).split())
 
 
 def detail_url(platform, external_id):
@@ -56,7 +56,19 @@ def parse(platform, external_id, raw):
         stock=str(offer.get('availability','')).rsplit('/',1)[-1].lower()
         availability={'instock':'在庫あり','limitedavailability':'在庫わずか','outofstock':'無現貨','soldout':'售完','discontinued':'無現貨','preorder':'預購','backorder':'お取り寄せ'}.get(stock,'未確認')
         kind='listed'
-        if platform=='tower':fmt=item.get('itemVariant')
+        if platform=='tower':
+            fmt=item.get('itemVariant')
+            # Tower's Product name omits edition suffixes present in its visible
+            # product heading. Retain those suffixes for the saved-title check.
+            headings=root.find('h1','PC-item-info-title')
+            if headings:
+                if len(headings)!=1 or not isinstance(title,str) or not title.strip():
+                    raise ValueError('商品頁結構改變')
+                full_title=text(headings[0].text());base=text(title)
+                suffix=full_title[len(base):] if full_title.startswith(base) else None
+                if suffix is None or (suffix and not re.fullmatch(r'(?:\s*(?:＜[^＜＞]+＞|\[[^\[\]]+\]))+',suffix)):
+                    raise ValueError('商品名稱變更，待重新配對')
+                title=full_title
         if platform=='yahoo_jp':
             # A structured Offer can describe the current bid, not a buy-now price.
             kind='current_bid'

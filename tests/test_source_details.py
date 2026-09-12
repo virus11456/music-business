@@ -36,11 +36,11 @@ class DetailTests(unittest.TestCase):
             s=Settings(db_path=Path(folder)/'test.db');init(s.db_path);platforms.init(s)
             with connect(s.db_path) as c:
                 for i in range(1,4):
-                    c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,'tower',str(i),'test','Album','Artist','CD','CAT','200','JPY','listed','未確認',source_details.detail_url('tower',str(i)),'2020-01-01T00:00:00+00:00'))
+                    c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,'tower',str(i),'test','Album＜初回限定盤＞','Artist','CD','CAT','200','JPY','listed','未確認',source_details.detail_url('tower',str(i)),'2020-01-01T00:00:00+00:00'))
             calls=[]
             def fetch(url):
                 eid=url.rsplit('/',1)[-1];calls.append(eid)
-                return product(eid=eid,fmt='LP' if eid=='2' else 'CD')
+                return product(eid=eid,fmt='LP' if eid=='2' else 'CD')+'<h1 class="PC-item-info-title">Album＜初回限定盤＞</h1>'
             report=source_refresh.run(s,fetch,detail_limit=2,sleeper=lambda _:None)
             self.assertEqual((report['attempted'],report['updated'],report['failed']),(2,1,1));self.assertEqual(calls,['1','2']);self.assertEqual(report['platforms'][-1]['failures'],[{'external_id':'2','reason':'format_changed'}])
             with connect(s.db_path) as c:
@@ -59,3 +59,17 @@ class DetailTests(unittest.TestCase):
     def test_direction_marker_is_not_an_edition_change(self):
         self.assertEqual(source_details.text('The Beatles \u200e– Rarities'),source_details.text('The Beatles – Rarities'))
         self.assertNotEqual(source_details.text('Album＜初回限定盤＞'),source_details.text('Album'))
+
+    def test_tower_visible_edition_is_retained_and_conflicts_rejected(self):
+        def heading(title):return '<h1 class="is-bold PC-item-info-title">'+title+'</h1>'
+        raw=product(title='Album')+heading('Album＜初回限定盤＞')
+        self.assertEqual(source_details.parse('tower','123',raw)['title'],'Album＜初回限定盤＞')
+        self.assertNotEqual(source_details.parse('tower','123',raw)['title'],'Album＜通常盤＞')
+        bundle=product(title='Album')+heading('Album ［SHM-CD+折りポスター］＜限定盤＞')
+        self.assertEqual(source_details.parse('tower','123',bundle)['title'],'Album [SHM-CD+折りポスター]＜限定盤＞')
+        for extra in [heading('Another Album＜初回限定盤＞'),heading('Album Deluxe'),heading('Album')+heading('Album')]:
+            with self.assertRaises(ValueError):source_details.parse('tower','123',product()+extra)
+
+    def test_bundle_brackets_normalize_without_dropping_contents(self):
+        self.assertEqual(source_details.text('Album ［LP+Poster］＜限定盤＞'),source_details.text('Album [LP+Poster]＜限定盤＞'))
+        self.assertNotEqual(source_details.text('Album ［LP+Poster］'),source_details.text('Album [CD+Poster]'))
