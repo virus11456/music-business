@@ -30,3 +30,11 @@ test('default view hides old or unknown timestamps and unavailable supply while 
  const html=renderToStaticMarkup(React.createElement(View,{rows,locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
  assert.ok(html.includes('符合條件 1 筆'));assert.ok(html.includes('fresh-source'));assert.ok(!html.includes('hidden-source-'));assert.ok(html.includes('供貨待確認'));
 });
+
+test('listing status is an independent control and unknown rows are not labeled unlisted',()=>{
+ const html=renderToStaticMarkup(React.createElement(View,{rows:[{...row,listing_status:undefined,key:'unknown',source_title:'Unknown listing',release_title:'Album',source_url:'https://example.com/item',release_id:1}],locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
+ assert.ok(html.includes('aria-label="刊登狀態篩選"'));
+ const tbody=html.split('<tbody>')[1].split('</tbody>')[0];
+ assert.ok(tbody.includes('<b>刊登狀態待確認</b>'));assert.ok(!tbody.includes('<b>未上架</b>'));
+ const quality=html.split('aria-label="篩選配對"')[1].split('</select>')[0];assert.ok(!quality.includes('value="unlisted"'));
+});
