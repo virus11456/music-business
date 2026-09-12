@@ -76,7 +76,7 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'inventory':__import__('inventory_sync').state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
@@ -189,6 +189,9 @@ class Dashboard:
         if not self.lock.acquire(blocking=False):
             raise ValueError('行情工作執行中，請完成後再儲存')
         try:
+            if path=='/api/notifications/resolve':
+                import notification_review
+                return notification_review.resolve(s,data.get('id'),data.get('outcome'))
             if path=='/api/inventory/reset':
                 with connect(s.db_path) as c:c.execute("DELETE FROM meta WHERE key='discogs_inventory_pending'")
                 return {'saved':True,'message':'已重設分頁進度，保留完整快照與刊登紀錄'}
