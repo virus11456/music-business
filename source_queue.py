@@ -59,7 +59,7 @@ def run(settings,query=None,selected=None,limit=20):
     import source_refresh
     result['source_refresh']=source_refresh.run(settings)
     if result['source_refresh']['failed'] or result['source_refresh']['missing']:
-        result['errors'].append({'step':'source_refresh','error':'部分露天報價未刷新'})
+        result['errors'].append({'step':'source_refresh','error':'部分平台報價未刷新'})
     instant=datetime.now(timezone.utc)
     with connect(settings.db_path) as c:
         candidates=[dict(r) for r in c.execute("SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY (s.checked_at IS NOT NULL),CASE WHEN trim(lower(p.catalog_no)) NOT IN ('','none','未確認') THEN 0 ELSE 1 END,coalesce(s.checked_at,''),p.id")]

@@ -20,7 +20,11 @@ export function jobReport(detail:string|null):string[]{
  function batch(value:unknown){
   const b=obj(value);
   const quotes=obj(b.source_refresh);
-  if(quotes.platform==='ruten')lines.push(`露天已存報價：檢查 ${count(quotes.attempted)??0} 件 · 更新 ${count(quotes.updated)??0} 件 · 未回傳 ${count(quotes.missing)??0} 件 · 失敗 ${count(quotes.failed)??0} 件`);
+  const quoteParts=list(quotes.platforms).length?list(quotes.platforms):quotes.platform==='ruten'?[quotes]:[];
+  for(const raw of quoteParts){
+   const q=obj(raw),name=names[String(q.platform)];if(!name)continue;
+   lines.push(`${name}已存報價：檢查 ${count(q.attempted)??0} 件 · 更新 ${count(q.updated)??0} 件 · 未回傳 ${count(q.missing)??0} 件 · 失敗 ${count(q.failed)??0} 件`);
+  }
   if(b.flow==='source_first'){
    source(b.collection);
    lines.push(`反查 ${count(b.checked)??0} 件 · 有配對 ${count(b.matched)??0} 件 · 留待配對 ${count(b.unmatched)??0} 件 · 沿用快取 ${count(b.cached)??0} 件 · 待處理 ${count(b.pending)??0} 件`);

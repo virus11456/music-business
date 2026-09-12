@@ -20,3 +20,9 @@ test('older and malformed records remain readable',()=>{
  assert.ok(jobReport(JSON.stringify({failed_platforms:2}))[0].includes('舊紀錄'));
  assert.ok(jobReport(JSON.stringify({synced:true,market_rows:3,source_rows:0}))[0].includes('報價 0 列'));
 });
+
+test('saved quote refresh reports all supported platforms and retains legacy Ruten jobs',()=>{
+ const text=jobReport(JSON.stringify({flow:'source_first',source_refresh:{platform:'all',platforms:[{platform:'tower',attempted:2,updated:1,failed:1,missing:0},{platform:'yahoo_tw',attempted:2,updated:2,failed:0,missing:0}]}})).join('\n');
+ assert.ok(text.includes('Tower已存報價：檢查 2 件 · 更新 1 件'));assert.ok(text.includes('Yahoo 台灣已存報價'));
+ const old=jobReport(JSON.stringify({flow:'source_first',source_refresh:{platform:'ruten',attempted:20,updated:20}})).join('\n');assert.ok(old.includes('露天已存報價：檢查 20 件'));
+});
