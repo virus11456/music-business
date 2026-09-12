@@ -580,3 +580,11 @@ source_details：Tower 讀 Product JSON-LD 並核對 itemId／商品路徑，bac
 使用者確認繼續同步後，四平台刷新程式與文件已同步 GitHub main（ed10d9d），Vercel 前端部署成功。Chrome 正式登入並開啟進貨頁，既有 1,191 件貨源、首次反查 100%、待處理 0、9/13 10:00 下輪排程正常顯示，與正式 API 一致。這只驗證新前端相容既有後端；新商品頁刷新尚未在 VPS 執行。
 
 重新進入正確共用主機管理帳號後，新 Web Console 仍顯示未回應，SSH 金鑰管理未載入成功。未新增臨時金鑰、未修改 SSH 設定、未重啟正式服務或整台 VPS。後端部署及正式刷新寫入驗收仍需恢復可用管理連線。
+
+### 2026-09-13 VPS 刷新部署與正式驗收完成
+
+透過 Chrome Hostinger SSH 管理加入臨時部署公鑰，連上 srv1542946；備份舊 source_refresh.py / source_queue.py 到 backups/refresh-20260913，部署 source_details.py、source_refresh.py、source_queue.py。三個檔案 SHA-256 與本機一致，主機 Python 編譯通過，僅重新啟動 music-business，服務 active。
+
+正式 API 工作 #81 已完成（partial）：22 件嘗試、21 件更新；露天 16/16、Yahoo TW 2/2、Yahoo JP 2/2、Tower 1/2。Tower 8142237 身分核對不符，保留舊價格與舊抓取時間，記錄 identity_changed，並未偽裝成功。正式 SQLite 回讀確認四平台更新時間、價格與失敗保留結果；行情更新 20 版，1,191 件沿用快取，未新增主題或商品。Sheets 回報同步成功 143 行行情（未逐格回讀）。Chrome 正式網站登入與資料呈現正常。
+
+排程 enabled，仍由 VPS 每日台灣時間 10:00、16:00、22:00 執行；下輪 9/13 10:00。新功能部署後的自動時段尚未到，已用相同正式流程手動驗收一輪，不宣稱排程新一輪已完成。部署臨時公鑰已從 Hostinger 移除。此紀錄取代上方後端待部署／管理連線阻塞狀態。
