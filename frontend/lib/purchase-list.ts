@@ -3,6 +3,7 @@ import {hasDemandAndSource,hasPositiveMargin,hasFreshComparison} from './compari
 import {matchLevel,matchConflicts} from './match-evidence';
 import {sourceAvailability} from './source-availability';
 export type PurchasePick={key:string;release_id:number;source_url:string;title:string;seller:string};
+const platformNames:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower'};
 export const purchaseStorageKey='simples.purchase-list.v1';
 export function parsePicks(raw:string|null):PurchasePick[]{
  try{const data=JSON.parse(raw||'[]');if(!Array.isArray(data))return [];
@@ -29,7 +30,7 @@ export function purchaseRows(picks:PurchasePick[],rows:Comparison[],now=Date.now
 export type PurchaseItem=ReturnType<typeof purchaseRows>[number];
 export function purchaseGroups(items:PurchaseItem[]){
  const groups=new Map<string,{name:string;items:PurchaseItem[]}>();
- for(const item of items){const vendor=item.row?.vendor||'平台待確認';const seller=item.pick.seller.trim();
+ for(const item of items){const rawVendor=item.row?.vendor||'平台待確認';const vendor=platformNames[rawVendor]||rawVendor;const seller=item.pick.seller.trim();
  const key=JSON.stringify([vendor,seller||item.pick.source_url]);
  if(!groups.has(key))groups.set(key,{name:seller?`${vendor} · ${seller}（自行指定）`:`${vendor} · 賣家待確認`,items:[]});
  groups.get(key)!.items.push(item);}
