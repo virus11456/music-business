@@ -1,5 +1,6 @@
 """GET-only client; shared SQLite budget keeps overlapping jobs below 60/min."""
 import json
+import re
 import time
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
@@ -34,7 +35,7 @@ class DiscogsClient:
                       (self.clock()+seconds,))
 
     def get(self, path, params=None):
-        if not path.startswith(('/releases/', '/database/search', '/marketplace/stats/')):
+        if not (path.startswith(('/releases/', '/database/search', '/marketplace/stats/')) or path=='/oauth/identity' or re.fullmatch(r'/users/[A-Za-z0-9_%.-]+/inventory',path)):
             raise APIError('第一版僅允許已列出的唯讀端點')
         url = 'https://api.discogs.com'+path+('?' + urlencode(params) if params else '')
         request = Request(url,headers={'User-Agent':self.settings.user_agent,

@@ -40,3 +40,5 @@
 HTTP 完整流程測試在允許 localhost bind 的隔離測試環境執行；測試 subprocess 不應繼承正式 REMOTE_ACCESS_TOKEN／FRONTEND_ORIGIN／PUBLIC_API_ORIGIN，避免 fixture 被正式 Origin 拒絕。不得因此修改正式服務的認證設定。外部服務 mock、API 工作成功、真實平台連線與 Sheet 回讀各自說明，不混成「全流程已上線」。
 
 診斷前端最近工作時，失敗 detail 可能只是例外名稱，執行中可能為 null。`frontend/lib/collection-job.ts` 同時辨識收集／排程工作名稱及 JSON detail，不能只找最近成功 JSON。完整待開發項目見根目錄 `docs/IMPLEMENTATION_STATUS.md`。
+
+庫存讀回新模組 `inventory_sync.py` 與端點、分頁及關聯規則見根目錄 `docs/INVENTORY_SYNC.md`；此為開發中功能，勿將既有行情 API 成功視為庫存端點已驗收。
