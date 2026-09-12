@@ -162,4 +162,4 @@ source_details：Tower 讀 Product JSON-LD 並核對 itemId／商品路徑，bac
 
 source_refresh 工作結果新增逐平台 failures，保存商品 ID 與有限原因碼；區分名稱、格式、HTTP、逾時、欄位與狀態問題，不保存原始例外／HTML。前端工作明細新增未更新商品原因與可信平台連結，拒絕不合法 ID，兼容舊紀錄。VPS 已部署診斷，正式工作 #83：6 件嘗試、4 更新（Yahoo TW/JP 各 2）、Tower 2 件 title_changed；沿用 1,191 件快取，Sheets 回報 143 行同步成功，未逐格回讀。Tower 版本限制尚未放寬。
 
-19 項相關後端測試及 5 項前端報告測試通過。前端上線與畫面驗收待本次 GitHub 同步後確認；VPS 每日 10:00、16:00、22:00 排程維持。
+19 項相關後端測試及 5 項前端報告測試通過。前端 Vercel 部署 FJTrvYhgyLi7w8DsmEFux9spKdEm 成功；Chrome 正式登入，展開 #83 工作明細，已顯示兩筆 Tower 商品的名稱／版本標記原因及正確商品連結，與 API 一致。VPS 每日 10:00、16:00、22:00 排程維持；部署臨時公鑰及本機私鑰均已移除。
