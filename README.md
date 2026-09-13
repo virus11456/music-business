@@ -769,3 +769,6 @@ sheet_sync 在寫入前檢查比較資料的重複、格式／品番／條碼及
 ### 2026-09-13 略過未變動的展示分頁
 
 同步先讀取已有的受管理展示表，比較內容與公式，僅對不同或新建分頁送出寫入。所有受驗證分頁（含略過者）最後仍再次讀回核對；全部未變時不送展示表batchUpdate，但jobs及last_sheet_sync等原始紀錄仍正常寫入。Inputs保留原有使用者設定，頁面顯示本次寫入／略過數。此优化減少寫入量，不宣稱免讀取、不宣稱整個同步完全不寫Sheet或已量測加速比例。12項後端、7項前端測試通過，正式驗收另補記。
+
+
+正式補記：後端已部署，備份sheet-incremental-20260913。正式#96於12:31完成，changed_tables=[]、unchanged_tables為Comparisons／PlatformCandidates／Discogs／Sources／Analysis，5頁再讀回通過：2724比較、1309貨源、257行情。Chrome正式站仍正常登入連線。前端計數提示尚未上線：GitHub commit87906e8的Vercel建置因build-rate-limit失敗，未付費升級或改走其他專案規避限制；待額度恢復再部署。程式已同步GitHub，現有前端沿用先前成功版。此限制不影響已部署的後端略過重寫與自動核對。
