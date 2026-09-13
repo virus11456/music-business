@@ -26,6 +26,7 @@ export function refreshFailures(detail:string|null):{label:string;url:string}[]{
 export function jobReport(detail:string|null):string[]{
  let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return ['未保存步驟明細；請檢查連線與設定後重試。']}
  const lines:string[]=[];
+ function verification(value:Obj){const v=obj(value.verification);if(v.ok===true)lines.push(`Sheet 寫入後核對通過：${count(v.tables)??'未知'} 個分頁，價格與比對資料已讀回確認`);}
  const names:Record<string,string>={yahoo_tw:'Yahoo 台灣',yahoo_jp:'Yahoo 日本',ruten:'露天',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
  function source(value:unknown,prefix=''){
   const s=obj(value);
@@ -64,11 +65,13 @@ export function jobReport(detail:string|null):string[]{
    if(steps[String(e.step)])lines.push(`${id===null?'':`版本 #${id} · `}${steps[String(e.step)]}未完成；請檢查該服務的連線與設定後重試`);
   }
   if(obj(b.sheet_sync).synced===true)lines.push('Google Sheets 同步完成');
+  verification(obj(b.sheet_sync));
  }
  if(data.collection_paused===true)lines.push(`先處理已存商品（待反查 ${count(data.pending_before)??'未知'} 件），本輪不新增收集`);
  if(count(data.versions)!==null)lines.push(`本次排程涵蓋 ${data.versions} 個版本`);
  if(Array.isArray(data.batches))for(const b of data.batches)batch(b);else batch(data);
  source(data);
+ verification(data);
  if(data.synced===true)lines.push(`Google Sheets 同步完成：行情 ${count(data.market_rows)??'未知'} 列、報價 ${count(data.source_rows)??'未知'} 列`);
  return lines.length?lines:['此工作未保存可顯示的步驟明細。'];
 }

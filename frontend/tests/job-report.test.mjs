@@ -33,3 +33,9 @@ test('refresh failures expose safe reasons and construct trusted product links',
  assert.ok(result[0].label.includes('版本標記'));assert.ok(result[1].label.includes('403'));
  assert.ok(!JSON.stringify(result).includes('SECRET'));assert.deepEqual(refreshFailures('bad'),[]);
 });
+
+test('readback verification is visible for sync and nested batches',()=>{
+ const verification={ok:true,tables:5};
+ assert.match(jobReport(JSON.stringify({synced:true,verification})).join('\n'),/核對通過：5/);
+ assert.match(jobReport(JSON.stringify({sheet_sync:{synced:true,verification}})).join('\n'),/核對通過：5/);
+});

@@ -75,7 +75,11 @@ def build_tables(settings):
     with connect(settings.db_path) as c:
         has_platforms=c.execute("SELECT 1 FROM sqlite_master WHERE name='platform_candidates'").fetchone()
     if has_platforms:
-        for r in comparisons.build(settings):
+        comparison_data=comparisons.build(settings)
+        from sheet_audit import audit_comparisons
+        if not audit_comparisons(comparison_data)['ok']:
+            raise ValueError('比對資料檢查未通過，停止同步')
+        for r in comparison_data:
             def number(key):return float(r[key]) if r[key] is not None else None
             comparison_rows.append([r['status'],r['release_id'],r['format'],r['source_title'],r['vendor'],r['source_url'],number('source_price'),r['source_currency'],number('sale_twd'),number('cost_twd'),number('spread_twd'),number('gross_twd'),r['gross_margin'],number('net_twd'),r['net_margin'],'；'.join(r['issues']),'預估毛利按來源標價計算；未含未填的進貨費用。已填總成本時改用總成本。匯率 https://www.exchangerate-api.com',r.get('want'),r.get('have'),'已上架（人工登錄）' if r.get('listing_status')=='listed' else '未上架',r.get('listing_id'),'進貨總成本' if r.get('cost_basis')=='confirmed_total' else '來源標價'])
     return {'Comparisons':comparison_rows,'PlatformCandidates':candidates,'Discogs':market,'Sources':sources,'Inputs':inputs,'Analysis':analysis},formula_positions
@@ -105,6 +109,7 @@ def sync(settings,session=None):
     existing={s['properties']['title']:s for s in info.get('sheets',[])}
     tables,formulas=build_tables(settings)
     requests=[]
+    written={}
     ids=set(s['properties']['sheetId'] for s in existing.values())
     for title,rows in tables.items():
         name=PREFIX+title
@@ -119,6 +124,7 @@ def sync(settings,session=None):
             sid=max(ids or {0})+1;ids.add(sid)
             requests.extend([{'addSheet':{'properties':{'sheetId':sid,'title':name}}},
                 {'createDeveloperMetadata':{'developerMetadata':{'metadataKey':'simples_owner','metadataValue':'record_business_v1','visibility':'DOCUMENT','location':{'sheetId':sid}}}}])
+        written[title]=rows
         encoded=[{'values':[cell(v,title=='Analysis' and (i,j) in formulas) for j,v in enumerate(values)]} for i,values in enumerate(rows)]
         requests.extend([
             {'updateSheetProperties':{'properties':{'sheetId':sid,'gridProperties':{'rowCount':max(1000,len(rows)+10),'columnCount':max(26,len(rows[0])),'frozenRowCount':1}},'fields':'gridProperties'}},
@@ -126,6 +132,11 @@ def sync(settings,session=None):
             {'repeatCell':{'range':{'sheetId':sid,'startRowIndex':0,'endRowIndex':1},'cell':{'userEnteredFormat':{'backgroundColor':{'red':.14,'green':.31,'blue':.24},'textFormat':{'bold':True,'foregroundColor':{'red':1,'green':1,'blue':1}}}},'fields':'userEnteredFormat'}},
             {'updateDimensionProperties':{'range':{'sheetId':sid,'dimension':'COLUMNS','startIndex':0,'endIndex':len(rows[0])},'properties':{'pixelSize':170},'fields':'pixelSize'}}])
     request('POST',base+':batchUpdate',json={'requests':requests})
+    from sheet_audit import audit_written_tables
+    reply=request('GET',base+'/values:batchGet',params=[('ranges',"'"+PREFIX+name+"'") for name in written]+[('valueRenderOption','FORMULA')])
+    verification=audit_written_tables(written,reply.get('valueRanges',[]))
+    if not verification['ok']:
+        raise ValueError('Google Sheet 寫入後讀回不一致，請檢查同步紀錄')
     with connect(settings.db_path) as c:
         c.execute("INSERT OR REPLACE INTO meta VALUES('last_sheet_sync',?)",(now(),))
-    return {'synced':True,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}
+    return {'synced':True,'verification':verification,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}

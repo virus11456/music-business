@@ -45,3 +45,10 @@ class AuditTests(unittest.TestCase):
     def test_catalog_conflict(self):
         row=self.row();row.update(catalog_no='TOCP-123',source_catalog_no='TOCP-456')
         self.assertFalse(audit_comparisons([row])['ok'])
+
+    def test_written_cells_and_missing_blank_tails(self):
+        from sheet_audit import audit_written_tables
+        expected={'Data':[['id','value'],[1,None],[2,'=A2']]}
+        self.assertTrue(audit_written_tables(expected,[{'values':[['id','value'],[1],[2,'=A2']]}])['ok'])
+        self.assertFalse(audit_written_tables(expected,[{'values':[['id','value'],[1],[2,1]]}])['ok'])
+        self.assertFalse(audit_written_tables(expected,[])['ok'])

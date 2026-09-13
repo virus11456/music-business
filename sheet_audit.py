@@ -80,3 +80,25 @@ def audit_comparisons(rows):
             errors.append({'key': r['key'], 'code': 'invalid_gross_values'})
     return {'ok': not errors, 'rows': len(rows), 'positive_demand_combinations': positive, 'errors': errors,
             'scope': 'structure_format_barcode_arithmetic_not_pressing_confirmation'}
+
+
+def audit_written_tables(expected, ranges):
+    """Compare exact written cells, including formula text; tolerate omitted blank tails."""
+    errors = []
+    if len(ranges) != len(expected):
+        return {'ok': False, 'errors': [{'code': 'missing_readback_range'}]}
+    def canonical(rows):
+        cleaned = []
+        for row in rows:
+            row = ['' if v is None else v for v in row]
+            while row and row[-1] == '':
+                row.pop()
+            cleaned.append(row)
+        while cleaned and not cleaned[-1]:
+            cleaned.pop()
+        return cleaned
+    for (name, rows), result in zip(expected.items(), ranges):
+        if canonical(rows) != canonical(result.get('values', [])):
+            errors.append({'table': name, 'code': 'write_readback_mismatch'})
+    return {'ok': not errors, 'errors': errors, 'tables': len(expected),
+            'rows': {name: len(rows)-1 for name, rows in expected.items()}}

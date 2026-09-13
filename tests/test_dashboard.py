@@ -69,12 +69,16 @@ class DashboardTests(unittest.TestCase):
     def test_sync_preserves_existing_inputs(self):
         with connect(self.settings.db_path) as c:c.execute("INSERT INTO meta VALUES('google_sheet_id','test123')")
         captured=[]
+        self_outer=self
         class Response:
             status_code=200
             def __init__(self,data):self.data=data
             def json(self):return self.data
         class Session:
             def request(self,method,url,**kwargs):
+                if url.endswith('/values:batchGet'):
+                    tables,_=sheet_sync.build_tables(self_outer.settings)
+                    return Response({'valueRanges':[{'values':rows} for name,rows in tables.items() if name!='Inputs']})
                 if method=='GET':return Response({'sheets':[{'properties':{'title':'SIMPLES_Inputs','sheetId':10},'developerMetadata':[{'metadataKey':'simples_owner','metadataValue':'record_business_v1'}]}]})
                 captured.extend(kwargs['json']['requests']);return Response({})
         sheet_sync.sync(self.settings,Session())
