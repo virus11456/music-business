@@ -62,6 +62,12 @@ export function jobReport(detail:string|null):string[]{
   for(const raw of list(b.errors)){
    const e=obj(raw),id=count(e.release_id);
    const steps:Record<string,string>={market:'Discogs 行情',sourcing:'找貨',sheets:'Google Sheets 同步',fx:'參考匯率',reverse_match:'反查版本',source_refresh:'貨源報價刷新'};
+   const syncCodes:Record<string,string>={comparison_invalid:'比對資料檢查未通過；請檢查格式、版本編號與毛利',read_failed:'無法讀取工作表；請檢查連線、分享權限與服務狀態',write_rejected:'Google 拒絕寫入；請檢查分享權限、配額及工作表設定',write_unknown:'寫入結果尚未確認；請先查看 Sheet，勿連續重送',readback_failed:'已送出寫入，但無法讀回核對；尚未確認同步成功',readback_mismatch:'寫入後讀回不一致；請檢查下列分頁是否遭同時修改',ownership_conflict:'同名分頁非系統管理，已停止覆寫'};
+   if(e.step==='sheets' && syncCodes[String(e.code)]){
+    const allowed=['Comparisons','PlatformCandidates','Discogs','Sources','Inputs','Analysis'];
+    const tabs=list(e.tables).filter(t=>typeof t==='string'&&allowed.includes(t));
+    lines.push('Google Sheets：'+syncCodes[String(e.code)]+(tabs.length?'（'+tabs.map(t=>'SIMPLES_'+t).join('、')+'）':''));continue;
+   }
    if(steps[String(e.step)])lines.push(`${id===null?'':`版本 #${id} · `}${steps[String(e.step)]}未完成；請檢查該服務的連線與設定後重試`);
   }
   if(obj(b.sheet_sync).synced===true)lines.push('Google Sheets 同步完成');

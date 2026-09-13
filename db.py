@@ -121,7 +121,7 @@ def job(path, name):
         yield detail
     except Exception as exc:
         with connect(path) as c:
-            c.execute("UPDATE jobs SET finished_at=?,status='failed',detail=? WHERE id=?",(now(),type(exc).__name__,jid))
+            c.execute("UPDATE jobs SET finished_at=?,status='failed',detail=? WHERE id=?",(now(),json.dumps({'errors':[__import__('sync_failure').report(exc)]}) if type(exc) is __import__('sync_failure').SyncFailure else type(exc).__name__,jid))
         raise
     else:
         with connect(path) as c:

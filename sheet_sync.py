@@ -5,6 +5,7 @@ Requires an existing spreadsheet explicitly selected by the owner.
 """
 import json
 import os
+from sync_failure import SyncFailure
 from pathlib import Path
 from db import connect, now
 
@@ -78,7 +79,7 @@ def build_tables(settings):
         comparison_data=comparisons.build(settings)
         from sheet_audit import audit_comparisons
         if not audit_comparisons(comparison_data)['ok']:
-            raise ValueError('比對資料檢查未通過，停止同步')
+            raise SyncFailure('comparison_invalid')
         for r in comparison_data:
             def number(key):return float(r[key]) if r[key] is not None else None
             comparison_rows.append([r['status'],r['release_id'],r['format'],r['source_title'],r['vendor'],r['source_url'],number('source_price'),r['source_currency'],number('sale_twd'),number('cost_twd'),number('spread_twd'),number('gross_twd'),r['gross_margin'],number('net_twd'),r['net_margin'],'；'.join(r['issues']),'預估毛利按來源標價計算；未含未填的進貨費用。已填總成本時改用總成本。匯率 https://www.exchangerate-api.com',r.get('want'),r.get('have'),'已上架（人工登錄）' if r.get('listing_status')=='listed' else '未上架',r.get('listing_id'),'進貨總成本' if r.get('cost_basis')=='confirmed_total' else '來源標價'])
@@ -101,10 +102,15 @@ def sync(settings,session=None):
         session=AuthorizedSession(creds)
     base='https://sheets.googleapis.com/v4/spreadsheets/'+row[0]
     def request(method,url,**kwargs):
-        response=session.request(method,url,timeout=40,**kwargs)
+        code='write_unknown' if method=='POST' else 'readback_failed' if url.endswith('/values:batchGet') else 'read_failed'
+        try:
+            response=session.request(method,url,timeout=40,**kwargs)
+        except Exception:
+            raise SyncFailure(code) from None
         if response.status_code>=400:
-            raise ValueError('Google Sheets 請求未完成，請確認試算表分享權限與 API 設定')
-        return response.json()
+            raise SyncFailure('write_rejected' if method=='POST' and response.status_code<500 else code)
+        try:return response.json()
+        except (ValueError,TypeError):raise SyncFailure(code) from None
     info=request('GET',base,params={'fields':'sheets(properties,developerMetadata)'})
     existing={s['properties']['title']:s for s in info.get('sheets',[])}
     tables,formulas=build_tables(settings)
@@ -116,7 +122,7 @@ def sync(settings,session=None):
         existing_sheet=existing.get(name)
         if existing_sheet:
             if not any(m.get('metadataKey')=='simples_owner' and m.get('metadataValue')=='record_business_v1' for m in existing_sheet.get('developerMetadata',[])):
-                raise ValueError('同名工作表不是本系統建立，為避免覆寫已停止')
+                raise SyncFailure('ownership_conflict',[title])
             sid=existing_sheet['properties']['sheetId']
             if title=='Inputs':
                 continue # User-owned assumptions and rates survive every subsequent sync.
@@ -136,7 +142,7 @@ def sync(settings,session=None):
     reply=request('GET',base+'/values:batchGet',params=[('ranges',"'"+PREFIX+name+"'") for name in written]+[('valueRenderOption','FORMULA')])
     verification=audit_written_tables(written,reply.get('valueRanges',[]))
     if not verification['ok']:
-        raise ValueError('Google Sheet 寫入後讀回不一致，請檢查同步紀錄')
+        raise SyncFailure('readback_mismatch',[e.get('table') for e in verification['errors']])
     with connect(settings.db_path) as c:
         c.execute("INSERT OR REPLACE INTO meta VALUES('last_sheet_sync',?)",(now(),))
     return {'synced':True,'verification':verification,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}

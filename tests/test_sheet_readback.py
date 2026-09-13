@@ -32,3 +32,32 @@ class ReadbackTests(unittest.TestCase):
         finally:c.close()
     def test_success_after_readback(self):self.check(False)
     def test_mismatch_not_marked_success(self):self.check(True)
+
+    def test_failure_reports_only_safe_fields(self):
+        from sync_failure import SyncFailure,report
+        failure=SyncFailure('readback_mismatch',['Comparisons','secret-token'])
+        self.assertEqual(report(failure)['tables'],['Comparisons'])
+        self.assertNotIn('secret',str(report(ValueError('secret'))))
+
+    def test_unknown_write_and_rejected_write_are_distinct(self):
+        from sync_failure import SyncFailure
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from db import init,connect
+        from config import Settings
+        with TemporaryDirectory() as tmp:
+            settings=Settings(db_path=Path(tmp)/'test.db');init(settings.db_path)
+            with connect(settings.db_path) as c:c.execute("INSERT INTO meta VALUES('google_sheet_id','test123')")
+            class Response:
+                status_code=200
+                def json(self):return {'sheets':[]}
+            class Session:
+                def __init__(self, rejected):self.rejected=rejected
+                def request(self,method,url,**kwargs):
+                    if method=='GET':return Response()
+                    if not self.rejected:raise TimeoutError('private upstream text')
+                    r=Response();r.status_code=403;return r
+            for rejected,code in [(False,'write_unknown'),(True,'write_rejected')]:
+                with patch('sheet_sync.build_tables',return_value=({'Sources':[['id']],'Discogs':[['id']]},set())):
+                    with self.assertRaises(SyncFailure) as raised:sheet_sync.sync(settings,Session(rejected))
+                self.assertEqual(raised.exception.code,code)

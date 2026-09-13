@@ -116,7 +116,7 @@ def run(settings,query=None,selected=None,limit=20,source_platform=None):
     except Exception as exc:result['errors'].append({'step':'fx','error':type(exc).__name__})
     analyze.run(settings)
     try:result['sheet_sync']=sheet_sync.sync(settings)
-    except Exception as exc:result['errors'].append({'step':'sheets','error':type(exc).__name__})
+    except Exception as exc:result['errors'].append(__import__('sync_failure').report(exc))
     result['pending']=max(0,len(due)-result['checked'])
     result['failed']=len(result['errors'])+result.get('collection',{}).get('failed_platforms',0)
     return result

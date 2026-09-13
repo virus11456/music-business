@@ -17,7 +17,7 @@ def run(settings,release_ids,selected,query=None):
         result['releases'].append(row)
     analyze.run(settings)
     try:result['sheet_sync']=sheet_sync.sync(settings)
-    except Exception as exc:result['errors'].append({'step':'sheets','error':type(exc).__name__})
+    except Exception as exc:result['errors'].append(__import__('sync_failure').report(exc))
     result['failed']=len(result['errors'])+sum(r.get('sourcing',{}).get('failed_platforms',0) for r in result['releases'])
     return result
 

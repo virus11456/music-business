@@ -39,3 +39,9 @@ test('readback verification is visible for sync and nested batches',()=>{
  assert.match(jobReport(JSON.stringify({synced:true,verification})).join('\n'),/核對通過：5/);
  assert.match(jobReport(JSON.stringify({sheet_sync:{synced:true,verification}})).join('\n'),/核對通過：5/);
 });
+
+test('sync failures identify safe stages and tabs without upstream text',()=>{
+ const text=jobReport(JSON.stringify({errors:[{step:'sheets',code:'readback_mismatch',tables:['Comparisons','secret'],message:'private response'}]})).join('\n');
+ assert.match(text,/SIMPLES_Comparisons/);assert.doesNotMatch(text,/secret|private response/);
+ assert.match(jobReport(JSON.stringify({errors:[{step:'sheets',code:'write_unknown'}]})).join('\n'),/勿連續重送/);
+});
