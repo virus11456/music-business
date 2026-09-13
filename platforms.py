@@ -15,6 +15,7 @@ CATALOG=[
  {'id':'yahoo_jp','name':'Yahoo 日本拍賣','url':'https://auctions.yahoo.co.jp/','supported':True},
  {'id':'tower','name':'Tower Records 日本','url':'https://tower.jp/','supported':True},
  {'id':'ruten','name':'露天市集','url':'https://www.ruten.com.tw/','supported':True},
+ {'id':'rottenblues','name':'Rotten Blues 爛調唱片','url':'https://www.rottenblues.com/','supported':True},
  {'id':'mercari','name':'Mercari 日本','url':'https://jp.mercari.com/','supported':False},
  {'id':'rakuten','name':'樂天市場日本','url':'https://www.rakuten.co.jp/','supported':False},
  {'id':'diskunion','name':'Disk Union 專業唱片通路','url':'https://diskunion.net/','supported':False},
@@ -131,11 +132,15 @@ def parse_ruten(raw):
   out.append(candidate('ruten',item['ProdId'],item['ProdName'],prices[0],kind,status))
  return out
 
-PARSERS={'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten}
+def parse_rottenblues(raw):
+ return __import__('rottenblues').parse_catalog(raw)[0]
+
+PARSERS={'rottenblues':parse_rottenblues,'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten}
 def search_url(platform,query,page=1):
  q=quote(query,safe='')
  if not isinstance(page,int) or not 1<=page<=1000:raise ValueError('搜尋頁數無效')
- return {'yahoo_tw':f'https://tw.bid.yahoo.com/search/auction/product?p={q}'+(f'&pg={page}' if page>1 else ''),
+ return {'rottenblues':f'https://www.rottenblues.com/products.json?limit=40&page={page}',
+         'yahoo_tw':f'https://tw.bid.yahoo.com/search/auction/product?p={q}'+(f'&pg={page}' if page>1 else ''),
          'yahoo_jp':f'https://auctions.yahoo.co.jp/search/search?p={q}&ei=utf-8'+(f'&b={(page-1)*50+1}&n=50' if page>1 else ''),
          'tower':f'https://tower.jp/search/item/{q}'+(f'?page={page}' if page>1 else ''),
          'ruten':f'https://rtapi.ruten.com.tw/api/search/v4/index.php/core/prod?q={q}&type=direct&sort=rnk%2Fdc&limit=40&offset={(page-1)*40+1}'}[platform]
@@ -154,7 +159,7 @@ def fetch(url):
 
 def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
  if not isinstance(query,str) or not 1<=len(query.strip())<=120:raise ValueError('請填搜尋詞，最多 120 字')
- if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in PARSERS for p in selected):raise ValueError('請選擇已支援的平台')
+ if not isinstance(selected,list) or not selected or len(selected)>len(PARSERS) or any(p not in PARSERS for p in selected):raise ValueError('請選擇已支援的平台')
  query=query.strip();total=0;failed=0;reports=[]
  for platform in dict.fromkeys(selected):
   try:
@@ -173,18 +178,25 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
      time.sleep(3)
      raw=fetcher('https://rtapi.ruten.com.tw/api/prod/v3/index.php/prod?id='+','.join(ids))
     else:raw='[]'
-   rows=PARSERS[platform](raw)[:50 if platform=='yahoo_jp' and (page>1 or full_page) else 40]
+   more=None
+   if platform=='rottenblues':rows,more=__import__('rottenblues').parse_catalog(raw,query)
+   else:rows=PARSERS[platform](raw)[:50 if platform=='yahoo_jp' and (page>1 or full_page) else 40]
    total_pages=tower_pages(raw) if platform=='tower' and full_page else None
    if platform=='tower' and full_page and total_pages is None:raise ValueError('Tower 分頁結構改變，停止推進頁碼')
    stamp=now()
    with connect(settings.db_path) as c:
     for row in rows:
      row.update(query=query,captured_at=stamp)
+     identity={k:row.pop(k) for k in ('barcodes','labels') if k in row}
      cols=list(row)
      c.execute(f"INSERT INTO platform_candidates ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)}) ON CONFLICT(platform,external_id) DO UPDATE SET "+','.join(f'{k}=excluded.{k}' for k in cols if k not in ('platform','external_id')),list(row.values()))
+     if identity:
+      saved=c.execute('SELECT * FROM platform_candidates WHERE platform=? AND external_id=?',(platform,row['external_id'])).fetchone()
+      __import__('identity_data').save_source(c,saved,identity)
     c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,len(rows),'完成' if rows else '沒有符合商品',stamp))
    total+=len(rows)
    report={'platform':platform,'count':len(rows),'status':'success' if rows else 'empty'}
+   if more is not None:report.update(has_more=more,search_scope='catalog_page')
    if total_pages is not None:report.update(has_more=page<total_pages,total_pages=total_pages)
    reports.append(report)
   except Exception as e:

@@ -42,7 +42,7 @@ class DetailTests(unittest.TestCase):
                 eid=url.rsplit('/',1)[-1];calls.append(eid)
                 return product(eid=eid,fmt='LP' if eid=='2' else 'CD')+'<h1 class="PC-item-info-title">Album＜初回限定盤＞</h1>'
             report=source_refresh.run(s,fetch,detail_limit=2,sleeper=lambda _:None)
-            self.assertEqual((report['attempted'],report['updated'],report['failed']),(2,1,1));self.assertEqual(calls,['1','2']);self.assertEqual(report['platforms'][-1]['failures'],[{'external_id':'2','reason':'format_changed'}])
+            self.assertEqual((report['attempted'],report['updated'],report['failed']),(2,1,1));self.assertEqual(calls,['1','2']);self.assertEqual(next(p for p in report['platforms'] if p['platform']=='tower')['failures'],[{'external_id':'2','reason':'format_changed'}])
             with connect(s.db_path) as c:
                 rows=c.execute('SELECT * FROM platform_candidates ORDER BY id').fetchall()
                 self.assertEqual(rows[0]['price'],'5790');self.assertEqual(rows[0]['catalog_no'],'CAT');self.assertTrue(rows[1]['captured_at'].startswith('2020'))

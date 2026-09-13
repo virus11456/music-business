@@ -24,10 +24,10 @@ def run(settings,release_ids,selected,query=None):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description='更新需求行情、找貨、比價並同步 Google Sheets；不刊登')
     parser.add_argument('--release-id',type=int,action='append',required=True)
-    parser.add_argument('--platform',action='append',choices=['yahoo_tw','yahoo_jp','ruten','tower'])
+    parser.add_argument('--platform',action='append',choices=['yahoo_tw','yahoo_jp','ruten','tower','rottenblues'])
     args=parser.parse_args();load_env();s=Settings()
     from server import Dashboard
     Dashboard(s)
-    result=run(s,args.release_id,args.platform or ['yahoo_tw','yahoo_jp','ruten','tower'])
+    result=run(s,args.release_id,args.platform or ['yahoo_tw','yahoo_jp','ruten','tower','rottenblues'])
     print(json.dumps(result,ensure_ascii=False))
     raise SystemExit(1 if result['errors'] or any(r.get('sourcing',{}).get('failed_platforms') for r in result['releases']) else 0)

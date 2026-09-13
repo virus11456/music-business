@@ -5,7 +5,7 @@ const count=(v:unknown)=>typeof v==='number'&&Number.isInteger(v)&&v>=0?v:null;
 export function refreshFailures(detail:string|null):{label:string;url:string}[]{
  let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return []}
  const results:{label:string;url:string}[]=[];
- const platforms:Record<string,[string,string]>={tower:['Tower','https://tower.jp/item/'],yahoo_tw:['Yahoo 台灣','https://tw.bid.yahoo.com/item/'],yahoo_jp:['Yahoo 日本','https://auctions.yahoo.co.jp/jp/auction/'],ruten:['露天','https://www.ruten.com.tw/item/']};
+ const platforms:Record<string,[string,string]>={rottenblues:['Rotten Blues',''],tower:['Tower','https://tower.jp/item/'],yahoo_tw:['Yahoo 台灣','https://tw.bid.yahoo.com/item/'],yahoo_jp:['Yahoo 日本','https://auctions.yahoo.co.jp/jp/auction/'],ruten:['露天','https://www.ruten.com.tw/item/']};
  const reasons:Record<string,string>={title_changed:'名稱／版本標記不同，待核對',format_changed:'商品格式不同，待核對',unknown_state:'商品狀態未能識別',page_structure:'商品頁結構未能識別',product_structure:'商品資料缺失或不唯一',wrong_product:'回傳商品編號不符',invalid_id:'商品編號無效',currency:'價格幣別不符',missing_price_or_title:'缺少有效價格或名稱',auction_time:'拍賣時間未能識別',timeout:'連線逾時',connection:'連線失敗',invalid_json:'商品資料格式無效',missing_field:'缺少必要商品欄位',not_returned:'來源未回傳此商品',unclassified:'尚未分類的更新錯誤'};
  for(const batch of Array.isArray(data.batches)?data.batches:[data]){
   const q=obj(obj(batch).source_refresh);
@@ -15,7 +15,9 @@ export function refreshFailures(detail:string|null):{label:string;url:string}[]{
     const f=obj(rawFailure),id=String(f.external_id??''),code=String(f.reason??'');
     if(!(platform==='yahoo_jp'?/^[a-zA-Z0-9]{1,40}$/:/^\d{1,40}$/).test(id))continue;
     const reason=reasons[code]??(/^http_[1-5]\d{2}$/.test(code)?`來源回應 HTTP ${code.slice(5)}`:'尚未分類的更新錯誤');
-    results.push({label:`${source[0]} #${id}：${reason}（舊資料未更新）`,url:source[1]+id});
+    let url=source[1]+id;
+    if(platform==='rottenblues'){try{const u=new URL(String(f.source_url));if(u.origin!=='https://www.rottenblues.com'||!/^\/products\/[^/]+$/.test(u.pathname)||u.searchParams.get('variant')!==id)continue;url=u.href}catch{continue}}
+    results.push({label:`${source[0]} #${id}：${reason}（舊資料未更新）`,url});
    }
   }
  }
@@ -24,7 +26,7 @@ export function refreshFailures(detail:string|null):{label:string;url:string}[]{
 export function jobReport(detail:string|null):string[]{
  let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return ['未保存步驟明細；請檢查連線與設定後重試。']}
  const lines:string[]=[];
- const names:Record<string,string>={yahoo_tw:'Yahoo 台灣',yahoo_jp:'Yahoo 日本',ruten:'露天',tower:'Tower'};
+ const names:Record<string,string>={yahoo_tw:'Yahoo 台灣',yahoo_jp:'Yahoo 日本',ruten:'露天',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
  function source(value:unknown,prefix=''){
   const s=obj(value);
   for(const raw of list(s.platforms)){

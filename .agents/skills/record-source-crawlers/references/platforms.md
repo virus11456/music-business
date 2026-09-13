@@ -4,7 +4,7 @@
 
 ## 共同規則
 
-`search(settings, query, selected, page=1, full_page=False)` 驗證搜尋詞 1–120 字、平台最多 4 個、頁碼 1–1000。平台最近一次收集不足 3 秒時等待。`fetch` 的 timeout 為 25 秒、回應上限 5 MB，跨主機重新導向會拒絕。
+`search(settings, query, selected, page=1, full_page=False)` 驗證搜尋詞 1–120 字、平台數上限依 PARSERS 已接通數量、頁碼 1–1000。平台最近一次收集不足 3 秒時等待。`fetch` 的 timeout 為 25 秒、回應上限 5 MB，跨主機重新導向會拒絕。
 
 商品以 `(platform, external_id)` upsert，保存標題、歌手、格式、編號、價格、幣別、price_kind、availability、source_url、captured_at。非正數或無效價格是缺值，不是零元。成功空頁與讀取失敗分開寫入 `platform_runs`；解析結構壞掉應拋錯。
 
@@ -73,3 +73,12 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 正式 VPS 唯讀重查原失敗商品 8142237、8042797、7922849、8025772、8037648 及本轮發現的 8025770，修正後名稱均與已存正式資料一致；未重設重試時間或強制覆寫舊配對。21 項相關後端測試通過，source_details.py 部署到既有服務，SHA-256 與本機一致，備份於 backups/tower-title-20260913。
 
 正式工作 #84 曾 5/6 成功並找出方括號差異；修正後工作 #85 全部 6/6 成功（Yahoo TW、JP、Tower 各 2 件；露天本輪沒有到期商品），1191 件沿用快取，未新增搜尋主題；Sheets 回報同步 143 行行情，未逐格回讀。正式 SQLite 回讀六件 updated 與新價格／時間；Chrome「掃描與設定」展開最新工作明細確認各平台 0 失敗與 Sheets 同步完成。原失敗商品的重查是唯讀診斷，#85 更新的是正常輪替選出的另一批。每日 10/16/22 排程仍開啟，尚未到部署後第一個自動時段；單批全成功不代表全站商品都能解析。
+
+
+## 2026-09-13 Rotten Blues 爛調唱片
+
+新增 rottenblues 來源，公開 products.json 每頁40個商品，以 variant ID 區分價格與規格，來源連結指向商品及對應 variant。只接收格式明確的黑膠／CD／卡帶；預購優先於 available=true，售罄、未知狀態分開。公開目錄按頁取得，文字／格式在該頁篩選，不宣稱全站即時搜尋；「Rotten Blues 全部唱片」收集整頁音樂商品。即使當頁篩選結果為0，仍依原始商品數推進頁碼，不跳過後續頁。公開介面免金鑰，不是承諾穩定的官方開發者 API。
+
+單品使用已存的同站商品路徑讀 .js，以相同 variant ID 核對；.js 的分價格除100，目錄價格已是元。不採用 compare_at_price，不把店名 vendor 當 Label，不以SKU猜條碼。明確提供的有效條碼與標示編號／Label 才存為版本證據。沿用 Google Sheet 主資料、重試快取、既有排程與每平台每輪最多2件舊報價刷新；不建立第二套排程。上架與購買均不在此次範圍。
+
+42 項相關後端測試、29 項相關前端測試通過。正式讀取／部署驗收結果另補記。

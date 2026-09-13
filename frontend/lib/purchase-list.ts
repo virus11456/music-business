@@ -3,7 +3,7 @@ import {hasDemandAndSource,hasPositiveMargin,hasFreshComparison,sourceFreshness}
 import {matchLevel,matchConflicts} from './match-evidence';
 import {sourceAvailability} from './source-availability';
 export type PurchasePick={key:string;release_id:number;source_url:string;title:string;seller:string};
-const platformNames:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower'};
+const platformNames:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
 export const purchaseStorageKey='simples.purchase-list.v1';
 export function parsePicks(raw:string|null):PurchasePick[]{
  try{const data=JSON.parse(raw||'[]');if(!Array.isArray(data))return [];

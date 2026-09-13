@@ -2,7 +2,7 @@ import {matchLabel} from '@/lib/match-evidence';
 import {sourceAvailability,supplyLabels} from '@/lib/source-availability';
 import {candidateProfit,marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp} from '@/lib/comparison-sort';
 import type {Comparison} from '@/components/comparison-table';
-const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower'};
+const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
 const formats:Record<string,string>={Vinyl:'黑膠',CD:'CD',Cassette:'卡帶'};
 const money=(value:string|null|undefined)=>value==null?'—':Number(value).toLocaleString('zh-TW',{maximumFractionDigits:2});
 type Actions={purchaseLocked?:boolean;onPurchase?:(row:Comparison)=>void;purchaseKeys?:string[];locked?:boolean;onAction?:(row:Comparison)=>void};

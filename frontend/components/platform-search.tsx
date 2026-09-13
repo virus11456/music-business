@@ -5,7 +5,7 @@ export type Candidate={id:number;platform:string;title:string;artist:string;form
 type Version={release_id:number;title:string;country:string;year:string;format:string;catno:string;labels:string;evidence:string[];url:string};
 export type PlatformState={matches:Record<string,{results:Version[];searched_at:string;query:object}>;catalog:{id:string;name:string;url:string;supported:boolean}[];candidates:Candidate[];runs:{id:number;platform:string;query:string;count:number;status:string;recorded_at:string}[]};
 export default function PlatformSearch({data,locked,send,onSelect}:{data:PlatformState;locked:boolean;send:(path:string,data:object)=>Promise<boolean>;onSelect:(c:Candidate)=>void}){
- const [selected,setSelected]=useState(['yahoo_tw','yahoo_jp','tower','ruten']),[filter,setFilter]=useState(''),[expanded,setExpanded]=useState<number|null>(null);
+ const [selected,setSelected]=useState(['yahoo_tw','yahoo_jp','tower','ruten','rottenblues']),[filter,setFilter]=useState(''),[expanded,setExpanded]=useState<number|null>(null);
  async function search(e:FormEvent<HTMLFormElement>){e.preventDefault();const query=String(new FormData(e.currentTarget).get('query'));if(await send('/api/platforms/search',{query,platforms:selected}))setFilter(query.trim())}
  const name=(id:string)=>data.catalog.find(p=>p.id===id)?.name||id;
  const candidates=data.candidates.filter(c=>!filter||c.query===filter);

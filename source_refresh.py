@@ -31,7 +31,9 @@ def failure_reason(error):
 
 
 def failure_item(row,reason):
-    return {'external_id':str(row['external_id']),'reason':reason}
+    result={'external_id':str(row['external_id']),'reason':reason}
+    if row['platform']=='rottenblues':result['source_url']=row['source_url']
+    return result
 
 
 def _ruten(settings,fetcher=None,limit=20,priorities=None):
@@ -86,7 +88,7 @@ def run(settings,fetcher=None,limit=20,detail_limit=2,sleeper=None):
     instant=datetime.now(timezone.utc)
     cutoff=(instant-timedelta(hours=6)).isoformat()
     retry=(instant-timedelta(hours=1)).isoformat()
-    for platform in ('yahoo_tw','yahoo_jp','tower'):
+    for platform in ('yahoo_tw','yahoo_jp','tower','rottenblues'):
         with connect(settings.db_path) as c:
             rows,selection=__import__('refresh_priority').select(c,platform,detail_limit,priorities)
         part={'platform':platform,'attempted':len(rows),'updated':0,'missing':0,'failed':0,'failures':[],'selection':selection}
@@ -95,8 +97,8 @@ def run(settings,fetcher=None,limit=20,detail_limit=2,sleeper=None):
             (sleeper or time.sleep)(3)
             stamp=now();status='failed'
             try:
-                raw=(fetcher or platforms.fetch)(source_details.detail_url(platform,row['external_id']))
-                item=source_details.parse(platform,row['external_id'],raw)
+                raw=(fetcher or platforms.fetch)(source_details.detail_url(platform,row['external_id'],row['source_url']))
+                item=source_details.parse(platform,row['external_id'],raw,row['source_url'])
                 from source_match import identified_format
                 old_format=identified_format(row['format'],row['title'])
                 new_format=identified_format(item.get('format'))

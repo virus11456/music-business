@@ -11,14 +11,16 @@ def text(value):
     return ' '.join(unescape(str(value)).replace('\u200e','').translate(str.maketrans('［］','[]')).split())
 
 
-def detail_url(platform, external_id):
+def detail_url(platform, external_id, source_url=None):
+    if platform=='rottenblues':return __import__('rottenblues').detail_url(external_id,source_url)
     pattern=r'[0-9]+' if platform in ('tower','yahoo_tw') else r'[A-Za-z0-9]+'
     if platform not in ('tower','yahoo_tw','yahoo_jp') or not re.fullmatch(pattern,str(external_id)):
         raise ValueError('商品編號無效')
     return platforms.candidate(platform,external_id,'',None)['source_url']
 
 
-def parse(platform, external_id, raw):
+def parse(platform, external_id, raw, source_url=None):
+    if platform=='rottenblues':return __import__('rottenblues').parse_detail(external_id,source_url,raw)
     expected=detail_url(platform,external_id)
     root=platforms.Tree(raw).root
     def script(sid):

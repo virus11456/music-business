@@ -119,7 +119,7 @@ class Dashboard:
             if mode and mode[0]=='demo':raise ValueError('示範庫不能抓入真實資料')
             query=required(data,'query',120) if data.get('query') else None
             selected=data.get('platforms')
-            if query and (not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected)):raise ValueError('請選擇平台')
+            if query and (not isinstance(selected,list) or not selected or len(selected)>len(platforms.PARSERS) or any(p not in platforms.PARSERS for p in selected)):raise ValueError('請選擇平台')
             return self.start('先找貨 → 反查需求 → 比價同步',lambda:source_queue.run(s,query,selected))
         if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find','/api/pipeline/run'):
             with connect(s.db_path) as c:
@@ -131,13 +131,13 @@ class Dashboard:
         if path=='/api/pipeline/run':
             rid=release_id(required(data,'release_id'))
             selected=data.get('platforms')
-            if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
+            if not isinstance(selected,list) or not selected or len(selected)>len(platforms.PARSERS) or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
             query=required(data,'query',120) if data.get('query') else None
             return self.start('完整更新與比價同步',lambda:pipeline.run(s,[rid],selected,query))
         if path=='/api/sourcing/find':
             rid=release_id(required(data,'release_id'))
             selected=data.get('platforms')
-            if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
+            if not isinstance(selected,list) or not selected or len(selected)>len(platforms.PARSERS) or any(p not in platforms.PARSERS for p in selected):raise ValueError('請選擇平台')
             query=required(data,'query',120) if data.get('query') else None
             return self.start('依 Discogs 需求找貨',lambda:sourcing.find(s,rid,selected,query))
         if path=='/api/platforms/match':
@@ -150,7 +150,7 @@ class Dashboard:
         if path=='/api/platforms/search':
             query=required(data,'query',120)
             selected=data.get('platforms')
-            if not isinstance(selected,list) or not selected or len(selected)>4 or any(p not in platforms.PARSERS for p in selected):
+            if not isinstance(selected,list) or not selected or len(selected)>len(platforms.PARSERS) or any(p not in platforms.PARSERS for p in selected):
                 raise ValueError('請選擇已支援的平台')
             with connect(s.db_path) as c:
                 mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()

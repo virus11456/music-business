@@ -1,6 +1,6 @@
 ---
 name: record-source-crawlers
-description: 維護或執行 SIMPLES 唱片進貨資料抓取，涵蓋台灣 Yahoo、日本 Yahoo、露天、Tower、Discogs 反查、分批快取與 Sheets 同步。用於抓資料、修爬蟲、檢查自動收集或新增來源；不負責購買、刊登或客服。
+description: 維護或執行 SIMPLES 唱片進貨資料抓取，涵蓋台灣 Yahoo、日本 Yahoo、露天、Tower、Rotten Blues、Discogs 反查、分批快取與 Sheets 同步。用於抓資料、修爬蟲、檢查自動收集或新增來源；不負責購買、刊登或客服。
 ---
 
 # 唱片資料抓取
