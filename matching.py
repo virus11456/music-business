@@ -43,7 +43,7 @@ def search(settings,candidate_id,query=None,client=None):
  elif catalog:
   params['catno']=catalog
   if row['artist']:params['artist']=row['artist']
- else:params['q']=search_title(row['title']) or row['title'][:160]
+ else:params['q']=__import__('rottenblues').search_query(row['title']) if row['platform']=='rottenblues' else search_title(row['title']) or row['title'][:160]
  # Share the strict title/metadata rule with comparison admission.
  from source_match import identified_format,MERCH
  fmt=identified_format(row['format'],row['title'])

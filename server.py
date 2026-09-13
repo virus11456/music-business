@@ -120,7 +120,10 @@ class Dashboard:
             query=required(data,'query',120) if data.get('query') else None
             selected=data.get('platforms')
             if query and (not isinstance(selected,list) or not selected or len(selected)>len(platforms.PARSERS) or any(p not in platforms.PARSERS for p in selected)):raise ValueError('請選擇平台')
-            return self.start('先找貨 → 反查需求 → 比價同步',lambda:source_queue.run(s,query,selected))
+            source_platform=data.get('source_platform');limit=data.get('limit',20)
+            if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=40:raise ValueError('每批比對1至40件')
+            if source_platform is not None and (not isinstance(source_platform,str) or source_platform not in platforms.PARSERS or query):raise ValueError('指定來源只能比對已保存商品')
+            return self.start('先找貨 → 反查需求 → 比價同步',lambda:source_queue.run(s,query,selected,limit,source_platform))
         if path in ('/api/refresh','/api/releases','/api/scan','/api/platforms/match','/api/sourcing/find','/api/pipeline/run'):
             with connect(s.db_path) as c:
                 mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()

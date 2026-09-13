@@ -53,3 +53,8 @@ class RottenTests(unittest.TestCase):
    result=source_refresh.run(s,lambda u:json.dumps(p),sleeper=lambda _:None)
    self.assertEqual(result['updated'],1)
    with connect(s.db_path) as c:self.assertEqual(c.execute('SELECT price FROM platform_candidates').fetchone()[0],'1350')
+
+ def test_search_uses_explicit_album_without_rewriting_source(self):
+  title='【日版CD】Artist《Album Title》初回限定盤 [通常盤]'
+  self.assertEqual(rb.search_query(title),'Artist Album Title')
+  self.assertEqual(rb.search_query('Unknown Album'),'Unknown Album')

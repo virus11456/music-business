@@ -83,3 +83,11 @@ def parse_detail(external_id, source_url, raw):
     found=[r for r in rows if r['external_id']==str(external_id)]
     if len(found)!=1:raise ValueError('回傳其他商品')
     return found[0]
+
+
+def search_query(title):
+    """Use explicit artist/album delimiters for search only, keeping identity intact."""
+    value=unicodedata.normalize('NFKC',str(title))
+    value=re.sub(r'^\s*[【〖\[][^】〗\]]+[】〗\]]\s*','',value)
+    m=re.fullmatch(r'([^《》]+)《([^《》]+)》.*',value)
+    return (m[1].strip()+' '+m[2].strip())[:160] if m else value[:160]

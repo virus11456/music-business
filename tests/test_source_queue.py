@@ -12,11 +12,11 @@ class SourceQueueTests(unittest.TestCase):
   with connect(self.s.db_path) as c:
    c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(1,'tower','1','test','Test','Artist','CD','','200','JPY','listed','在庫あり','https://tower.jp/item/1',now()))
  def tearDown(self):self.tmp.cleanup()
- def cycle(self,results,limit=20):
+ def cycle(self,results,limit=20,source_platform=None):
   def search(s,cid,client=None):
    with connect(s.db_path) as c:c.execute('INSERT OR REPLACE INTO version_searches VALUES(?,?,?,?)',(cid,'{}',json.dumps(results),now()))
   with patch('source_queue.matching.search',side_effect=search) as search_mock,patch('source_queue.ingest.fetch_one'),patch('source_queue.analyze.run'),patch('source_queue.sheet_sync.sync',return_value={'synced':True}),patch('fx.refresh_reference',return_value={'cached':True}):
-   report=source_queue.run(self.s,limit=limit);return report,search_mock.call_count
+   report=source_queue.run(self.s,limit=limit,source_platform=source_platform);return report,search_mock.call_count
  def test_catalog_evidence_is_processed_before_ambiguous_titles(self):
   with connect(self.s.db_path) as c:
    c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(2,'tower','2','test','Precise record','Artist','CD','ABC-1','200','JPY','listed','在庫あり','https://tower.jp/item/2',now()))
@@ -72,3 +72,16 @@ class SourceQueueTests(unittest.TestCase):
   search.assert_not_called();self.assertGreater(fetch.call_count,0)
   self.assertEqual(report['market_updated'],fetch.call_count);self.assertEqual(report['cached'],1)
   self.assertTrue(report['sheet_sync']['synced'])
+
+ def test_source_filter_preserves_other_platform_queue_and_cache(self):
+  with connect(self.s.db_path) as c:
+   c.execute('INSERT INTO platform_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(2,'rottenblues','2','test','Album','Artist','CD','','200','TWD','listed','未確認','https://www.rottenblues.com/products/album?variant=2',now()))
+  result,calls=self.cycle([],source_platform='rottenblues');self.assertEqual(calls,1);self.assertEqual(result['source_platform'],'rottenblues')
+  with connect(self.s.db_path) as c:self.assertEqual([r[0] for r in c.execute('SELECT candidate_id FROM source_checks')],[2])
+  self.assertEqual(self.cycle([],source_platform='rottenblues')[1],0)
+  self.assertEqual(self.cycle([])[1],1)
+ def test_filter_validation(self):
+  for value in ['unknown',[],3]:
+   with self.assertRaises(ValueError):source_queue.run(self.s,source_platform=value)
+  with self.assertRaises(ValueError):source_queue.run(self.s,query='CD',source_platform='rottenblues')
+  with self.assertRaises(ValueError):source_queue.run(self.s,limit=True)

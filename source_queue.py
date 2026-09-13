@@ -37,9 +37,10 @@ def state(settings):
         return {'total':total,'unchecked':total-sum(statuses.values()),'statuses':statuses,
                 'topics':[dict(r) for r in c.execute('SELECT * FROM source_topics ORDER BY query')]}
 
-def run(settings,query=None,selected=None,limit=20):
+def run(settings,query=None,selected=None,limit=20,source_platform=None):
+    if source_platform is not None and (not isinstance(source_platform,str) or source_platform not in platforms.PARSERS or query):raise ValueError('指定來源只能比對已保存商品')
     init(settings)
-    if not 1<=limit<=40:raise ValueError('每批比對 1 至 40 件')
+    if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=40:raise ValueError('每批比對 1 至 40 件')
     result={'flow':'source_first','checked':0,'cached':0,'matched':0,'unmatched':0,'market_updated':0,'errors':[],'sheet_sync':None}
     if query:
         report={'candidates':0,'failed_platforms':0,'platforms':[]}
@@ -64,6 +65,9 @@ def run(settings,query=None,selected=None,limit=20):
     instant=datetime.now(timezone.utc)
     with connect(settings.db_path) as c:
         candidates=[__import__('identity_data').enrich(c,r) for r in c.execute("SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id ORDER BY (s.checked_at IS NOT NULL),CASE WHEN trim(lower(p.catalog_no)) NOT IN ('','none','未確認') THEN 0 ELSE 1 END,coalesce(s.checked_at,''),p.id")]
+    if source_platform:
+        candidates=[row for row in candidates if row['platform']==source_platform]
+        result['source_platform']=source_platform
     due=[]
     for row in candidates:
         if row['saved_fingerprint']==fingerprint(row) and row['retry_at']>instant.isoformat():

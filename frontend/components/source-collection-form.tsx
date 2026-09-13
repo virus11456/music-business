@@ -24,6 +24,7 @@ export default function SourceCollectionForm({topics,catalog,locked,send}:{topic
   {!selected.length&&<p role="status">請至少選擇一個進貨平台。</p>}
   <p>{existing?'接續這個主題已保存的頁碼；送出後更新它的平台設定。':'完成首次收集後，這個主題與所選平台會保存並納入定時更新。'}每天 10:00、16:00、22:00 輪流處理；佇列較多時先完成已存商品比對。</p>
   <button type="submit" className="btn primary" disabled={disabled||!request}>{existing?'接續此主題 → 反查需求 → 同步 Sheets':'新增主題並收集 → 反查需求 → 同步 Sheets'}</button>
+  {selected.length===1&&<button type="button" className="btn secondary" disabled={disabled} onClick={()=>void run({source_platform:selected[0],limit:40})}>只比對 {catalog.find(p=>p.id===selected[0])?.name} 已存商品（最多40件）</button>}
   <button type="button" className="btn secondary" disabled={disabled} onClick={()=>void run({})}>只處理已存商品的下一批</button>
  </form>;
 }
