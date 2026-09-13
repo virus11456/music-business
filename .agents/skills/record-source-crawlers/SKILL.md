@@ -27,7 +27,7 @@ python3 .agents/skills/record-source-crawlers/scripts/inspect_crawlers.py --db /
 
 ## 執行邊界
 
-本專案以 VPS 為唯一正式資料庫與排程。維護前讀取 `/api/state` 的 active、jobs、schedule、source_queue；不要在 Mac 啟動第二套正式後端。程式測試用臨時資料庫，不能往正式庫塞示範商品。
+最新主資料源是使用者指定 Google Sheet，VPS 只執行單一正式程序與排程；SQLite 僅作記憶體查詢引擎，不能改回舊磁碟庫。詳見專案 docs/SHEET_PRIMARY.md。維護前讀取 `/api/state` 的 active、jobs、schedule、source_queue；不要在 Mac 啟動第二套正式後端。程式測試用臨時資料庫，不能往正式庫塞示範商品。
 
 需要實際收集時，優先使用既有前端或後端工作 API，沿用使用者指定主題、平台及 Google Sheet。建立新主題會保存並納入後續輪替，不能因示例而擅自扩大搜尋範圍。API 傳回 accepted 只表示已接單，須讀工作結果判斷成功、部分失敗或仍執行中；結果不明時先查狀態，勿重送同一批。
 

@@ -1,8 +1,14 @@
 # SIMPLES 唱片生意模組
 
-> **目前功能狀態與後續順序：** [開發狀態表](docs/IMPLEMENTATION_STATUS.md)。下方日期章節包含歷史狀態；正式部署目前為 Vercel 前端＋VPS 後端。
+> **目前功能狀態與後續順序：** [開發狀態表](docs/IMPLEMENTATION_STATUS.md)。下方日期章節包含歷史狀態；正式部署為 Vercel 前端＋VPS 執行程式，Google Sheet 是唯一業務主資料源。
 
 已完成本機操作前端、Discogs 行情連接、四個平台的關鍵字搜尋，以及 Google Sheets 同步程式。這仍是開發版本；Sheets 真實讀寫已驗證；AI 文案及 Discogs 正式批次刊登尚未接通。
+
+## 目前正式使用方式（2026-09-13）
+
+開啟 https://music-business.vercel.app/ 。資料直接讀寫指定 Google Sheet 的 `SIMPLES_Data_` 分頁，採購清單跨裝置共用。正式服務已完成重啟與畫面讀寫驗收；VPS 不再讀寫本地業務庫，舊庫僅留作遷移備份。正式批次 #91 已完成資料寫回與分析同步；26 件貨源刷新中，1 件 Tower 名稱變更保留待核對。詳細資料分頁與驗證見 [Sheet 主資料源](docs/SHEET_PRIMARY.md)。
+
+以下本機啟動與日期章節保留歷史開發流程；正式使用以網站與最新狀態表為準。
 
 ## 開啟操作介面
 

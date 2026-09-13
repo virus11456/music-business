@@ -124,3 +124,31 @@ class SheetRepository:
                     'rows': [{'values': [cell(v) for v in row]} for row in rows], 'fields': 'userEnteredValue'}},
             ])
         self.request('POST', ':batchUpdate', json={'requests': requests})
+
+    def format_data_tables(self):
+        """Readable data sheets without changing source values or unrelated tabs."""
+        existing = self.inventory()
+        requests = []
+        for name in TABLES:
+            sheet = existing.get(PREFIX + name)
+            if not sheet or not self.owned(sheet):
+                raise ValueError('Data sheet missing; formatting stopped')
+            sid = sheet['properties']['sheetId']
+            requests.extend([
+                {'repeatCell': {'range': {'sheetId': sid, 'startRowIndex': 0, 'endRowIndex': 1},
+                    'cell': {'userEnteredFormat': {'backgroundColor': {'red': .14, 'green': .31, 'blue': .24},
+                        'textFormat': {'bold': True, 'foregroundColor': {'red': 1, 'green': 1, 'blue': 1}},
+                        'wrapStrategy': 'WRAP'}}, 'fields': 'userEnteredFormat'}},
+                {'updateDimensionProperties': {'range': {'sheetId': sid, 'dimension': 'COLUMNS'},
+                    'properties': {'pixelSize': 180}, 'fields': 'pixelSize'}},
+            ])
+            if name == 'purchase_items':
+                for start,end,width in [(0,1,260),(1,2,120),(2,4,360)]:
+                    requests.append({'updateDimensionProperties': {'range': {'sheetId': sid,
+                        'dimension': 'COLUMNS','startIndex': start,'endIndex': end},
+                        'properties': {'pixelSize': width},'fields': 'pixelSize'}})
+                requests.append({'repeatCell': {'range': {'sheetId': sid,'startRowIndex': 1},
+                    'cell': {'userEnteredFormat': {'wrapStrategy': 'WRAP','verticalAlignment': 'TOP'}},
+                    'fields': 'userEnteredFormat.wrapStrategy,userEnteredFormat.verticalAlignment'}})
+        self.request('POST', ':batchUpdate', json={'requests': requests})
+        return {'formatted': len(TABLES)}

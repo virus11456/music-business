@@ -16,4 +16,17 @@
 
 `scripts/migrate_sheet_data.py --db <舊庫> --sheet-id <既有指定 ID>` 預設唯讀盤點。`--write-missing` 只建立缺少的專用分頁，既有同名但未標為本系統／內容不同時停止；不覆蓋使用者其他分頁。完成後逐表讀回比較實際值。`--verify` 可單獨複核。切換前需確認正式工作空閒，保留可回復的舊程式與遷移前資料，且停止舊寫入程序。
 
-目前正式遷移讀回：143 版本、281 歷史行情、1269 貨源、1211 反查／檢查紀錄、6836 評分，24 表一致。獨立 Sheet 模式可讀回 2609 比對，初始化約 9.21 秒，PRAGMA database_list 的檔案路徑為空。正式服務切換、重啟及前端跨裝置驗收進行中，完成後補記。
+目前正式遷移讀回：143 版本、281 歷史行情、1269 貨源、1211 反查／檢查紀錄、6836 評分，24 表一致。獨立 Sheet 模式可讀回 2609 比對，初始化約 9.21 秒，PRAGMA database_list 的檔案路徑為空。正式服務切換、重啟及網站清單持久性验收已完成，見下方紀錄。
+
+## 正式切換驗收（2026-09-13）
+
+正式後端已切換。API 回報 `storage.backend=google_sheets`、`persistent_local=false`；檢查主程序 `/proc/<pid>/fd`，沒有開啟 `/opt/music-business/data/` 內檔案。排程仍啟用、10:00 工作已完成、下一輪16:00；10:00 是切換前執行，切換後自然時段尚待觀察。
+
+Chrome 正式頁加入既有 Yahoo TW 商品（6967698／101758319812），Sheet 的 purchase_items 立即出現資料；重啟 music-business 後 API 與重新登入的網頁仍讀回 revision=1、同一選取。已透過畫面移除驗收選取。沒有建立商品報價、刊登、付款或第二套排程。Vercel GQCsgpNKYx2ePhJrDYyfRHdZ9TBN 部署成功。新存儲流程實際反查驗收已完成，見下方批次紀錄。
+
+舊資料庫與舊程式僅暫留作遷移回復備份，不再被正式服務讀寫。不要直接切回舊庫，否則會遺失切換後已寫進 Sheet 的資料；回復前必須匯回新資料並再核對。
+
+自動化調用請讀 `SIMPLES_Data_` 原始分頁：貨源用 platform_candidates，版本用 releases，歷史行情與 Want/Have 用 snapshots，反查結果用 version_searches，採購用 purchase_items，上架用 listing_drafts/published_listings。其他分頁保留抓取進度與審閱紀錄。分頁列數不是唯一可套利商品數。
+
+
+正式批次 #91（10:30–10:39）已完成，狀態 partial：反查20件、沿用1208件快取、更新20筆行情；貨源刷新26件中25件成功，Tower 3012920 因 title_changed 保留失敗，不硬套原商品。分析 Sheet 同步成功143行。獨立直接讀原始 Sheet：source_checks=1231、snapshots=301、scores=6979、jobs=91，且工作完成明細已存在 Sheet；這些讀回證明新資料不是只存在服務記憶體。沒有新匹配不代表流程失敗；本輪20件均為 unmatched，保留供日後增量比對。
