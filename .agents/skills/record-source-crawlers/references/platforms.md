@@ -82,3 +82,8 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 單品使用已存的同站商品路徑讀 .js，以相同 variant ID 核對；.js 的分價格除100，目錄價格已是元。不採用 compare_at_price，不把店名 vendor 當 Label，不以SKU猜條碼。明確提供的有效條碼與標示編號／Label 才存為版本證據。沿用 Google Sheet 主資料、重試快取、既有排程與每平台每輪最多2件舊報價刷新；不建立第二套排程。上架與購買均不在此次範圍。
 
 42 項相關後端測試、29 項相關前端測試通過。正式讀取／部署驗收結果另補記。
+
+
+正式驗收補記：VPS 的首頁解析40件（Vinyl 5、CD 32、Cassette 3）；首件 variant 53256229159093 目錄 TWD1290 與 .js 分價換算1290一致，名稱與預購狀態一致。後端6檔部署至既有服務，仍為 Google Sheet 主資料，無第二程序。Vercel HaA5u8xkteadS4ccR4vGaoQoSzTp 成功。
+
+正式工作 #92 已收集40件並寫入 Sheet；獨立讀回 platform_candidates 確認40筆、同一格式數量與前兩筆價格／預購狀態。source_topics 已保存「Rotten Blues 全部唱片」及 rottenblues，source_pages 的 next_page=2。Chrome正式網站已顯示新平台選項、保存主題、40筆收集成功紀錄及商品；不是只有本機測試。排程仍啟用每日10/16/22，依既有主題與待比對佇列輪替，並不保證每時段輪到新來源。#92 後續反查仍在執行（驗收時總待首次檢查72件），不宣稱這40件已全部匹配Discogs或有正毛利。
