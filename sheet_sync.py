@@ -101,8 +101,8 @@ def sync(settings,session=None):
         creds=Credentials.from_service_account_file(os.environ['GOOGLE_SERVICE_ACCOUNT_FILE'],scopes=['https://www.googleapis.com/auth/spreadsheets'])
         session=AuthorizedSession(creds)
     base='https://sheets.googleapis.com/v4/spreadsheets/'+row[0]
-    def request(method,url,**kwargs):
-        code='write_unknown' if method=='POST' else 'readback_failed' if url.endswith('/values:batchGet') else 'read_failed'
+    def request(method,url,stage=None,**kwargs):
+        code=stage or ('write_unknown' if method=='POST' else 'readback_failed' if url.endswith('/values:batchGet') else 'read_failed')
         try:
             response=session.request(method,url,timeout=40,**kwargs)
         except Exception:
@@ -114,8 +114,22 @@ def sync(settings,session=None):
     info=request('GET',base,params={'fields':'sheets(properties,developerMetadata)'})
     existing={s['properties']['title']:s for s in info.get('sheets',[])}
     tables,formulas=build_tables(settings)
+    from sheet_audit import audit_written_tables
+    previous_names=[]
+    for title in tables:
+        old=existing.get(PREFIX+title)
+        if old and not any(m.get('metadataKey')=='simples_owner' and m.get('metadataValue')=='record_business_v1' for m in old.get('developerMetadata',[])):
+            raise SyncFailure('ownership_conflict',[title])
+        if old and title!='Inputs':previous_names.append(title)
+    unchanged=[]
+    if previous_names:
+        before=request('GET',base+'/values:batchGet',stage='read_failed',params=[('ranges',"'"+PREFIX+n+"'") for n in previous_names]+[('valueRenderOption','FORMULA')])
+        ranges=before.get('valueRanges',[])
+        if len(ranges)!=len(previous_names):raise SyncFailure('read_failed')
+        unchanged=[n for n,r in zip(previous_names,ranges) if audit_written_tables({n:tables[n]},[r])['ok']]
     requests=[]
     written={}
+    changed=[]
     ids=set(s['properties']['sheetId'] for s in existing.values())
     for title,rows in tables.items():
         name=PREFIX+title
@@ -131,13 +145,15 @@ def sync(settings,session=None):
             requests.extend([{'addSheet':{'properties':{'sheetId':sid,'title':name}}},
                 {'createDeveloperMetadata':{'developerMetadata':{'metadataKey':'simples_owner','metadataValue':'record_business_v1','visibility':'DOCUMENT','location':{'sheetId':sid}}}}])
         written[title]=rows
+        if title in unchanged:continue
+        changed.append(title)
         encoded=[{'values':[cell(v,title=='Analysis' and (i,j) in formulas) for j,v in enumerate(values)]} for i,values in enumerate(rows)]
         requests.extend([
             {'updateSheetProperties':{'properties':{'sheetId':sid,'gridProperties':{'rowCount':max(1000,len(rows)+10),'columnCount':max(26,len(rows[0])),'frozenRowCount':1}},'fields':'gridProperties'}},
             {'updateCells':{'range':{'sheetId':sid},'rows':encoded,'fields':'userEnteredValue'}},
             {'repeatCell':{'range':{'sheetId':sid,'startRowIndex':0,'endRowIndex':1},'cell':{'userEnteredFormat':{'backgroundColor':{'red':.14,'green':.31,'blue':.24},'textFormat':{'bold':True,'foregroundColor':{'red':1,'green':1,'blue':1}}}},'fields':'userEnteredFormat'}},
             {'updateDimensionProperties':{'range':{'sheetId':sid,'dimension':'COLUMNS','startIndex':0,'endIndex':len(rows[0])},'properties':{'pixelSize':170},'fields':'pixelSize'}}])
-    request('POST',base+':batchUpdate',json={'requests':requests})
+    if requests:request('POST',base+':batchUpdate',json={'requests':requests})
     from sheet_audit import audit_written_tables
     reply=request('GET',base+'/values:batchGet',params=[('ranges',"'"+PREFIX+name+"'") for name in written]+[('valueRenderOption','FORMULA')])
     verification=audit_written_tables(written,reply.get('valueRanges',[]))
@@ -145,4 +161,4 @@ def sync(settings,session=None):
         raise SyncFailure('readback_mismatch',[e.get('table') for e in verification['errors']])
     with connect(settings.db_path) as c:
         c.execute("INSERT OR REPLACE INTO meta VALUES('last_sheet_sync',?)",(now(),))
-    return {'synced':True,'verification':verification,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}
+    return {'synced':True,'changed_tables':changed,'unchanged_tables':unchanged,'verification':verification,'source_rows':len(tables['Sources'])-1,'market_rows':len(tables['Discogs'])-1}

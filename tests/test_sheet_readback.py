@@ -61,3 +61,26 @@ class ReadbackTests(unittest.TestCase):
                 with patch('sheet_sync.build_tables',return_value=({'Sources':[['id']],'Discogs':[['id']]},set())):
                     with self.assertRaises(SyncFailure) as raised:sheet_sync.sync(settings,Session(rejected))
                 self.assertEqual(raised.exception.code,code)
+
+    def test_unchanged_skips_post_but_checks_again(self):
+        c=sqlite3.connect(':memory:');c.execute('CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT)');c.execute("INSERT INTO meta VALUES('google_sheet_id','test123')")
+        @contextmanager
+        def connection(path):yield c
+        class Response:
+            status_code=200
+            def __init__(self,data):self.data=data
+            def json(self):return self.data
+        calls=[]
+        class Session:
+            def request(self,method,url,**kwargs):
+                calls.append((method,url))
+                if url.endswith('/values:batchGet'):return Response({'valueRanges':[{'values':[['id'],[1]]} for _ in range(2)]})
+                return Response({'sheets':[{'properties':{'title':'SIMPLES_'+n,'sheetId':i},'developerMetadata':[{'metadataKey':'simples_owner','metadataValue':'record_business_v1'}]} for i,n in enumerate(['Sources','Discogs'])]})
+        try:
+            with patch('sheet_sync.connect',connection),patch('sheet_sync.build_tables',return_value=({'Sources':[['id'],[1]],'Discogs':[['id'],[1]]},set())):
+                result=sheet_sync.sync(SimpleNamespace(db_path=None),Session())
+            self.assertEqual(result['changed_tables'],[])
+            self.assertEqual(len(result['unchanged_tables']),2)
+            self.assertFalse(any(m=='POST' for m,u in calls))
+            self.assertEqual(sum(u.endswith('/values:batchGet') for m,u in calls),2)
+        finally:c.close()

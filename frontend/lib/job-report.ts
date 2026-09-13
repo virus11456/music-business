@@ -26,7 +26,7 @@ export function refreshFailures(detail:string|null):{label:string;url:string}[]{
 export function jobReport(detail:string|null):string[]{
  let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return ['未保存步驟明細；請檢查連線與設定後重試。']}
  const lines:string[]=[];
- function verification(value:Obj){const v=obj(value.verification);if(v.ok===true)lines.push(`Sheet 寫入後核對通過：${count(v.tables)??'未知'} 個分頁，價格與比對資料已讀回確認`);}
+ function verification(value:Obj){if(Array.isArray(value.changed_tables)&&Array.isArray(value.unchanged_tables))lines.push(`本次寫入 ${value.changed_tables.length} 個分頁，${value.unchanged_tables.length} 個分頁資料未變、略過重寫`);const v=obj(value.verification);if(v.ok===true)lines.push(`Sheet 寫入後核對通過：${count(v.tables)??'未知'} 個分頁，價格與比對資料已讀回確認`);}
  const names:Record<string,string>={yahoo_tw:'Yahoo 台灣',yahoo_jp:'Yahoo 日本',ruten:'露天',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
  function source(value:unknown,prefix=''){
   const s=obj(value);
