@@ -144,3 +144,6 @@ Vercel Eh2CemvhBiUKXrGiKKvE84bLsZyA 部署成功，VPS 已部署指定來源反�
 sheet_sync 在寫入前檢查比較資料的重複、格式／品番／條碼及毛利算式；寫入後透過一次 batchGet 逐格比對本次寫入的展示分頁（含公式文字）。既有 Inputs 為使用者可編輯參數，不覆寫也不拿舊預設值比對。允許Google省略空白尾欄／尾列，其他差異使工作失敗；只有核對通過才更新last_sheet_sync並回傳verification。批次工作明細自動保存到Google Sheet jobs，前端顯示核對分頁數。原24張原始表完整性工具仍可單獨執行，本次自動核對範圍是同步展示表，不誤稱每輪都完整稽核所有原始表。
 
 18項相關後端測試、6項前端工作明細測試通過；15項需要本機socket的整合測試因執行環境限制未能運行。正式部署與讀回驗收另補記。
+
+
+正式驗收補記：Vercel G7xkR4fU7rZvKWi7cHY5to5BsTgj 成功部署。Chrome控制連線中斷後，以內建瀏覽器登入正式站，在進貨與Sheets按一次同步（12:01）。工作完成，掃描與設定展開明細顯示「Sheet 寫入後核對通過：5 個分頁，價格與比對資料已讀回確認」及「行情257列、報價0列」。這證明新後端已生效且本次實際寫入後讀回成功；5頁為Comparisons、PlatformCandidates、Discogs、Sources、Analysis，既有Inputs保留不寫。原始24頁稽核與自然排程時段驗證不包含在這次單次同步驗收內。後端部署程式備份位置 /opt/music-business/backups/sheet-readback-20260913。
