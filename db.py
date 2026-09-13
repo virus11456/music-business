@@ -62,6 +62,11 @@ PRAGMA user_version=1;
 
 @contextmanager
 def connect(path):
+    import sheet_primary
+    if sheet_primary.enabled():
+        with sheet_primary.instance().connect() as conn:
+            yield conn
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=30)
     conn.row_factory = sqlite3.Row

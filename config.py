@@ -63,8 +63,10 @@ class Settings:
 
     def __post_init__(self):
         self.db_path = Path(self.db_path).resolve()
-        if self.db_path.exists():
-            with closing(sqlite3.connect(self.db_path)) as c:
+        primary = os.getenv('DATA_BACKEND') == 'google_sheets'
+        if primary or self.db_path.exists():
+            from db import connect
+            with connect(self.db_path) as c:
                 if c.execute("SELECT 1 FROM sqlite_master WHERE name='meta'").fetchone():
                     row=c.execute("SELECT value FROM meta WHERE key='business_assumptions'").fetchone()
                     if row:

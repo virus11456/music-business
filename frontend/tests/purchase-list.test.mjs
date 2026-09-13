@@ -39,7 +39,7 @@ test('CSV keeps unresolved items and escapes formulas and quotes',()=>{
 test('purchase panel shows issues, no automatic purchase, and review-only export',()=>{
  const View=load('components/purchase-list.tsx').default;
  const html=renderToStaticMarkup(React.createElement(View,{picks:[pick],rows:[],onChange:()=>{},storageError:''}));
- for(const text of ['採購清單','不會下單或上架','目前資料未找到','匯出採購審閱 CSV','不跨裝置同步'])assert.ok(html.includes(text),text);
+ for(const text of ['採購清單','不會下單或上架','目前資料未找到','匯出採購審閱 CSV','所有裝置共用'])assert.ok(html.includes(text),text);
 });
 
 test('same source matched to multiple releases is not counted as multiple available copies',()=>{

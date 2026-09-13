@@ -76,7 +76,7 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'storage':{'backend':'google_sheets' if __import__('sheet_primary').enabled() else 'sqlite','persistent_local':not __import__('sheet_primary').enabled()},'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
@@ -191,6 +191,9 @@ class Dashboard:
         if not self.lock.acquire(blocking=False):
             raise ValueError('行情工作執行中，請完成後再儲存')
         try:
+            if path=='/api/purchase-list':
+                if not __import__('sheet_primary').enabled(): raise ValueError('Sheet 主資料源尚未啟用')
+                return __import__('purchase_store').save(s,data)
             if path=='/api/notifications/resolve':
                 import notification_review
                 return notification_review.resolve(s,data.get('id'),data.get('outcome'))
@@ -212,6 +215,8 @@ class Dashboard:
             with connect(s.db_path) as c:
                 if path=='/api/sheets/config':
                     sid=workflow.sheet_id(required(data,'url',1500))
+                    if __import__('sheet_primary').enabled() and sid!=__import__('os').environ.get('GOOGLE_SPREADSHEET_ID'):
+                        raise ValueError('主資料源切換需要完整遷移')
                     c.execute("INSERT OR REPLACE INTO meta VALUES('google_sheet_id',?)",(sid,))
                 elif path=='/api/offers':
                     workflow.save_offer(c,data,release_id,currency,required)
@@ -355,7 +360,7 @@ def handler(dashboard):
                 return self.respond(415,{'error':'不支援的資料格式'})
             try:
                 length=int(self.headers.get('Content-Length','0'))
-                if not 0<length<=16384:
+                if not 0<length<=(700000 if self.path=='/api/purchase-list' else 16384):
                     return self.respond(413,{'error':'資料長度無效'})
                 data=json.loads(self.rfile.read(length))
                 if not isinstance(data,dict):
