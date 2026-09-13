@@ -227,3 +227,14 @@ Rotten Blues 明確「歌手《專輯》」名稱只在Discogs搜尋時抽出歌
 Vercel Eh2CemvhBiUKXrGiKKvE84bLsZyA 部署成功，VPS 已部署指定來源反查與搜尋名稱清理。正式工作 #93 指定 rottenblues、最多40件，不重新收集、不清除其他來源快取。驗收時 Sheet 直接回讀已完成15件：9件找到版本候選、6件 unmatched；工作仍 running，不代表首批40件完成。
 
 正式 API 曾讀得15組 Rotten Blues 商品／版本比較，其中9組 Want>0 且正預估毛利；這是比較組數，不是9件獨立商品，也不代表壓片已確認。Chrome 正式網站實際顯示 Andrew Hill《Nefertiti》：來源 TWD350、Discogs release 6782488 參考價 USD29.98、Want38、價差／預估毛利 TWD596.31、毛利率63.0%，來源與Discogs連結可見。運費等未完整扣除，不能當作淨利或成交價。新增原始資料已存Google Sheet；本輪最終分析同步仍待工作結束。
+
+
+### 2026-09-13 Sheet 寫入與比對完整性驗收
+
+正式 #93 於11:47完成：Rotten Blues 40件反查、25件matched候選／15件unmatched、134筆行情更新、26/26舊貨源刷新成功，errors=[]，分析同步257版本成功。直接讀Google Sheet全部24張原始表，257版本、455筆行情、1309件貨源、1291筆搜尋與檢查可在獨立記憶體schema還原；欄位、NULL、主鍵唯一性與外鍵檢查通過，無磁碟業務庫回退。
+
+正式API的2724組比較通過重複key、候選格式／品番／條碼衝突與毛利計算檢查。SIMPLES_Comparisons逐組對照同一API的來源價格、TWD售價、毛利與毛利率，2724/2724一致；SIMPLES_PlatformCandidates有1309件。915組符合正毛利且Want>0，不代表915件獨立商品或已核對壓片。Chrome正式進貨頁當時預設其他價格、新鮮度、供貨篩選後顯示372/2724，並非漏寫。
+
+新增 sheet_audit.py 與 scripts/audit_sheet_data.py，唯讀診斷24張原始表與已運行正式API，不啟動抓取、不修改Sheet、不建立另一套後端。VPS已執行通過，無需重啟。重跑方式：在 /opt/music-business 執行 `.venv/bin/python scripts/audit_sheet_data.py`；exit 0通過、1資料檢查異常、2 API無法驗收。工具只證明讀取快照與結構／數學一致性，不取代壓片人工確認、來源庫存實查或逐次寫入回讀。API讀取與Sheet快照可能不同時，活躍批次中不能以數量變動認定漏寫。
+
+16項診斷與Sheet儲存測試通過；既有測試有連線未關閉ResourceWarning，不影響本次結果。初版稽核對金額顯示四捨五入的毛利率容差太小，已按誤差界限修正並加低售價／高負毛利測試，未修改正式毛利算式以遷就檢查。
