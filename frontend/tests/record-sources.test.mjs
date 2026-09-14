@@ -11,7 +11,8 @@ const supplySource=await readFile(new URL('../lib/source-availability.ts',import
 const supply={};new Function('exports',ts.transpileModule(supplySource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(supply);
 const prices={};new Function('exports',ts.transpileModule(await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(prices);
 const evidence={};new Function('exports',ts.transpileModule(await readFile(new URL('../lib/match-evidence.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(evidence);
-const exports={};new Function('require','exports',js)(id=>id==='@/lib/source-availability'?supply:id==='@/lib/comparison-sort'?prices:id==='@/lib/match-evidence'?evidence:createRequire(import.meta.url)(id),exports);
+const media={};new Function('require','exports',ts.transpileModule(await readFile(new URL('../components/media-badge.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(createRequire(import.meta.url),media);
+const exports={};new Function('require','exports',js)(id=>id==='@/components/media-badge'?media:id==='@/lib/source-availability'?supply:id==='@/lib/comparison-sort'?prices:id==='@/lib/match-evidence'?evidence:createRequire(import.meta.url)(id),exports);
 const row={source_url:'https://www.ruten.com.tw/item/show?123',vendor:'ruten',source_title:'Album A',source_price:'350',source_currency:'TWD',price_kind:'listed',gross_twd:'120',availability:'來源標示有庫存'};
 const render=rows=>renderToStaticMarkup(React.createElement(exports.default,{rows}));
 test('record source cards show actual quote, destination and candidate status',()=>{
@@ -31,8 +32,8 @@ test('profit chart preserves signed percentage and separates sale price from spr
 test('only highest known gross is outside collapsed sources, even when all offers lose money',()=>{
  const html=render([{...row,source_title:'unknown',gross_twd:null},{...row,source_url:'https://example.com/loss',source_title:'larger loss',gross_twd:'-200'},{...row,source_url:'https://example.com/best',source_title:'best offer',gross_twd:'-20'}]);
  const [visible,collapsed]=html.split('<details>');
- assert.ok(visible.includes('best offer'));assert.ok(!visible.includes('larger loss'));assert.ok(!visible.includes('unknown'));
- assert.ok(collapsed.includes('展開其餘 2 個賣場'));assert.ok(collapsed.indexOf('larger loss')<collapsed.indexOf('unknown'));
+ assert.ok(visible.includes('best offer'));assert.ok(!visible.includes('larger loss'));assert.ok(!visible.includes('>unknown ↗</a>'));
+ assert.ok(collapsed.includes('展開其餘 2 個賣場'));assert.ok(collapsed.indexOf('larger loss')<collapsed.indexOf('>unknown ↗</a>'));
  assert.ok(visible.includes('價差／毛利'));assert.ok(visible.includes('<small>毛利率</small><b>—</b>'));
 });
 test('source action shows readiness and disables while locked or market missing',()=>{

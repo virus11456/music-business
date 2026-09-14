@@ -7,7 +7,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 const require=createRequire(import.meta.url),cache={};
 function load(name){if(cache[name])return cache[name];const out=cache[name]={};const source=readFileSync(new URL('../'+name,import.meta.url),'utf8');
- new Function('require','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>id.startsWith('@/')?load(id.slice(2)+'.ts'):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id),out);return out;}
+ new Function('require','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>id.startsWith('@/')?load(id.slice(2)+(id.startsWith('@/components/')?'.tsx':'.ts')):id.startsWith('./')?load('lib/'+id.slice(2)+'.ts'):require(id),out);return out;}
 const {purchaseSupply,purchaseSupplyLabel,parsePicks,purchaseRows,purchaseGroups,purchaseTotals,purchaseCsv}=load('lib/purchase-list.ts');
 const now=Date.parse('2026-09-12T12:00:00Z'),stamp=new Date(now).toISOString();
 const row={key:'candidate-1',release_id:1,source_url:'https://example.com/item/1',source_title:'Test album',format:'CD',source_format:'CD',version_confirmed:true,source_catalog_no:'ABC-1',catalog_no:'ABC 1',source_price:'500',source_currency:'TWD',has_market:true,want:20,market_price:'30',market_currency:'USD',source_at:stamp,market_at:stamp,cost_basis:'source_price',source_twd:'500',gross_twd:'400',gross_margin:0.44,availability:'來源標示有庫存',vendor:'ruten'};
