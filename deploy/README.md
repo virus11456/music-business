@@ -96,3 +96,8 @@ CLI無登入時允許使用既有GitHub連接器：先讀遠端main，確認是�
 單一管理者存取碼是目前的登入方式，非多帳號權限系統。更換存取碼並重啟服務即可撤銷舊碼。勿在代理存取日誌記錄 Authorization。
 
 Caddy 官方參考：https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+
+
+### 2026-09-15 帳密儲存修正
+
+正式重設曾因systemd ProtectSystem=strict禁止寫入secrets而中斷回應，帳密檔未建立。認證狀態改存已允許寫入的data/auth（僅認證設定，不是業務資料）；目錄700、檔案600。部署需保留原一次性重置紀錄並核對服務隔離內可寫性，不放寬systemd保護。儲存OSError回覆安全503與AUTH_STORAGE_UNAVAILABLE，不洩漏原始例外。使用者輸入與提交新密碼仍需本人完成；正式儲存結果待驗證。

@@ -45,13 +45,14 @@ class ResetTests(PasswordTests):
   self.assertEqual(sorted(results),[200,400])
 
 class LoginRouteTests(unittest.TestCase):
- def request(self,origin='https://music-business.vercel.app',payload=None,content_type='application/json',path='/api/login'):
+ def request(self,origin='https://music-business.vercel.app',payload=None,content_type='application/json',path='/api/login',storage_failure=False):
   import io,os
   from unittest.mock import patch
   from types import SimpleNamespace
   from remote_access import RemoteAccess
   from server import handler
   with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':'x'*40,'FRONTEND_ORIGIN':'https://music-business.vercel.app','PUBLIC_API_ORIGIN':'https://api.example.com'}):access=RemoteAccess()
+  if storage_failure:access.passwords.reset=lambda *args:(_ for _ in ()).throw(OSError('sensitive error'))
   calls=[];access.passwords.login=lambda u,p:(calls.append((u,p)) or (401,{'error':'帳號或密碼不正確'}))
   cls=handler(SimpleNamespace(access=access,csrf='csrf'))
   h=object.__new__(cls);h.path=path;body=json.dumps(payload if payload is not None else {'username':'admin','password':'wrong'}).encode()
@@ -71,3 +72,9 @@ class LoginRouteTests(unittest.TestCase):
  def test_reset_needs_token_and_rejects_other_origin(self):
   result,calls=self.request(path='/api/account/reset');self.assertEqual(result[0][0],400)
   result,calls=self.request(path='/api/account/reset',origin='https://evil.example');self.assertEqual(result[0][0],403)
+
+ def test_reset_storage_failure_returns_safe_response(self):
+  result,_=self.request(path='/api/account/reset',storage_failure=True)
+  self.assertEqual(result[0][0],503)
+  self.assertEqual(result[0][1]['code'],'AUTH_STORAGE_UNAVAILABLE')
+  self.assertNotIn('sensitive',json.dumps(result))

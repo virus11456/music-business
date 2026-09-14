@@ -2,7 +2,7 @@
 import hashlib,json,secrets,threading,time,os,tempfile,fcntl
 from pathlib import Path
 
-AUTH_FILE=Path(__file__).resolve().parent/'secrets'/'admin-login.json'
+AUTH_FILE=Path(__file__).resolve().parent/'data'/'auth'/'admin-login.json'
 
 def password_hash(password,salt):
  return hashlib.scrypt(password.encode(),salt=bytes.fromhex(salt),n=16384,r=8,p=1,dklen=32).hex()

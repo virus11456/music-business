@@ -351,3 +351,8 @@ sheet_sync 在寫入前檢查比較資料的重複、格式／品番／條碼及
 
 
 正式補記：後端已部署，備份sheet-incremental-20260913。正式#96於12:31完成，changed_tables=[]、unchanged_tables為Comparisons／PlatformCandidates／Discogs／Sources／Analysis，5頁再讀回通過：2724比較、1309貨源、257行情。Chrome正式站仍正常登入連線。前端計數提示尚未上線：GitHub commit87906e8的Vercel建置因build-rate-limit失敗，未付費升級或改走其他專案規避限制；待額度恢復再部署。程式已同步GitHub，現有前端沿用先前成功版。此限制不影響已部署的後端略過重寫與自動核對。
+
+
+### 2026-09-15 帳密儲存修正
+
+正式重設曾因systemd ProtectSystem=strict禁止寫入secrets而中斷回應，帳密檔未建立。認證狀態改存已允許寫入的data/auth（僅認證設定，不是業務資料）；目錄700、檔案600。部署需保留原一次性重置紀錄並核對服務隔離內可寫性，不放寬systemd保護。儲存OSError回覆安全503與AUTH_STORAGE_UNAVAILABLE，不洩漏原始例外。使用者輸入與提交新密碼仍需本人完成；正式儲存結果待驗證。

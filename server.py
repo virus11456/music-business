@@ -368,7 +368,10 @@ def handler(dashboard):
                     if not isinstance(data,dict):raise ValueError()
                 except (ValueError,TypeError):return self.respond(400,{'error':'登入資料格式無效'})
                 if self.path=='/api/account/reset':
-                    status,result=dashboard.access.passwords.reset(data.get('reset_token'),data.get('username'),data.get('password'))
+                    try:
+                        status,result=dashboard.access.passwords.reset(data.get('reset_token'),data.get('username'),data.get('password'))
+                    except OSError:
+                        return self.respond(503,{'error':'帳密儲存未完成，請聯絡管理者核對後再試','code':'AUTH_STORAGE_UNAVAILABLE'})
                 else:
                     status,result=dashboard.access.passwords.login(data.get('username'),data.get('password'))
                 return self.respond(status,result)
