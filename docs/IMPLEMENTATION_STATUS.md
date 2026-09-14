@@ -1,14 +1,73 @@
-# 開發狀態與執行順序（2026-09-12）
+# 開發狀態與執行順序（2026-09-14）
+
+## 2026-09-14 純Git同步與連接器流程
+
+已確認Vercel Git連接停用時，純Git同步不觸發部署，不要求Vercel額度或其他專案停止發布；仍須乾淨提交、測試、正式API與自動建置停用證據。release_guard.validate/reserve 的target=sync負責上述檢查。
+
+CLI無登入時允許使用既有GitHub連接器：先讀遠端main，確認是已審查的基準；以受追蹤差異建立tree，必須與本機HEAD tree相同；新commit以剛讀取的遠端main為parent，保留遠端歷史與本機提交。更新分支前再次讀遠端parent及自動部署設定，以reserve(...,target='sync',slots=0)記錄新鮮盤點，通過後僅對virus11456/music-business main做force=false的fast-forward；結果未知先讀回不重送。建立未連到分支的Git objects不觸發部署。不能借此進行Vercel發布，發布仍須另計額度。此明確流程優先於舊文件僅允許Git CLI的描述。
+
+## 2026-09-14 唱片總覽刊登狀態修正（本機待發布）
+
+唱片總覽與詳情改以三種刊登狀態聚合：任一貨源已有刊登紀錄則顯示已上架；其餘有缺失／未知資料顯示刊登狀態待確認；只有全部明確未上架才列為未上架。新增未知狀態篩選，避免缺資料被誤列未上架。不改Sheet資料、不新增頁面、不自動刊登。這批前端尚未正式部署。 101項前端測試、TypeScript型別檢查與Vite正式版建置通過。Vercel讀回目前仍為0edd07f舊版；本機未找到Vercel CLI與既有CLI登入設定，GitHub同步亦仍待處理。
+
+## 2026-09-14 22:26 最新發布規則與後端部署
+
+正式 HTTPS API 部署後讀回：active=null，google_sheets／persistent_local=false；source_queue total=1528、unchecked=139、pending=149；最新工作仍#101 success。systemd active、啟動22:26:25、NRestarts=0；下一輪2026-09-15 10:00。本次沒有觸發新抓取／同步寫入，部署後完整自然輪次尚待觀察。發布守門與來源佇列28項測試通過。
+
+每日 20 次只計 SIMPLES 在 Vercel 的正式與預覽部署；Vercel 帳號每日 100 次另行盤點。VPS 後端不受此額度限制，也不消耗 Vercel 次數。這段使用者最新要求取代下方所有「前後端合計20次」舊規則；不能因後端歷史部署次數未知阻擋後端維護。
+
+守門的 frontend／preview 使用 scope=simples_vercel，統計 Vercel；backend 預留0次，只核對提交、測試與正式 API 閒置／下次排程，不要求 Vercel 次數。前端保留集中發布及防誤觸 Git 建置流程。舊 audit 必須重新盤點，不能沿用包含後端的基準。
+
+後端 source_queue.py 已於台灣22:26部署，SHA256=7e4510455e8699d3b2d4ea0e147e2e406b85c1e30614cad75765f8d0a0e14523；備份 backups/queue-time-20260914T142625Z。修正重查時間比較並增加 pending；前端尚未部署。22:00自然工作#101成功，抓取153筆平台結果、反查20件（0候選／20未匹配）、更新20筆行情、刷新28/28貨源、Sheet寫3略過2且5頁讀回通過。部署後獨立Sheet稽核：24表、1528貨源、269版本、567行情快照；2736比較結構／格式／品番／條碼／算式全部通過。923個正毛利需求候選組合不是獨立商品或壓片確認。
+
+集中發布排程時段仍為12:15與21:15；此次更新自動化遭自動審核拒絕，未生效。不可聲稱排程已採用新規則；需另確認持續自動部署授權。VPS資料排程10/16/22不受影響。
+
+
+
+## 2026-09-14 12:15 Asia/Taipei release check: NOT DEPLOYED
+
+Vercel team date filter, both pages: 21 deployments (17 production, 4 preview), excluding backend. SIMPLES Git connection remains disconnected. The current conservative team-wide cap blocks publishing; user clarification requested on whether the 20/day scope means SIMPLES or all projects. Next scheduled check: 21:15; a same-day check does not reset the cap.
+
+Recovered the console through VPS1542946 overview, without reboot. Authenticated public API: active=null, google_sheets, persistent_local=false, next schedule16:00. Natural job99 succeeded10:00:00-10:10:41: checked20, matched1, unmatched19, market_updated25, source refresh28/28; collection paused with pending_before57. Sheet changed3/unchanged2, verification5 pages passed; comparisons2729, candidates1379, Discogs262 rows. Live queue: total1379, unchecked30, matched96, unmatched1253. This checks API and recorded outcomes, not a new full Sheet audit or write probe.
+
+Pending implementation HEAD a73122c; clean worktree before this note. Release guard check exited2 without complete audit. No push, deployment, restart or duplicate job; existing passing tests were not rerun without code changes.
+
+## 2026-09-14 固定集中發布時段
+
+使用者要求主動訂定發布時間，已建立本項工作heartbeat「SIMPLES 集中發布」（simples），每日Asia/Taipei **12:15、21:15** 接續盤點、集中發布及正式驗收；首次2026-09-14 12:15。這是發布工作提醒，與VPS每天10/16/22資料排程及Discogs申訴追蹤分開。沒有待發變更不空部署；有待發變更主動排除阻礙，不能無限停在本機完成。20次總上限與真實盤點要求不變；若仍受阻須報具體原因與下個時段，不把排程建立當作部署成功。
+
+同批修正工作明細：缺少／無效數量顯示未知，實際0保留；不明Sheet錯誤與損壞明細先要求讀回，不引導直接重送。前端99項測試、型別檢查與本機build通過；新前端仍待上述集中發布驗收。
+
+## 2026-09-14 重查時間判定修正（本機待發布）
+
+重查時間改以含時區的實際時間比較，排程待查數、API進度與反查批次共用同一判斷。不同UTC offset不再以字串先後誤判；損壞或缺時區的retry_at保留原資料並列入待查，由原每批上限逐次處理，成功完成該次查詢後沿用原規則保存新快取。不清空來源或快取、不立即啟動正式工作。
+
+隔離測試涵蓋跨時區先後、等於到期時間、損壞／空／缺時區時間，以及處理後不重複查詢。後端226項離線測試通過，15項socket測試未執行。新行為尚未部署，不能宣稱正式環境已修復。
+
+## 2026-09-14 待反查進度補強（本機待發布）
+
+`workflow.source_queue.pending` 現在提供與排程相同判定的待反查總數，在同一記憶體查詢連線統計。既有 `unchecked` 只計從未反查；前端分開顯示首次與到期／身份變更重查。首次進度100%仍可能有重查工作，舊後端缺欄位顯示待取得。沿用既有身份快取、價格變動不重搜、失敗重試與分批規則；沒有新增資料分頁或修改業務紀錄。
+
+驗證：支援的Python執行環境下後端離線222項通過（15項socket未跑）、前端97項、TypeScript、本機Vercel build通過。系統Python3.9首次測試因缺sqlite serialize而7項失敗，改用支援環境重跑後通過；沒有修改正式資料層遷就舊Python。本批未推送、未部署，正式API尚未有新pending欄位，正式畫面待合併發布驗收。部署完整額度仍未知。
+
+## 本次真正未完成項目
+
+1. **完整發布額度仍未知**：本機20次守門、預留及pre-push已完成測試；Vercel SIMPLES Git連接已移除並從UI確認，推送不再由該連接自動建置。無法核實今日後端部署總數與其他發布者的獨占窗口，禁止發布。
+2. **新前端仍待集中發布**：正式0edd07f不含寫入／略過分頁數提示；本批再加入實際行情更新數及版本候選用詞，95項前端測試、型別、本機建置通過，不等於正式完成。
+3. **唯讀正式驗證已完成**：9/14約02:55從VPS讀公開HTTPS API200，active=null、google_sheets、persistent_local=false；自然#97／#98成功。24原始表及2724比較稽核通過，1379貨源、257版本、495行情快照；目前未查50。尚未做本批新前端正式操作驗收及展示表逐格重新比對。
+4. **上架流程剩餘工作**：AI文案真實呼叫、正式批次刊登、防止結果未知重送、停權解除後庫存API驗收，以及完整成本細項。依使用者要求不購買、不刊登、不寄信；客服AI最後做。
+
+本次後端離線218項、守門9項、前端95項及型別／本機build通過；15項socket未跑。沒有推送或部署。本機為從遠端原SHA還原的淺層副本，原本機commit／未追蹤檔與Downloads最初文件未核實。
 
 此表以目前程式及既有驗證紀錄為準，取代 README 歷史更新中互相衝突的「尚未部署」描述；不代表今天重新測過所有外部平台。
 
 | 順序 | 功能 | 現況 | 剩餘工作／驗收 |
 |---|---|---|---|
-| 1 | 收集與比對狀態 | 四平台、Discogs、Sheets、分批快取及 VPS 10/16/22 排程已有實作與正式驗證紀錄 | 持續驗證平台結構、資料新鮮度；最新失敗工作顯示修正已完成本機測試 |
+| 1 | 收集與比對狀態 | 五來源、Discogs、Sheets、分批快取及 VPS 10/16/22 排程已實作；本次從Sheet核實自然#97／#98完成 | 正式API及24表／比較唯讀稽核通過；新前端待發布 |
 | 2 | 上架文案 | AI 建議 API、前端審閱／套用與隔離測試已完成；原品相範本保留 | 後端已部署但依使用者要求暫停；設定 OpenAI 金鑰與可用模型、真實呼叫驗收待做；詳見 AI_LISTING.md |
 | 3 | Discogs 正式刊登 | Quicklister CSV 匯出與草稿檢查可用 | 正式 API 寫入、逐件結果、失敗重試、結果不明時防重送；未連接，不能稱已刊登 |
 | 4 | 刊登狀態回讀 | 已實作分頁讀回、完整快照、精確關聯與前端入口，隔離測試通過 | 已部署 VPS；identity 成功，庫存 API 因帳號停權回傳 403，待解除限制後驗收；每日排程、主清單已售整合與消失原因判定待做，見 INVENTORY_SYNC.md |
-| 5 | 更多進貨渠道 | Yahoo TW／JP、露天、Tower 已有解析器 | 樂天、eBay 需適用憑證；Mercari、Disk Union、HMV、Record City 等需分別評估與實測，不以名錄冒充串接 |
+| 5 | 更多進貨渠道 | Yahoo TW／JP、露天、Tower、Rotten Blues 已有解析器 | 樂天、eBay 需適用憑證；Mercari、Disk Union、HMV、Record City 等需分別評估與實測，不以名錄冒充串接 |
 | 6 | 完整成本 | 原幣別、匯率、毛利、設定費用後淨利已實作 | 實際運費、代購、稅費等細項；平台未提供時保持未知，不宣稱自動取得完整成本 |
 | 7 | 通知管理 | 有通知 outbox、防重送與結果不明核對入口，148 項離線測試通過 | 通知管理已部署 VPS，API 讀取及無效請求驗證通過；新版前端登入、通知紀錄與清單排序已驗收；目標價歷史紀錄已部署，正式評分與前端讀取驗證通過；對外到價通知待做；真實發送另依使用者明確授權 |
 | 8 | AI 客服 | 尚未實作，依使用者要求最後做 | 訊息入口／權限、AI 建議回覆、人工審核及發送紀錄 |

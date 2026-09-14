@@ -11,3 +11,16 @@ test('empty, unavailable and malformed progress never display NaN or false compl
  const html=render({total:0,unchecked:0,statuses:{}});assert.ok(html.includes('0%'));assert.ok(!html.includes('NaN'));
  for(const queue of [{total:1,unchecked:2},{total:-1,unchecked:0},{total:NaN,unchecked:0}])assert.ok(render(queue).includes('待重新讀取'));
 });
+
+test('completed first pass still shows due rechecks',()=>{
+ const html=render({total:100,unchecked:0,pending:7,statuses:{matched:10,unmatched:90}});
+ for(const text of ['100%','目前待反查 7','首次 0','身份變更重查 7'])assert.ok(html.includes(text),text);
+});
+test('older backend and invalid pending counts remain unknown',()=>{
+ for(const pending of [undefined,null,-1,NaN,101,4]){
+  const html=render({total:100,unchecked:5,pending,statuses:{unmatched:95}});
+  assert.ok(html.includes('目前待反查總數待取得'));
+  assert.ok(!html.includes('NaN'));
+ }
+ assert.ok(render({total:0,unchecked:0,pending:0,statuses:{}}).includes('目前待反查 0'));
+});

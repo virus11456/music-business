@@ -1,0 +1,6 @@
+#!/bin/sh
+# Install in .git/hooks/pre-push; no network request or deployment here.
+if [ "${SIMPLES_RELEASE_GUARDED:-}" != "1" ]; then
+  echo '推送已阻擋：先依 deploy/README.md 核實今日全部部署、停用自動部署，再使用 release_guard.py。' >&2
+  exit 1
+fi

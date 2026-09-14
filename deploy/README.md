@@ -1,5 +1,61 @@
 # VPS 部署
 
+## 2026-09-14 純Git同步與連接器流程
+
+已確認Vercel Git連接停用時，純Git同步不觸發部署，不要求Vercel額度或其他專案停止發布；仍須乾淨提交、測試、正式API與自動建置停用證據。release_guard.validate/reserve 的target=sync負責上述檢查。
+
+CLI無登入時允許使用既有GitHub連接器：先讀遠端main，確認是已審查的基準；以受追蹤差異建立tree，必須與本機HEAD tree相同；新commit以剛讀取的遠端main為parent，保留遠端歷史與本機提交。更新分支前再次讀遠端parent及自動部署設定，以reserve(...,target='sync',slots=0)記錄新鮮盤點，通過後僅對virus11456/music-business main做force=false的fast-forward；結果未知先讀回不重送。建立未連到分支的Git objects不觸發部署。不能借此進行Vercel發布，發布仍須另計額度。此明確流程優先於舊文件僅允許Git CLI的描述。
+
+## 2026-09-14 22:26 最新發布規則與後端部署
+
+正式 HTTPS API 部署後讀回：active=null，google_sheets／persistent_local=false；source_queue total=1528、unchecked=139、pending=149；最新工作仍#101 success。systemd active、啟動22:26:25、NRestarts=0；下一輪2026-09-15 10:00。本次沒有觸發新抓取／同步寫入，部署後完整自然輪次尚待觀察。發布守門與來源佇列28項測試通過。
+
+每日 20 次只計 SIMPLES 在 Vercel 的正式與預覽部署；Vercel 帳號每日 100 次另行盤點。VPS 後端不受此額度限制，也不消耗 Vercel 次數。這段使用者最新要求取代下方所有「前後端合計20次」舊規則；不能因後端歷史部署次數未知阻擋後端維護。
+
+守門的 frontend／preview 使用 scope=simples_vercel，統計 Vercel；backend 預留0次，只核對提交、測試與正式 API 閒置／下次排程，不要求 Vercel 次數。前端保留集中發布及防誤觸 Git 建置流程。舊 audit 必須重新盤點，不能沿用包含後端的基準。
+
+後端 source_queue.py 已於台灣22:26部署，SHA256=7e4510455e8699d3b2d4ea0e147e2e406b85c1e30614cad75765f8d0a0e14523；備份 backups/queue-time-20260914T142625Z。修正重查時間比較並增加 pending；前端尚未部署。22:00自然工作#101成功，抓取153筆平台結果、反查20件（0候選／20未匹配）、更新20筆行情、刷新28/28貨源、Sheet寫3略過2且5頁讀回通過。部署後獨立Sheet稽核：24表、1528貨源、269版本、567行情快照；2736比較結構／格式／品番／條碼／算式全部通過。923個正毛利需求候選組合不是獨立商品或壓片確認。
+
+集中發布排程時段仍為12:15與21:15；此次更新自動化遭自動審核拒絕，未生效。不可聲稱排程已採用新規則；需另確認持續自動部署授權。VPS資料排程10/16/22不受影響。
+
+
+
+## 2026-09-14 固定集中發布時段
+
+使用者要求主動訂定發布時間，已建立本項工作heartbeat「SIMPLES 集中發布」（simples），每日Asia/Taipei **12:15、21:15** 接續盤點、集中發布及正式驗收；首次2026-09-14 12:15。這是發布工作提醒，與VPS每天10/16/22資料排程及Discogs申訴追蹤分開。沒有待發變更不空部署；有待發變更主動排除阻礙，不能無限停在本機完成。20次總上限與真實盤點要求不變；若仍受阻須報具體原因與下個時段，不把排程建立當作部署成功。
+
+同批修正工作明細：缺少／無效數量顯示未知，實際0保留；不明Sheet錯誤與損壞明細先要求讀回，不引導直接重送。新前端仍待上述集中發布驗收。
+
+## 目前發布規則（2026-09-14）
+
+每天以 Asia/Taipei 00:00 至翌日 00:00 計算，全部部署合計最多 **20 次**，包含正式、預覽、前端、後端。保守將已啟動、失敗、取消、結果未知及重試各算一次；不能只統計 Ready。前後端同批各部署一次就是 2 次。唯讀查驗、測試及本機 build 不算部署。Vercel 其他專案也可能共用額度；未釐清總範圍前採團隊全部部署加後端，不改其他專案設定。
+
+先累積本機開發、測試及 commit，再集中發布。推送／文件更新可能觸發 Vercel；**額度未知時只保留本機提交**。禁止 force push、reset 遠端歷史、付費升級或以其他專案規避上限。
+
+`frontend/vercel.json` 新增 `git.deploymentEnabled=false`，用來停用所有分支的自動 Git 部署（含預覽）。這是待同步設定，**不是目前 Vercel 已停用的證明**。第一次同步前先從 Vercel Git 設定停用連接並確認沒有排隊建置，避免為套用保護先耗用不明額度；之後維持明確發布。Ignored Build Step 的取消紀錄不能當作零次，也不能冒充部署計數器。官方設定：[Git Configuration](https://vercel.com/docs/project-configuration/git-configuration#turning-off-all-automatic-deployments)。
+
+### 單一發布窗口
+
+發布操作者（可由開發代理完成，不要求使用者補業務資料）負責：
+
+1. 唯讀查驗 Vercel 當日所有環境／狀態／分頁，及後端部署紀錄；補入所有已啟動或不明結果，不以 systemd 重啟次數直接當部署次數。與其他發布者確認本批期間不另行部署，無法確認就不發布。
+2. 讀正式 `/api/state` 的 active、jobs、schedule、source_queue；工作未完、狀態未知或距下個排程不到 15 分鐘時暫緩。不手動重送自然工作。
+3. 完成本批測試、檢查 Git 差異與憑證排除、提交。由 `deploy/release-audit.example.json` 產生忽略追蹤的 `secrets/release-audit.json`，只保存安全盤點摘要、證據位置和目前 HEAD；不放 Authorization、CSRF、憑證或原始 API 回應。未知欄位維持 null／false，不能為通過守門而猜值。
+4. 用 `python3 scripts/release_guard.py --target frontend --check` 試算。盤點有效期 5 分鐘、API 狀態 2 分鐘；跨台灣日期／HEAD 改變需重新查驗。
+5. 每次外部部署用 `python3 scripts/release_guard.py --target frontend -- <單次部署命令與參數>`；預覽用 `preview`、後端用 `backend`。每次命令只能含一次外部部署，不能包迴圈、重試或同時部署前後端。程式先鎖定同一盤點檔、持久預留 1 次，再執行命令；失敗、逾時或中斷不退回次數。不自動重試。
+6. 已確認自動部署停用後，Git 單純同步用 `python3 scripts/release_guard.py --target sync -- git push origin HEAD:main`，不消耗部署次數但仍需要完整證據。任何待發布工作只能在遠端狀態與額度均已核對後執行。
+7. 等部署結束，核對正式版本與網站／API／Sheet，再報告完成。寫入結果不明先讀回；不得把 accepted、running、本機 build 或單元測試當作正式驗收。
+
+`deploy/pre-push` 是本機防誤推送 hook，複製至 `.git/hooks/pre-push` 並設可執行；既有 hook 不可直接覆寫，須整合。此工作副本已安裝。環境旗標僅由守門子程序設定，不可手動用來跳過核對。
+
+**限制：**這套守門保護使用同一盤點檔的發布窗口，不是已上線的跨裝置／全帳號計數器。不能攔截他人直接按 Vercel Redeploy、其他 checkout、GitHub connector 或直接 SSH 部署；因此未能確認獨占窗口／完整基準就保持阻擋。更新盤點時先查明既有預留是否已包含在實際紀錄，不可清空不明預留求取額度。9/14 02:55已在Vercel移除SIMPLES Git連接並確認未連接儲存庫，正式首頁仍HTTP200；未觸發部署。團隊當日可見12次（10正式、2預覽），其他發布者仍活動。VPS沒有完整部署流水帳；程式mtime與service生命周期沒有今日變更不足以當作精確零次。總額度未核實，本批不發布。
+
+## 現行後端架構
+
+唯一正式後端是 srv1542946、`/opt/music-business`、systemd `music-business`；**不要操作 srv1527356**。Google Sheet 是唯一持久業務資料源，`DATA_BACKEND=google_sheets`；SQLite 只作記憶體 SQL。不在 Mac 啟動正式後端或排程，不再按下面歷史第 3 步搬入磁碟庫。既有 Inputs／採購／未配對快取均保留，詳見 `docs/SHEET_PRIMARY.md`。
+
+## 歷史重建紀錄（不直接照做）
+
 2026-09-11 已部署於使用者核准的 Hostinger srv1542946（Ubuntu 24.04 / 2 核心 / 8 GB）。後端 https://srv1542946.hstgr.cloud，程式 /opt/music-business，使用 music 帳號與 systemd。以下保留重建步驟。
 
 1. 在主機建立非 root 的 music 帳號，專案放 /opt/music-business；建立 data、logs、secrets 目錄並設定 music 擁有權。

@@ -23,11 +23,15 @@ description: 維護或執行 SIMPLES 唱片進貨資料抓取，涵蓋台灣 Yah
 python3 .agents/skills/record-source-crawlers/scripts/inspect_crawlers.py --db /path/to/existing.sqlite3
 ```
 
-路徑必須由目前部署設定確認，不能猜測或建立新庫。工具以 SQLite read-only/query-only 開啟一致快照，輸出各平台最近收集、48 小時過期／未知報價、未反查、到期或身份改變數與排程歷史；不連網、不開始工作、不讀取憑證。`due` 將損壞重試時間列為待診斷，不代表現行排程一定能正常處理它。資料庫歷史不能證明排程程序仍存活，enabled 固定為 null，須另查正式 `/api/state`。
+路徑必須由目前部署設定確認，不能猜測或建立新庫。工具以 SQLite read-only/query-only 開啟一致快照，輸出各平台最近收集、48 小時過期／未知報價、未反查、到期或身份改變數與排程歷史；不連網、不開始工作、不讀取憑證。`due` 將損壞重試時間列為待診斷；2026-09-14 22:26已部署重查時間修正，損壞或缺時區retry_at列入待查；下一輪自然工作仍待觀察。資料庫歷史不能證明排程程序仍存活，enabled 固定為 null，須另查正式 `/api/state`。
 
 ## 執行邊界
 
-最新主資料源是使用者指定 Google Sheet，VPS 只執行單一正式程序與排程；SQLite 僅作記憶體查詢引擎，不能改回舊磁碟庫。詳見專案 docs/SHEET_PRIMARY.md。維護前讀取 `/api/state` 的 active、jobs、schedule、source_queue；不要在 Mac 啟動第二套正式後端。程式測試用臨時資料庫，不能往正式庫塞示範商品。
+維護發布另遵守根目錄 deploy/README.md：每天台灣時間只有SIMPLES Vercel正式／預覽合計20次；帳號Vercel上限100次。VPS後端不計額度，只需提交、測試、即時API閒置及排程間隔核對。Vercel額度未知時不觸發Vercel部署。發布守門只保護受控窗口，不能當作已上線的全帳號計數器；不得為驗證自然排程重送一批。
+
+最新主資料源是使用者指定 Google Sheet，VPS 只執行單一正式程序與排程；SQLite 僅作記憶體查詢引擎，不能改回舊磁碟庫。詳見專案 docs/SHEET_PRIMARY.md。維護前讀取 `/api/state` 的 active、jobs、schedule、workflow.source_queue；不要在 Mac 啟動第二套正式後端。程式測試用臨時資料庫，不能往正式庫塞示範商品。
+
+進度的 unchecked 只代表從未反查；pending 為首次加到期／身份改變的待查總數（2026-09-14 22:26後端已部署）。舊API缺pending時保持未知，不把首次完成當作所有重查已完成。
 
 需要實際收集時，優先使用既有前端或後端工作 API，沿用使用者指定主題、平台及 Google Sheet。建立新主題會保存並納入後續輪替，不能因示例而擅自扩大搜尋範圍。API 傳回 accepted 只表示已接單，須讀工作結果判斷成功、部分失敗或仍執行中；結果不明時先查狀態，勿重送同一批。
 

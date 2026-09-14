@@ -1,0 +1,29 @@
+{
+  "date": null,
+  "checked_at": null,
+  "head": null,
+  "vercel": {
+    "complete": false,
+    "count": null,
+    "evidence": null
+  },
+  "automatic_deployments_disabled": false,
+  "exclusive_release_window": false,
+  "tests_passed": false,
+  "api": {
+    "verified": false,
+    "checked_at": null,
+    "active": null,
+    "jobs_checked": false,
+    "schedule_checked": false,
+    "source_queue_checked": false,
+    "next_run": null
+  },
+  "reservations": [],
+  "scope": "simples_vercel",
+  "account": {
+    "complete": false,
+    "count": null,
+    "evidence": null
+  }
+}

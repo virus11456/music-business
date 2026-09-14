@@ -45,3 +45,39 @@ test('sync failures identify safe stages and tabs without upstream text',()=>{
  assert.match(text,/SIMPLES_Comparisons/);assert.doesNotMatch(text,/secret|private response/);
  assert.match(jobReport(JSON.stringify({errors:[{step:'sheets',code:'write_unknown'}]})).join('\n'),/勿連續重送/);
 });
+
+test('source-first reports actual market updates and unconfirmed version candidates',()=>{
+ const text=jobReport(JSON.stringify({versions:257,batches:[{flow:'source_first',checked:20,matched:1,unmatched:19,market_updated:20}]})).join('\n');
+ assert.match(text,/已存 257 個版本（本輪分批更新）/);
+ assert.match(text,/本輪更新 Discogs 行情 20 個版本/);
+ assert.match(text,/最低掛牌價，非成交價/);
+ assert.match(text,/有版本候選 1 件/);
+ assert.doesNotMatch(text,/本次排程涵蓋/);
+});
+
+test('unchanged display sheets retain readback evidence without claiming no writes',()=>{
+ const detail={synced:true,changed_tables:[],unchanged_tables:['Comparisons','PlatformCandidates','Discogs','Sources','Analysis'],verification:{ok:true,tables:5}};
+ for(const value of [detail,{batches:[{sheet_sync:detail}]}]){
+  const text=jobReport(JSON.stringify(value)).join('\n');
+  assert.match(text,/本次寫入 0 個分頁，5 個分頁資料未變、略過重寫/);
+  assert.match(text,/核對通過：5 個分頁/);
+ }
+});
+
+test('unknown market update counts do not become zero',()=>{
+ for(const value of [undefined,null,-1,'20',true])assert.doesNotMatch(jobReport(JSON.stringify({flow:'source_first',market_updated:value})).join('\n'),/本輪更新 Discogs 行情/);
+ assert.match(jobReport(JSON.stringify({market_updated:0})).join('\n'),/行情 0 個版本/);
+});
+
+test('missing work counters stay unknown while actual zero is preserved',()=>{
+ for(const value of [undefined,null,-1,'0',true,Number.MAX_SAFE_INTEGER+1]){
+  const text=jobReport(JSON.stringify({flow:'source_first',pending:value,source_refresh:{platform:'ruten',failed:value}})).join('\n');
+  assert.match(text,/待處理 未知 件/);assert.match(text,/失敗 未知 件/);
+ }
+ assert.match(jobReport(JSON.stringify({flow:'source_first',pending:0})).join('\n'),/待處理 0 件/);
+});
+test('unclassified sync failures and unreadable detail do not advise blind retry',()=>{
+ for(const detail of ['broken JSON',JSON.stringify({errors:[{step:'sheets',error:'TimeoutError'}]})]){
+  const text=jobReport(detail).join('\n');assert.match(text,/勿直接重送/);assert.doesNotMatch(text,/設定後重試|TimeoutError/);
+ }
+});

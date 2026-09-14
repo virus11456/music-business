@@ -1,7 +1,7 @@
 type Obj=Record<string,unknown>;
 const obj=(v:unknown):Obj=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Obj:{};
 const list=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
-const count=(v:unknown)=>typeof v==='number'&&Number.isInteger(v)&&v>=0?v:null;
+const count=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0?v:null;
 export function refreshFailures(detail:string|null):{label:string;url:string}[]{
  let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return []}
  const results:{label:string;url:string}[]=[];
@@ -24,7 +24,7 @@ export function refreshFailures(detail:string|null):{label:string;url:string}[]{
  return results;
 }
 export function jobReport(detail:string|null):string[]{
- let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return ['未保存步驟明細；請檢查連線與設定後重試。']}
+ let data:Obj;try{data=obj(JSON.parse(detail||'{}'))}catch{return ['未保存可讀的步驟明細；請先確認工作狀態與 Sheet 結果，勿直接重送。']}
  const lines:string[]=[];
  function verification(value:Obj){if(Array.isArray(value.changed_tables)&&Array.isArray(value.unchanged_tables))lines.push(`本次寫入 ${value.changed_tables.length} 個分頁，${value.unchanged_tables.length} 個分頁資料未變、略過重寫`);const v=obj(value.verification);if(v.ok===true)lines.push(`Sheet 寫入後核對通過：${count(v.tables)??'未知'} 個分頁，價格與比對資料已讀回確認`);}
  const names:Record<string,string>={yahoo_tw:'Yahoo 台灣',yahoo_jp:'Yahoo 日本',ruten:'露天',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
@@ -45,14 +45,15 @@ export function jobReport(detail:string|null):string[]{
   const quoteParts=list(quotes.platforms).length?list(quotes.platforms):quotes.platform==='ruten'?[quotes]:[];
   for(const raw of quoteParts){
    const q=obj(raw),name=names[String(q.platform)];if(!name)continue;
-   if(count(obj(q.selection).rotation)!==null)lines.push(`${name}刷新排序：優先商品 ${count(obj(q.selection).priority)??0} 件 · 舊資料保留名額 ${count(obj(q.selection).rotation)??0} 件`);
-   lines.push(`${name}已存報價：檢查 ${count(q.attempted)??0} 件 · 更新 ${count(q.updated)??0} 件 · 未回傳 ${count(q.missing)??0} 件 · 失敗 ${count(q.failed)??0} 件`);
+   if(count(obj(q.selection).rotation)!==null)lines.push(`${name}刷新排序：優先商品 ${count(obj(q.selection).priority)??'未知'} 件 · 舊資料保留名額 ${count(obj(q.selection).rotation)??'未知'} 件`);
+   lines.push(`${name}已存報價：檢查 ${count(q.attempted)??'未知'} 件 · 更新 ${count(q.updated)??'未知'} 件 · 未回傳 ${count(q.missing)??'未知'} 件 · 失敗 ${count(q.failed)??'未知'} 件`);
   }
   if(b.flow==='source_first'){
    if(names[String(b.source_platform)])lines.push('指定比對來源：'+names[String(b.source_platform)]);
    source(b.collection);
-   lines.push(`反查 ${count(b.checked)??0} 件 · 有配對 ${count(b.matched)??0} 件 · 留待配對 ${count(b.unmatched)??0} 件 · 沿用快取 ${count(b.cached)??0} 件 · 待處理 ${count(b.pending)??0} 件`);
+   lines.push(`反查 ${count(b.checked)??'未知'} 件 · 有版本候選 ${count(b.matched)??'未知'} 件 · 留待配對 ${count(b.unmatched)??'未知'} 件 · 沿用快取 ${count(b.cached)??'未知'} 件 · 待處理 ${count(b.pending)??'未知'} 件`);
   }
+  if(count(b.market_updated)!==null)lines.push(`本輪更新 Discogs 行情 ${b.market_updated} 個版本（最低掛牌價，非成交價）`);
   for(const raw of list(b.releases)){
    const r=obj(raw),id=count(r.release_id);if(id===null)continue;
    const prefix=`版本 #${id} · `;
@@ -68,13 +69,14 @@ export function jobReport(detail:string|null):string[]{
     const tabs=list(e.tables).filter(t=>typeof t==='string'&&allowed.includes(t));
     lines.push('Google Sheets：'+syncCodes[String(e.code)]+(tabs.length?'（'+tabs.map(t=>'SIMPLES_'+t).join('、')+'）':''));continue;
    }
+   if(e.step==='sheets'){lines.push('Google Sheets 同步未完成；舊紀錄未保存可判定的寫入結果，請先讀回 Sheet，勿直接重送');continue;}
    if(steps[String(e.step)])lines.push(`${id===null?'':`版本 #${id} · `}${steps[String(e.step)]}未完成；請檢查該服務的連線與設定後重試`);
   }
   if(obj(b.sheet_sync).synced===true)lines.push('Google Sheets 同步完成');
   verification(obj(b.sheet_sync));
  }
  if(data.collection_paused===true)lines.push(`先處理已存商品（待反查 ${count(data.pending_before)??'未知'} 件），本輪不新增收集`);
- if(count(data.versions)!==null)lines.push(`本次排程涵蓋 ${data.versions} 個版本`);
+ if(count(data.versions)!==null)lines.push(`排程開始時已存 ${data.versions} 個版本（本輪分批更新）`);
  if(Array.isArray(data.batches))for(const b of data.batches)batch(b);else batch(data);
  source(data);
  verification(data);

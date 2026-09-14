@@ -1,5 +1,13 @@
 # Vercel 前端部署
 
+## 現況與發布限制（2026-09-14）
+
+以下 Mac 後端與未接通說明是歷史。正式後端已採 VPS／Google Sheet 架構，見 `deploy/README.md` 與 `docs/SHEET_PRIMARY.md`。所有發布先走 `scripts/release_guard.py`；每日全部正式／預覽／前後端合計 20 次，完整額度未知就只留本機提交。
+
+本次 Chrome 核對正式版本仍為 `0edd07f`、部署 `5iG7eC3uhSZHiurxr5ksGALt9zbu`（Ready），尚未包含略過分頁數提示。Git 仍連接 main、Root Directory=frontend、Node=24.x、Ignored Build Step=Automatic、沒有 Deploy Hooks。Skip deployments when unaffected 已勾選，但歷史文件 commit 仍有部署紀錄，不視為完整保護。
+
+新增 `git.deploymentEnabled=false` 僅為本機待同步設定。沒有重試 Vercel build，沒有宣稱 rate-limit 已解除；當日後端部署數及正式 `/api/state` 未能核實前不發布。實際停用自動建置、批次發布及線上驗收仍待完成。
+
 使用者已於 2026-09-10 授權將前端部署到 Vercel。後端、SQLite、憑證與每天三次的程式排程仍在 Mac；本次不部署後端。
 
 ## 部署設定

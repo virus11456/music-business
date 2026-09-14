@@ -85,3 +85,49 @@ class SourceQueueTests(unittest.TestCase):
    with self.assertRaises(ValueError):source_queue.run(self.s,source_platform=value)
   with self.assertRaises(ValueError):source_queue.run(self.s,query='CD',source_platform='rottenblues')
   with self.assertRaises(ValueError):source_queue.run(self.s,limit=True)
+
+ def test_state_distinguishes_first_checks_from_due_rechecks(self):
+  initial=source_queue.state(self.s)
+  self.assertEqual((initial['unchecked'],initial['pending']),(1,1))
+  self.cycle([])
+  cached=source_queue.state(self.s)
+  self.assertEqual((cached['unchecked'],cached['pending']),(0,0))
+  with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET price='999'")
+  self.assertEqual(source_queue.state(self.s)['pending'],0)
+  with connect(self.s.db_path) as c:c.execute("UPDATE platform_candidates SET catalog_no='NEW-1'")
+  changed=source_queue.state(self.s)
+  self.assertEqual((changed['unchecked'],changed['pending']),(0,1))
+  self.cycle([])
+  with connect(self.s.db_path) as c:c.execute("UPDATE source_checks SET retry_at='2000-01-01'")
+  expired=source_queue.state(self.s)
+  self.assertEqual((expired['unchecked'],expired['pending']),(0,1))
+  self.assertEqual(expired['pending'],source_queue.pending_count(self.s))
+
+ def test_queue_state_read_does_not_mutate_saved_checks(self):
+  self.cycle([])
+  with connect(self.s.db_path) as c:before=[tuple(r) for r in c.execute('SELECT * FROM source_checks')]
+  source_queue.state(self.s)
+  with connect(self.s.db_path) as c:after=[tuple(r) for r in c.execute('SELECT * FROM source_checks')]
+  self.assertEqual(before,after)
+
+ def test_retry_times_compare_instants_not_timezone_strings(self):
+  from datetime import datetime,timezone
+  with connect(self.s.db_path) as c:row=dict(c.execute('SELECT * FROM platform_candidates').fetchone())
+  row['saved_fingerprint']=source_queue.fingerprint(row)
+  instant=datetime(2026,9,14,2,tzinfo=timezone.utc)
+  for retry,due in [('2026-09-14T09:00:00+08:00',True),('2026-09-13T23:00:00-04:00',False),('2026-09-14T02:00:00+00:00',True)]:
+   with self.subTest(retry=retry):
+    self.assertEqual(source_queue.needs_check({**row,'retry_at':retry},instant),due)
+
+ def test_invalid_retry_time_stays_visible_and_is_processed_once(self):
+  self.cycle([])
+  for retry in ['not-a-time','9999-broken','', '2099-01-01T00:00:00']:
+   with self.subTest(retry=retry):
+    with connect(self.s.db_path) as c:c.execute('UPDATE source_checks SET retry_at=?',(retry,))
+    self.assertEqual(source_queue.state(self.s)['pending'],1)
+    self.assertEqual(source_queue.pending_count(self.s),1)
+    result,calls=self.cycle([])
+    self.assertEqual(calls,1)
+    self.assertEqual(result['cached'],0)
+    self.assertEqual(source_queue.state(self.s)['pending'],0)
+    self.assertEqual(self.cycle([])[1],0)

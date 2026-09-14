@@ -1,5 +1,11 @@
 # Google Sheet 主資料源
 
+## 2026-09-14 自然排程回讀
+
+本次經Chrome直接選取指定Sheet的SIMPLES_Data_jobs，讀回#97（9/13 16:00:06–16:08:48）與#98（22:00:23–22:09:59）均success，時間轉為Asia/Taipei。#98保存收集73筆結果、反查20、行情更新20、刷新28/28，以及changed_tables=3、unchanged_tables=2、verification.ok=true／tables=5；當次PlatformCandidates展示1379列、Comparisons2724組、Discogs257列。#97先處理佇列未收集新頁，符合既有設計。
+
+後續於台灣02:55登入正確VPS主控台，以既有憑證讀公開HTTPS API200，active=null、google_sheets且persistent_local=false。執行既有scripts/audit_sheet_data.py完成24張原始表還原、主外鍵及NULL稽核，errors=[]；1379貨源、257版本、495行情快照。API2724組比較的身份衝突與毛利算式稽核也無錯，915正毛利需求組合並非独立商品或確定壓片。範圍為唯讀單次快照，未做寫入探測或重新逐格比對展示表。下一自然時段9/14 10:00仍待發生。
+
 使用者於 2026-09-13 明確指定：既有 Google Sheet 為唯一業務資料來源；VPS 只執行程式與排程，不維護另一份持久業務庫。此要求取代先前 VPS 主庫／Sheet 副本的安排。
 
 ## 實作

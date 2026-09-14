@@ -24,17 +24,28 @@ def fingerprint(row):
     if isinstance(row,dict) and (row.get('barcodes') or row.get('labels')):values.extend([row.get('barcodes',[]),row.get('labels','')])
     return hashlib.sha256(json.dumps(values,ensure_ascii=False).encode()).hexdigest()
 
+def needs_check(row,instant):
+    """Expired or unusable cache timestamps must not hide saved source work."""
+    if row['saved_fingerprint']!=fingerprint(row):return True
+    try:
+        retry=datetime.fromisoformat(row['retry_at'])
+        if retry.tzinfo is None:return True
+    except (TypeError,ValueError):return True
+    return retry<=instant
+
+def _pending_count(c,instant):
+    rows=c.execute('SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
+    return sum(needs_check(__import__('identity_data').enrich(c,r),instant) for r in rows)
+
 def pending_count(settings):
-    instant=now()
     with connect(settings.db_path) as c:
-        rows=c.execute('SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
-        return sum(r['saved_fingerprint']!=fingerprint(__import__('identity_data').enrich(c,r)) or r['retry_at']<=instant for r in rows)
+        return _pending_count(c,datetime.now(timezone.utc))
 
 def state(settings):
     with connect(settings.db_path) as c:
         statuses={r[0]:r[1] for r in c.execute('SELECT status,count(*) FROM source_checks GROUP BY status')}
         total=c.execute('SELECT count(*) FROM platform_candidates').fetchone()[0]
-        return {'total':total,'unchecked':total-sum(statuses.values()),'statuses':statuses,
+        return {'total':total,'unchecked':total-sum(statuses.values()),'pending':_pending_count(c,datetime.now(timezone.utc)),'statuses':statuses,
                 'topics':[dict(r) for r in c.execute('SELECT * FROM source_topics ORDER BY query')]}
 
 def run(settings,query=None,selected=None,limit=20,source_platform=None):
@@ -70,7 +81,7 @@ def run(settings,query=None,selected=None,limit=20,source_platform=None):
         result['source_platform']=source_platform
     due=[]
     for row in candidates:
-        if row['saved_fingerprint']==fingerprint(row) and row['retry_at']>instant.isoformat():
+        if not needs_check(row,instant):
             result['cached']+=1
         else:due.append(row)
     client=DiscogsClient(settings)

@@ -19,7 +19,7 @@ function harness(post){
   if(id==='@/lib/api')return {accessRevision:()=>0,hosted:false,apiOrigin:'',apiFetch:(path,opts)=>opts?.method==='POST'?post(path,opts):Promise.resolve({ok:true,status:200,json:async()=>state})};
   if(id==='@/lib/use-price-filter')return {usePriceFilter:()=>({minimum:0})};
   if(id==='@/lib/comparison-sort')return {buildRecordIndex:()=>new Map([[42,{rows:[{format:'CD'}],bestGross:1,bestMargin:.1}]])};
-  if(id==='@/components/record-status')return {default:()=>null,listedReleaseIds:()=>new Set(),matchesListingStatus:()=>true};
+  if(id==='@/components/record-status')return {default:()=>null,recordListingStates:()=>new Map(),matchesListingStatus:()=>true};
   if(id.startsWith('@/'))return {default:()=>null,Button:()=>null};
   return realRequire(id);
  },exports);
