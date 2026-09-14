@@ -356,9 +356,28 @@ def handler(dashboard):
                 self.respond(500,{'error':'資料讀取失敗，請檢查本機服務'})
 
         def do_POST(self):
+            if self.path in ('/api/login','/api/account/reset'):
+                if not dashboard.access.token or self.headers.get('Origin')!=dashboard.access.origin or dashboard.access.allowed(self.headers)==403:
+                    return self.respond(403,{'error':'不允許此來源連線'})
+                if self.headers.get('Content-Type','').split(';')[0]!='application/json':
+                    return self.respond(415,{'error':'不支援的資料格式'})
+                try:
+                    length=int(self.headers.get('Content-Length','0'))
+                    if not 0<length<=8192:return self.respond(413,{'error':'資料長度無效'})
+                    data=json.loads(self.rfile.read(length))
+                    if not isinstance(data,dict):raise ValueError()
+                except (ValueError,TypeError):return self.respond(400,{'error':'登入資料格式無效'})
+                if self.path=='/api/account/reset':
+                    status,result=dashboard.access.passwords.reset(data.get('reset_token'),data.get('username'),data.get('password'))
+                else:
+                    status,result=dashboard.access.passwords.login(data.get('username'),data.get('password'))
+                return self.respond(status,result)
             if not self.authorized():return
             if not secrets.compare_digest(self.headers.get('X-CSRF-Token',''),dashboard.csrf):
                 return self.respond(403,{'error':'頁面驗證已過期，請重新整理'})
+            if self.path=='/api/logout':
+                dashboard.access.passwords.revoke(self.headers.get('Authorization','')[7:])
+                return self.respond(200,{'message':'已登出'})
             if self.headers.get('Content-Type','').split(';')[0]!='application/json':
                 return self.respond(415,{'error':'不支援的資料格式'})
             try:

@@ -8,6 +8,7 @@ import {hasPositiveMargin,buildRecordIndex,meetsProfit,meetsMinimumUsd,hasFreshC
 import {hasStrongMatch,matchConflicts} from '@/lib/match-evidence';
 import {meetsSupply} from '@/lib/source-availability';
 import {usePriceFilter} from '@/lib/use-price-filter';
+import LoginForm from '@/components/login-form';
 import RecordStatus, {recordListingStates,matchesListingStatus} from '@/components/record-status';
 import RecordSources from '@/components/record-sources';
 import type {Comparison} from '@/components/comparison-table';
@@ -76,7 +77,7 @@ export default function Home(){
   }catch(e){return {revision,error:e instanceof Error&&e.name==='AbortError'?'連線逾時，請稍後重試':e instanceof Error?e.message:'讀取失敗'}}
  },result=>{
   if(result.revision!==accessRevision())return;
-  if(result.unauthorized){setState(null);setSourceReview(null);setNeedsLogin(true);setError('請輸入管理者存取碼登入工作室')}
+  if(result.unauthorized){setState(null);setSourceReview(null);setNeedsLogin(true);setError('請登入工作室；也可使用原管理者存取碼')}
   else if(result.error)setError(result.error);
   else if(result.next){setState(result.next);setNeedsLogin(false);setError('')}
  });
@@ -116,7 +117,7 @@ export default function Home(){
   <aside className="sidebar"><a className="brand" href="/" aria-label="SIMPLES 首頁"><Disc3 size={30}/><span>SIMPLES<small>RECORD BUSINESS</small></span></a><div className="workspace-label">我的唱片工作室</div><nav>{([[ 'overview',LayoutDashboard],['records',Disc3],['sourcing',Radar],['listing',Disc3],['settings',Settings2]] as const).map(([id,Icon])=><button key={id} className={view===id?'nav active':'nav'} onClick={()=>{setView(id);setFilter('all');setQuery('')}}><Icon size={19}/>{names[id]}</button>)}</nav><div className="sidebar-bottom"><span className="dot"/> {hostedFrontend?'線上前端':'本機工作區'}<small>{hostedFrontend?connectionLabel:'資料儲存在這台 Mac'}</small><div className="profile"><span className="avatar">F</span><span>Frank<small>SIMPLES 管理者</small></span></div></div></aside>
   <main><header className="topbar"><div className="breadcrumb">工作室 <ChevronRight size={14}/> {names[view]}</div><span className="local-status"><span className="dot"/>{!state||error?connectionLabel:state.configured.discogs?'Discogs 已設定':'Discogs 尚未設定'}</span></header>
    <div className="content"><UpdateNotice/><div className="page-heading"><div><p className="eyebrow">YOUR RECORD DESK</p><h1>{names[view]}</h1><p>{view==='overview'?'先看機會，再決定下一張唱片。':view==='records'?'只列出 Discogs 有需求與行情、且平台已找到對應報價的專輯。':view==='sourcing'?'行情與進貨報價，集中到 Google Sheets 比較。':view==='listing'?'整理已確認貨源的唱片，準備批次上架。':'管理選品範圍、比較匯率與工作紀錄。'}</p></div><div className="heading-actions"><Button className="btn secondary" disabled={locked||!state} onClick={()=>void send('/api/refresh',{})}><RefreshCw size={16} className={state?.active?'spin':''}/>更新行情</Button><Button className="btn primary" onClick={()=>setModal({kind:'add'})} disabled={locked}><Plus size={17}/>加入唱片</Button></div></div>
-   {needsLogin&&<form className="panel" onSubmit={e=>{e.preventDefault();setAccessCode(String(new FormData(e.currentTarget).get('access_code')||''));e.currentTarget.reset();void load(true);}}><label className="field"><span>管理者存取碼</span><input name="access_code" type="password" autoComplete="current-password" required/></label><Button type="submit" className="btn primary">登入工作室</Button><p>存取碼只保留在本次頁面記憶體，重新整理後需重新登入。</p></form>}{state&&apiOrigin&&<Button className="btn secondary" onClick={()=>{setAccessCode('');setState(null);setNeedsLogin(true);setError('已登出，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}}>登出</Button>}{error&&<div className="alert" role="alert"><CircleAlert size={18}/>{error}<button onClick={()=>void load()}>重試</button></div>}
+   {needsLogin&&<LoginForm onLogin={token=>{setAccessCode(token);void load(true)}}/>}{state&&apiOrigin&&<Button className="btn secondary" onClick={async()=>{await apiFetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf}}).catch(()=>{});setAccessCode('');setState(null);setNeedsLogin(true);setError('已登出，請重新登入');setModal(null);setSelected(null);setSourceReview(null);}}>登出</Button>}{error&&<div className="alert" role="alert"><CircleAlert size={18}/>{error}<button onClick={()=>void load()}>重試</button></div>}
    {state?.mode==='demo'&&<div className="alert">目前為示範資料，請勿作為進貨依據。</div>}
    {state?.active&&<div className="activity" role="status"><LoaderCircle size={17} className="spin"/>{state.active.name}中，完成後會自動更新。你可以繼續查看資料。</div>}
    {!state&&!error&&<div className="empty"><LoaderCircle className="spin"/><p>正在讀取你的唱片資料…</p></div>}

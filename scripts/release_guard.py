@@ -73,8 +73,8 @@ def validate(audit, head, slots, now=None, target="frontend"):
             raise Blocked("Invalid account deployment count or evidence")
         if audit.get("automatic_deployments_disabled") is not True:
             raise Blocked("尚未確認 Git／預覽自動部署已停用")
-        if audit.get("exclusive_release_window") is not True:
-            raise Blocked("尚未確認其他發布者暫停；不可共用過期額度")
+        if audit.get("project_deployments_idle") is not True:
+            raise Blocked("尚未確認SIMPLES沒有排隊或執行中的Vercel部署")
     if audit.get("tests_passed") is not True:
         raise Blocked("本批測試尚未完成")
     state = audit.get("api")

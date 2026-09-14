@@ -8,7 +8,7 @@
     "evidence": null
   },
   "automatic_deployments_disabled": false,
-  "exclusive_release_window": false,
+  "project_deployments_idle": false,
   "tests_passed": false,
   "api": {
     "verified": false,

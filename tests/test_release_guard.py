@@ -12,7 +12,7 @@ def valid():
         "date":"2026-09-14", "checked_at":NOW.isoformat(), "head":"abc",
         "vercel":{"complete":True,"count":18,"evidence":"all environments and pages checked"},
         "backend":{"complete":True,"count":8,"evidence":"deployment records checked"},
-        "automatic_deployments_disabled":True, "exclusive_release_window":True,
+        "automatic_deployments_disabled":True, "project_deployments_idle":True,
         "tests_passed":True,
         "api":{"verified":True,"active":None,"jobs_checked":True,
                "schedule_checked":True,"source_queue_checked":True,
@@ -53,7 +53,7 @@ class ReleaseGuardTests(unittest.TestCase):
         with self.assertRaises(Blocked):validate(a,"abc",1,NOW)
 
     def test_uncontrolled_auto_deploy_and_other_publishers_block(self):
-        for key in ("automatic_deployments_disabled","exclusive_release_window","tests_passed"):
+        for key in ("automatic_deployments_disabled","project_deployments_idle","tests_passed"):
             a=valid();a[key]=False
             with self.assertRaises(Blocked):validate(a,"abc",1,NOW)
 
@@ -118,7 +118,7 @@ class ReleaseGuardTests(unittest.TestCase):
 
     def test_backend_does_not_need_or_consume_vercel_quota(self):
         a=valid()
-        for k in ("scope","account","vercel","backend","automatic_deployments_disabled","exclusive_release_window"):
+        for k in ("scope","account","vercel","backend","automatic_deployments_disabled","project_deployments_idle"):
             del a[k]
         self.assertEqual(validate(a,"abc",0,NOW,target="backend")["planned"],0)
         a["api"]["active"]="running"
@@ -130,7 +130,7 @@ class ReleaseGuardTests(unittest.TestCase):
 
     def test_pure_git_sync_requires_disabled_auto_build_but_not_quota(self):
         a=valid()
-        for k in ("account","vercel","backend","scope","exclusive_release_window"):
+        for k in ("account","vercel","backend","scope","project_deployments_idle"):
             del a[k]
         self.assertEqual(validate(a,"abc",0,NOW,target="sync")["quota_applicable"],False)
         a["automatic_deployments_disabled"]=False

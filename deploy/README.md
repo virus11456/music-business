@@ -1,5 +1,31 @@
 # VPS 部署
 
+## 2026-09-15 前台帳密重設（待正式發布）
+
+登入頁新增設定／重設帳號密碼畫面；管理者在指定VPS產生30分鐘一次性驗證連結，前台不提供公開索取token的端點。連結token放URL fragment並於畫面載入後清除，伺服器僅保存token雜湊與期限。新密碼須由使用者自行在前台填寫兩次，不必操作終端。帳密更新使用scrypt與原子檔案寫入，重設token先消耗，跨程序鎖避免重複使用；成功後清除現有session。原存取碼備援仍保留。
+
+自動審核曾拒絕帶HTTP連結發放端點的方案；已移除，改成本機限定發放並通過檢查。23項後端登入／重設與來源防護测试通過，沒有在正式環境設定測試密碼或消耗正式連結。正式部署及使用者完成設定需另驗收。
+
+## 2026-09-14 帳號密碼登入（待設定與部署）
+
+新增單一管理者帳號密碼登入、scrypt加鹽雜湊、8小時記憶體工作階段、每分鐘10次全域登入限速、登出撤銷；保留原管理者存取碼備援。登入限定原有HTTPS Origin與Host，寫入沿用CSRF。新secret檔案secrets/admin-login.json屬身分驗證設定，不是業務資料，不提交Git或輸出密碼。服務重啟撤銷工作階段。
+
+密碼由使用者親自在srv1542946互動終端執行 `sudo -u music /opt/music-business/.venv/bin/python /opt/music-business/scripts/setup_admin_login.py` 設定（預設帳號admin），不得將新密碼傳入對話、命令參數或由代理代填。至少15字元，須輸入兩次；原子寫入且權限600。設定完成後重啟服務會撤銷舊session。不得在設定或正式驗證尚未完成時聲稱可以帳號密碼登入。
+
+本次正式唯讀診斷：API預檢204、未登入401，CORS允許正式前端；Chrome登入表单顯示管理者存取碼，實際登入失敗原因仍待使用者確認。沒有重設既有憑證。
+
+## 2026-09-14 23:17 前端集中發布完成
+
+使用者明確授權後，Vercel已重新連接virus11456/music-business；保留frontend/vercel.json git.deploymentEnabled=false。重新連接未自動建立部署；手動指定61db27e正式發布一次，deployment RRQ87ipjqbVksLbnhSJNUtxXrVc1，Ready，建置6秒。公開正式/version.json HTTP200回傳完整61db27e629abca5a4019b56ef129e15aa789b3f9；首頁HTTP200，已送出新JS index-tAinbgqb.js。Chrome正式首頁可見SIMPLES，等待管理者登入。本次未進行登入後互動驗收或新增業務寫入，不冒稱全部正常流程已驗證。
+
+發布前23:15:59正式API active=null、無running工作、#101 success，Sheet主資料源正常，queue1528／unchecked139／pending149，下次9/15 10:00。Vercel發布前當日完整兩頁：帳號33、SIMPLES0；此次增加1個正式部署。本機保守預留另含先前被審核拒絕的嘗試，不把預留數當實際部署數。沒有新增預覽部署，沒有重啟後端。
+
+本批已發布寫入／略過分頁提示、實際工作數量與未知狀態、重查進度、唱片刊登未知狀態篩選。101前端測試、型別檢查與建置已通過；故障情境限隔離測試。後端時間修正已於22:26部署。持續自動發布heartbeat的獨立授權尚未更新；本次授權只恢復Vercel/GitHub連接。
+
+## 2026-09-14 發布窗口範圍
+
+SIMPLES發布前核對project_deployments_idle=true（本專案沒有排隊或執行中的Vercel部署），並使用新鮮專案／帳號次數及本機鎖定預留。其他專案不必停止發布；不宣稱能鎖定全帳號。此流程取代舊exclusive_release_window要求。每次正式操作前重新核對可用次數，結果不明先查紀錄，不自動重試。
+
 ## 2026-09-14 純Git同步與連接器流程
 
 已確認Vercel Git連接停用時，純Git同步不觸發部署，不要求Vercel額度或其他專案停止發布；仍須乾淨提交、測試、正式API與自動建置停用證據。release_guard.validate/reserve 的target=sync負責上述檢查。

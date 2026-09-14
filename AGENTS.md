@@ -1,5 +1,9 @@
 # 專案協作約定
 
+## 2026-09-14 發布窗口範圍
+
+SIMPLES發布前核對project_deployments_idle=true（本專案沒有排隊或執行中的Vercel部署），並使用新鮮專案／帳號次數及本機鎖定預留。其他專案不必停止發布；不宣稱能鎖定全帳號。此流程取代舊exclusive_release_window要求。每次正式操作前重新核對可用次數，結果不明先查紀錄，不自動重試。
+
 ## 2026-09-14 純Git同步與連接器流程
 
 已確認Vercel Git連接停用時，純Git同步不觸發部署，不要求Vercel額度或其他專案停止發布；仍須乾淨提交、測試、正式API與自動建置停用證據。release_guard.validate/reserve 的target=sync負責上述檢查。
