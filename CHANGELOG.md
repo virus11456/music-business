@@ -1,3 +1,15 @@
+## 2026-09-17 公開唯讀目錄正式發布驗收
+
+已將本機 5539113（tree f59f3a556068d6a846fc37137cd3ec368f316454）以保留遠端歷史的 fast-forward 同步為 GitHub c8c1eaa59fbe698d32830afb0a1138117376656a。Vercel 正式部署 7dKFrsG9H9cMQ1cNEtXeBQzhVfWk 為 Ready，正式 /version.json 讀回同一完整 SHA。發布前當日全帳號完整日期篩選盤點35次、SIMPLES 0次，本批新增1次正式前端部署；git.deploymentEnabled=false 保留，文件同步不另觸發建置。
+
+正確 VPS srv1542946、/opt/music-business 於台灣21:34:13完成 server.py 與 public_catalog.py 部署並重啟單一 music-business 服務。備份 backups/public-catalog-20260917T133413Z。第一次傳輸因解壓完整性檢查失敗，在寫檔前停止；確認未寫入後修正，兩檔SHA256均與本機相同，服務active。未操作另一台VPS或crypig專案。
+
+正式匿名 API HTTP200，277版本、2744組比較；逐層公開白名單核對通過，不含採購、草稿、jobs或CSRF。管理者API仍可讀工作、排程且含CSRF；匿名GET草稿匯出HTTP401。Chrome不輸入帳密即顯示目錄，預設近48小時等條件下10個版本；黑膠加US$30篩選顯示1個版本，來源/Discogs連結、格式、Want、價格、毛利率條可見。沒有測試購買、刊登或正式業務寫入；權限錯誤情境沿用已通過的隔離測試。
+
+直接唯讀指定Sheet全部24原始表稽核通過：1601貨源、277版本、735行情快照，2744比較格式/編號/條碼/算式檢查通過；941個正毛利需求候選組合不是獨立商品或壓片確認。DATA_BACKEND=google_sheets與指定Sheet ID均核對正確。今天自然#108（10:00）、#109（16:00）成功；#109收集80筆、反查20件（0候選/20未匹配）、更新20行情、刷新28/28，展示頁寫3略過2、5頁读回通過。21:37:26再次讀取active=null，queue1601/unchecked53/pending70，下一輪22:00；本次部署後自然輪次尚未發生，不能稱已驗收。
+
+本批程式驗證：30項後端、106項前端測試、型別檢查與build已通過。此節正式證據取代下方「公開目錄待發布／Hostinger登出」歷史狀態；完整業務流程與帳號密碼互動登入並未在本批重測。
+
 ## 2026-09-16 公開唯讀目錄（本機實作，待發布驗收）
 
 驗證：30 項後端權限／登入測試、106 項前端測試、型別檢查及正式 build 通過。Hostinger 已登出，目前無法核對正式 API active／jobs／schedule／source_queue，故尚未推送或部署。遠端 main 仍 ccce258，Git 自動部署設定仍為 false。
