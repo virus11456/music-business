@@ -8,9 +8,10 @@ const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.Common
 const realRequire=createRequire(import.meta.url);
 const queueSource=await readFile(new URL('../lib/refresh-queue.ts',import.meta.url),'utf8');
 const queueExports={};new Function('exports',ts.transpileModule(queueSource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(queueExports);
-function harness(post){
+function harness(post,publicView=false){
  const record={release_id:42,artist:'Artist',title:'Album',format:'CD',history:[],analysis:null,cost:null,snapshot:{currency:'USD',lowest_price:'30'},decision:{decision:'watch',target_price:'3000',target_currency:'JPY'}};
  const state={csrf:'test',records:[record],workflow:{comparisons:[],drafts:[],offers:[]},configured:{discogs:true},jobs:[],targets:[],fx:[],active:null,schedule:{times:[]}};
+ if(publicView){state.permissions={can_write:false};state.csrf='';state.workflow={comparisons:[]};}
  const slots=[];let cursor=0;
  const hooks={useEffect:()=>{},useCallback:fn=>fn,useRef:value=>{const i=cursor++;return slots[i]??={current:value}},useState:value=>{const i=cursor++;if(!(i in slots))slots[i]=i===0?state:typeof value==='function'?value():value;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next}]}};
  const exports={};new Function('require','exports',js)(id=>{
@@ -54,4 +55,12 @@ test('editing an existing watch preserves target currency rather than market cur
  const form=find(h.render(),byType('form'));
  assert.equal(find(form,n=>n.type==='select'&&n.props.name==='currency').props.defaultValue,'JPY');
  assert.equal(find(form,n=>n.type==='input'&&n.props.name==='target').props.defaultValue,'3000');
+});
+
+test('public catalogue renders without a login form or admin data and offers optional admin login',()=>{
+ const h=harness(()=>{throw Error('public browsing must not write')},true);
+ const tree=h.render();assert.equal(tree.props.login,null);
+ assert.ok(Array.isArray(tree.props.records));assert.deepEqual(tree.props.rows,[]);
+ assert.equal(find(tree,text('加入唱片')),undefined);
+ tree.props.onLogin();assert.ok(h.render().props.login);
 });

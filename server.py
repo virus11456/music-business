@@ -323,6 +323,15 @@ def handler(dashboard):
             self.wfile.write(body)
 
         def do_GET(self):
+            # Public access is limited to the explicitly approved catalogue fields.
+            if self.path=='/api/state' and not self.headers.get('Authorization'):
+                status=dashboard.access.allowed(self.headers)
+                if status==401:
+                    try:
+                        from public_catalog import public_catalog
+                        return self.respond(200,public_catalog(dashboard.state()))
+                    except Exception:
+                        return self.respond(500,{'error':'資料讀取失敗，請稍後重試'})
             if not self.authorized():return
             if urlsplit(self.path).path=='/api/drafts/quicklister':
                 try:
