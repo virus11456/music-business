@@ -21,6 +21,7 @@ import matching
 import comparisons
 import source_queue
 import sourcing
+import discogs_publish
 from cli import currency
 from config import Settings, load_env, money
 from db import connect, decide, init, job, latest_decision, now
@@ -76,9 +77,9 @@ class Dashboard:
             fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
             health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
             mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'storage':{'backend':'google_sheets' if __import__('sheet_primary').enabled() else 'sqlite','persistent_local':not __import__('sheet_primary').enabled()},'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
+        return {'storage':{'backend':'google_sheets' if __import__('sheet_primary').enabled() else 'sqlite','persistent_local':not __import__('sheet_primary').enabled()},'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
-            'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
+            'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs_listing_write':discogs_publish.configured() and bool(self.settings.token),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
@@ -110,6 +111,14 @@ class Dashboard:
             if mode and mode[0]=='demo':raise ValueError('示範庫不能同步正式庫存')
             import inventory_sync
             return self.start('讀回 Discogs 刊登狀態',lambda:inventory_sync.run(s))
+        if path=='/api/listings/publish':
+            if not s.token:raise ValueError('尚未設定 Discogs')
+            with connect(s.db_path) as c:
+                mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
+            if mode and mode[0]=='demo':raise ValueError('示範庫不能建立正式刊登')
+            ids=data.get('draft_ids');seller_currency=currency(required(data,'currency'));status=str(data.get('status','Draft'))
+            discogs_publish.prepare(s,ids,seller_currency,status)
+            return self.start('送出 Discogs 刊登',lambda:discogs_publish.run(s,ids,seller_currency,status))
         if path=='/api/purchase-priority':
             return __import__('refresh_priority').set_purchases(s,data.get('source_urls'),data.get('enabled'))
         if path=='/api/sourcing/reverse':
@@ -200,6 +209,8 @@ class Dashboard:
             if path=='/api/notifications/resolve':
                 import notification_review
                 return notification_review.resolve(s,data.get('id'),data.get('outcome'))
+            if path=='/api/listings/submissions/resolve':
+                return discogs_publish.resolve(s,data.get('draft_id'),data.get('outcome'),data.get('listing_id'))
             if path=='/api/inventory/reset':
                 with connect(s.db_path) as c:c.execute("DELETE FROM meta WHERE key='discogs_inventory_pending'")
                 return {'saved':True,'message':'已重設分頁進度，保留完整快照與刊登紀錄'}

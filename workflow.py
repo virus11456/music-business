@@ -10,6 +10,7 @@ from db import connect, now
 from config import money
 from fx import convert,business_day
 
+SUBMISSION_PREFIX='listing_submission:'
 GRADES=('Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)')
 SCHEMA='''
 CREATE TABLE IF NOT EXISTS published_listings (source_url TEXT NOT NULL,release_id INTEGER NOT NULL,listing_id TEXT UNIQUE NOT NULL,recorded_at TEXT NOT NULL,PRIMARY KEY(source_url,release_id));
@@ -86,6 +87,8 @@ def get_workflow(settings):
         for draft in drafts:
             draft['listing_status']='listed' if c.execute('SELECT 1 FROM published_listings WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone() else 'unlisted'
             draft['export_issues']=draft_export_issues(c,draft)
+            submission=submission_record(c,draft['id'])
+            draft['submission']={k:v for k,v in submission.items() if k in ('status','listing_id','reason','requested_status','started_at','finished_at','attempts')} if submission is not None else None
             draft['profit_review']=draft_profit_review(c,settings,draft)
     return {'exports':export_history(settings),'offers':offers,'drafts':drafts,'sheet_url':f'https://docs.google.com/spreadsheets/d/{config[0]}/edit' if config else None,'grades':GRADES}
 
@@ -153,11 +156,23 @@ def review_csv(settings):
             writer.writerow([r['id'],r['release_id'],r['media_cond'],r['sleeve_cond'],r['price'],r['currency'],text,'待確認照片及刊登權限'])
     return '\ufeff'+output.getvalue()
 
+def submission_record(c,draft_id):
+    """Latest Discogs submission for a draft; a damaged record reads as an unresolved attempt, never as absent."""
+    row=c.execute('SELECT value FROM meta WHERE key=?',(SUBMISSION_PREFIX+str(draft_id),)).fetchone()
+    if not row:return None
+    try:
+        data=json.loads(row[0])
+    except ValueError:
+        data=None
+    return data if isinstance(data,dict) else {'status':'damaged','reason':'送出紀錄損壞，請人工核對'}
+
 def draft_export_issues(c,draft):
     """Recheck mutable source facts at download time, not only when drafting."""
     issues=[]
     if c.execute('SELECT 1 FROM published_listings WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone():issues.append('此貨源版本已登錄上架，避免重複匯出')
     if c.execute('SELECT 1 FROM excluded_matches WHERE source_url=? AND release_id=?',(draft['source_url'],draft['release_id'])).fetchone():issues.append('此貨源配對已被排除，請先核對或恢復配對')
+    submission=submission_record(c,draft['id'])
+    if submission is not None and submission.get('status') not in ('listed','failed'):issues.append('Discogs 刊登結果不明，請先讀回刊登狀態或人工核對；系統不會重送')
     def stale(value):
         try:
             age=(datetime.now(timezone.utc)-datetime.fromisoformat(value)).total_seconds()

@@ -44,6 +44,7 @@ def run(settings,client=None):
  complete=page>=pages
  if complete and len(rows)!=total:raise ValueError('庫存數量不完整，保留既有快照')
  if not complete and not items:raise ValueError('庫存出現空白中間頁，保留既有快照')
+ reconciled=0
  with connect(settings.db_path) as c:
   if complete:
    # Link only exact known listing IDs or exported draft identifiers, never album names.
@@ -64,9 +65,14 @@ def run(settings,client=None):
        elif c.execute('SELECT 1 FROM published_listings WHERE listing_id=?',(str(row['listing_id']),)).fetchone():row['linked']=False
        else:c.execute('INSERT OR IGNORE INTO published_listings VALUES(?,?,?,?)',(draft['source_url'],row['release_id'],str(row['listing_id']),now()))
     linked+=int(row['linked'])
-   snapshot={'username':username,'captured_at':now(),'rows':rows,'linked':linked,'total':len(rows)}
+   # A complete snapshot is the only automatic proof that an unknown submission really exists.
+   import discogs_publish
+   reconciled=discogs_publish.reconcile(c,rows)
+   for row in rows:
+    if not row['linked'] and c.execute('SELECT 1 FROM published_listings WHERE listing_id=? AND release_id=?',(str(row['listing_id']),row['release_id'])).fetchone():row['linked']=True;linked+=1
+   snapshot={'username':username,'captured_at':now(),'rows':rows,'linked':linked,'total':len(rows),'reconciled':reconciled}
    c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(KEY,json.dumps(snapshot)))
    c.execute('DELETE FROM meta WHERE key=?',(PENDING,))
   else:
    c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(PENDING,json.dumps({'username':username,'next_page':page+1,'pages':pages,'total':total,'rows':rows})))
- return {'inventory_sync':True,'complete':complete,'received':len(rows),'next_page':1 if complete else page+1,'failed':0}
+ return {'inventory_sync':True,'complete':complete,'received':len(rows),'next_page':1 if complete else page+1,'reconciled':reconciled if complete else 0,'failed':0}

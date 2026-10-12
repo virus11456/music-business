@@ -1,3 +1,9 @@
+## 2026-10-12 Discogs 刊登送出（本機實作，待啟用與部署）
+
+新增 `discogs_publish.py` 與 `POST /api/listings/publish`：以已勾選、通過匯出檢查的草稿直接建立 Discogs 刊登（預設 Draft，可選 For Sale），每件先記錄再送、只送一次。4xx 為 failed 可重送；5xx／斷線／回應不完整為 uncertain，停止同批其餘草稿並阻擋該草稿的匯出、AI 文案與再送，直到庫存讀回自動對帳或人工以 `/api/listings/submissions/resolve` 核對。成功寫入 published_listings。需後端 `DISCOGS_LISTING_WRITE=1` 才啟用；Discogs 帳號仍停權，未送出任何真實請求。前端上架整理頁新增「送出到 Discogs」面板與草稿送出狀態標示。
+
+驗證：16 項新隔離測試，後端離線 275 項、前端 109 項、tsc 與 build:vercel 通過。未部署、未正式驗收；詳見 docs/DISCOGS_LISTING.md。
+
 ## 2026-09-17 公開唯讀目錄正式發布驗收
 
 已將本機 5539113（tree f59f3a556068d6a846fc37137cd3ec368f316454）以保留遠端歷史的 fast-forward 同步為 GitHub c8c1eaa59fbe698d32830afb0a1138117376656a。Vercel 正式部署 7dKFrsG9H9cMQ1cNEtXeBQzhVfWk 為 Ready，正式 /version.json 讀回同一完整 SHA。發布前當日全帳號完整日期篩選盤點35次、SIMPLES 0次，本批新增1次正式前端部署；git.deploymentEnabled=false 保留，文件同步不另觸發建置。
@@ -103,7 +109,7 @@ Pending implementation HEAD a73122c; clean worktree before this note. Release gu
 1. **完整發布額度仍未知**：本機20次守門、預留及pre-push已完成測試；Vercel SIMPLES Git連接已移除並從UI確認，推送不再由該連接自動建置。無法核實今日後端部署總數與其他發布者的獨占窗口，禁止發布。
 2. **新前端仍待集中發布**：正式0edd07f不含寫入／略過分頁數提示；本批再加入實際行情更新數及版本候選用詞，95項前端測試、型別、本機建置通過，不等於正式完成。
 3. **唯讀正式驗證已完成**：9/14約02:55從VPS讀公開HTTPS API200，active=null、google_sheets、persistent_local=false；自然#97／#98成功。24原始表及2724比較稽核通過，1379貨源、257版本、495行情快照；目前未查50。尚未做本批新前端正式操作驗收及展示表逐格重新比對。
-4. **上架流程剩餘工作**：AI文案真實呼叫、正式批次刊登、防止結果未知重送、停權解除後庫存API驗收，以及完整成本細項。依使用者要求不購買、不刊登、不寄信；客服AI最後做。
+4. **上架流程剩餘工作**：AI文案真實呼叫、刊登送出的正式驗收（程式已於2026-10-12實作，含結果未知防重送）、停權解除後庫存API驗收，以及完整成本細項。依使用者要求不購買、不刊登、不寄信；客服AI最後做。
 
 本次後端離線218項、守門9項、前端95項及型別／本機build通過；15項socket未跑。沒有推送或部署。本機為從遠端原SHA還原的淺層副本，原本機commit／未追蹤檔與Downloads最初文件未核實。
 
@@ -113,7 +119,7 @@ Pending implementation HEAD a73122c; clean worktree before this note. Release gu
 |---|---|---|---|
 | 1 | 收集與比對狀態 | 五來源、Discogs、Sheets、分批快取及 VPS 10/16/22 排程已實作；本次從Sheet核實自然#97／#98完成 | 正式API及24表／比較唯讀稽核通過；新前端待發布 |
 | 2 | 上架文案 | AI 建議 API、前端審閱／套用與隔離測試已完成；原品相範本保留 | 後端已部署但依使用者要求暫停；設定 OpenAI 金鑰與可用模型、真實呼叫驗收待做；詳見 AI_LISTING.md |
-| 3 | Discogs 正式刊登 | Quicklister CSV 匯出與草稿檢查可用 | 正式 API 寫入、逐件結果、失敗重試、結果不明時防重送；未連接，不能稱已刊登 |
+| 3 | Discogs 正式刊登 | Quicklister CSV 匯出與草稿檢查可用；2026-10-12 已實作 `/api/listings/publish` 單次送出、逐件結果、4xx 可重送、結果不明防重送與人工／讀回核對，16 項隔離測試通過 | 設定 DISCOGS_LISTING_WRITE=1、部署 VPS、帳號停權解除後以真實草稿驗收；見 docs/DISCOGS_LISTING.md |
 | 4 | 刊登狀態回讀 | 已實作分頁讀回、完整快照、精確關聯與前端入口，隔離測試通過 | 已部署 VPS；identity 成功，庫存 API 因帳號停權回傳 403，待解除限制後驗收；每日排程、主清單已售整合與消失原因判定待做，見 INVENTORY_SYNC.md |
 | 5 | 更多進貨渠道 | Yahoo TW／JP、露天、Tower、Rotten Blues 已有解析器 | 樂天、eBay 需適用憑證；Mercari、Disk Union、HMV、Record City 等需分別評估與實測，不以名錄冒充串接 |
 | 6 | 完整成本 | 原幣別、匯率、毛利、設定費用後淨利已實作 | 實際運費、代購、稅費等細項；平台未提供時保持未知，不宣稱自動取得完整成本 |

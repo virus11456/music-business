@@ -11,6 +11,15 @@ from config import money
 class APIError(RuntimeError):
     pass
 
+class ListingRejected(APIError):
+    """Discogs answered with a definite 4xx: nothing was created; the draft may be fixed and resent."""
+    def __init__(self, code, message=''):
+        super().__init__(f'Discogs 拒絕（HTTP {code}）' + (f'：{message}' if message else ''))
+        self.code, self.message = code, message
+
+class ListingUncertain(APIError):
+    """Network loss, 5xx, or an unreadable reply: the listing may or may not exist. Never retry blindly."""
+
 class DiscogsClient:
     def __init__(self, settings, transport=urlopen, clock=time.time, sleep=time.sleep):
         if not settings.token:
@@ -76,6 +85,64 @@ class DiscogsClient:
                     raise APIError('Discogs 連線失敗，已停止本筆抓取') from None
                 self.cooldown(2**attempt)
         raise APIError('已達重試上限')
+
+    def post(self, path, payload):
+        """Single attempt marketplace write. Callers classify the outcome and must not auto-retry."""
+        if path != '/marketplace/listings' or not isinstance(payload, dict):
+            raise APIError('只允許建立 marketplace 刊登的寫入端點')
+        request = Request('https://api.discogs.com'+path, data=json.dumps(payload).encode(), method='POST',
+                          headers={'User-Agent': self.settings.user_agent, 'Authorization': 'Discogs token='+self.settings.token,
+                                   'Accept': 'application/json', 'Content-Type': 'application/json'})
+        self.wait_turn()
+        try:
+            with self.transport(request, timeout=30) as response:
+                self._record_health(response.headers.get('X-Discogs-Ratelimit-Remaining'))
+                status = getattr(response, 'status', 201)
+                raw = response.read(100001)
+        except HTTPError as exc:
+            code = exc.code
+            try:
+                raw = exc.read(4000)
+            except Exception:
+                raw = b''
+            exc.close()
+            if code == 429:
+                self.cooldown(60)
+            if 400 <= code < 500:
+                raise ListingRejected(code, _error_message(raw)) from None
+            raise ListingUncertain(f'Discogs HTTP {code}，刊登結果不明') from None
+        except (URLError, TimeoutError, OSError):
+            raise ListingUncertain('Discogs 連線中斷或逾時，刊登結果不明') from None
+        if len(raw) > 100000:
+            raise ListingUncertain('Discogs 回應過大，刊登結果不明')
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            raise ListingUncertain('Discogs 回應格式無效，刊登結果不明') from None
+        if status not in (200, 201) or not isinstance(data, dict):
+            raise ListingUncertain(f'Discogs HTTP {status}，刊登結果不明')
+        return data
+
+    def _record_health(self, remaining):
+        try:
+            remaining = int(remaining)
+        except (ValueError, TypeError):
+            return
+        with connect(self.settings.db_path) as c:
+            c.execute('INSERT OR REPLACE INTO api_health VALUES(1,?,?)', (remaining, now()))
+        if remaining < 5:
+            self.cooldown(60)
+
+def _error_message(raw):
+    """Discogs error bodies carry a plain message; keep it short and free of control characters."""
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return ''
+    message = data.get('message') if isinstance(data, dict) else ''
+    if not isinstance(message, str):
+        return ''
+    return ''.join(ch for ch in message if ch.isprintable())[:200]
 
 def integer(value, name):
     if value is None:

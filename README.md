@@ -1,3 +1,9 @@
+## 2026-10-12 Discogs 刊登送出（本機實作，待啟用與部署）
+
+新增 `discogs_publish.py` 與 `POST /api/listings/publish`：以已勾選、通過匯出檢查的草稿直接建立 Discogs 刊登（預設 Draft，可選 For Sale），每件先記錄再送、只送一次。4xx 為 failed 可重送；5xx／斷線／回應不完整為 uncertain，停止同批其餘草稿並阻擋該草稿的匯出、AI 文案與再送，直到庫存讀回自動對帳或人工以 `/api/listings/submissions/resolve` 核對。成功寫入 published_listings。需後端 `DISCOGS_LISTING_WRITE=1` 才啟用；Discogs 帳號仍停權，未送出任何真實請求。前端上架整理頁新增「送出到 Discogs」面板與草稿送出狀態標示。
+
+驗證：16 項新隔離測試，後端離線 275 項、前端 109 項、tsc 與 build:vercel 通過。未部署、未正式驗收；詳見 docs/DISCOGS_LISTING.md。
+
 ## 2026-09-17 公開唯讀目錄正式發布驗收
 
 已將本機 5539113（tree f59f3a556068d6a846fc37137cd3ec368f316454）以保留遠端歷史的 fast-forward 同步為 GitHub c8c1eaa59fbe698d32830afb0a1138117376656a。Vercel 正式部署 7dKFrsG9H9cMQ1cNEtXeBQzhVfWk 為 Ready，正式 /version.json 讀回同一完整 SHA。發布前當日全帳號完整日期篩選盤點35次、SIMPLES 0次，本批新增1次正式前端部署；git.deploymentEnabled=false 保留，文件同步不另觸發建置。
@@ -100,7 +106,7 @@ Pending implementation HEAD a73122c; clean worktree before this note. Release gu
 
 > **目前功能狀態與後續順序：** [開發狀態表](docs/IMPLEMENTATION_STATUS.md)。下方日期章節包含歷史狀態；正式部署為 Vercel 前端＋VPS 執行程式，Google Sheet 是唯一業務主資料源。
 
-已實作操作前端、Discogs 行情連接、五個來源的分批收集，以及 Google Sheets 同步程式。這仍是開發版本；歷史驗證不代表當前全部服務正常；AI 真實文案呼叫及 Discogs 正式批次刊登尚未驗收。
+已實作操作前端、Discogs 行情連接、五個來源的分批收集，以及 Google Sheets 同步程式。這仍是開發版本；歷史驗證不代表當前全部服務正常；AI 真實文案呼叫尚未驗收，Discogs 刊登送出已實作（docs/DISCOGS_LISTING.md）但未啟用、未部署、未以真實帳號驗收。
 
 ## 最新接手查驗（2026-09-14 02:55 台灣時間）
 
@@ -165,7 +171,7 @@ Pending implementation HEAD a73122c; clean worktree before this note. Release gu
 ## 後續任務
 
 - 加入人工核對的進貨報價後，驗證試算表公式。
-- 版本搜尋輔助已完成；下一步加入 AI 文案，再完成 Discogs 批次上架流程及失敗重試紀錄。
+- 版本搜尋輔助已完成；AI 文案與 Discogs 刊登送出程式已實作，待設定金鑰／寫入旗標、部署與真實帳號驗收。
 - 擴充其他平台與分頁；後端內建定期更新已啟用，時程見下方。
 - 客服 GPT／AI 等前四項流程完成後再做。
 - GitHub 固定同步到 https://github.com/virus11456/music-business ，包含 README 與開發紀錄；部署之後再決定 VPS 或 Vercel。

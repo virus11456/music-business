@@ -36,7 +36,7 @@
 
 `ingest.py` 保存版本與行情；`analyze.py` 分析；`comparisons.py` 算含幣別換算的價差／毛利／扣設定費用後淨利；`sheet_sync.py` 的 build_tables/sync 是唯一表格輸出契約。沿用已指定 Sheet 與應用程式管理的分頁，不能覆寫使用者其他分頁。快取命中並不代表來源報價新鮮，前端 48 小時篩選與缺值語意需保留。
 
-配對、報價核對、草稿、正式刊登是不同狀態。`workflow.py` 匯出會重查已排除配對、48 小時確認期限、報價更新與來源 URL 一致性。現有 Quicklister 是檔案匯出，不能聲稱已透過 Discogs API 刊登。
+配對、報價核對、草稿、正式刊登是不同狀態。`workflow.py` 匯出會重查已排除配對、48 小時確認期限、報價更新與來源 URL 一致性。Quicklister 是檔案匯出；`discogs_publish.py` 的 `/api/listings/publish` 才會呼叫 Discogs 建立刊登，且需後端 `DISCOGS_LISTING_WRITE=1`（2026-10-12 僅本機實作，未部署、未驗收）。送出紀錄在 meta `listing_submission:*`，結果不明時阻擋匯出與重送，見根目錄 docs/DISCOGS_LISTING.md。
 
 ## 驗證
 
@@ -49,7 +49,7 @@ HTTP 完整流程測試在允許 localhost bind 的隔離測試環境執行；�
 
 診斷前端最近工作時，失敗 detail 可能只是例外名稱，執行中可能為 null。`frontend/lib/collection-job.ts` 同時辨識收集／排程工作名稱及 JSON detail，不能只找最近成功 JSON。完整待開發項目見根目錄 `docs/IMPLEMENTATION_STATUS.md`。
 
-庫存讀回新模組 `inventory_sync.py` 與端點、分頁及關聯規則見根目錄 `docs/INVENTORY_SYNC.md`；此為開發中功能，勿將既有行情 API 成功視為庫存端點已驗收。
+庫存讀回新模組 `inventory_sync.py` 與端點、分頁及關聯規則見根目錄 `docs/INVENTORY_SYNC.md`；完整快照另會對帳結果不明的刊登送出（`reconciled`）；此為開發中功能，勿將既有行情 API 成功視為庫存端點已驗收。
 
 ### 2026-09-12 觀察目標價紀錄
 
