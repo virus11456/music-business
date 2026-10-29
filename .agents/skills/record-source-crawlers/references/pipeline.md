@@ -47,7 +47,7 @@
 
 HTTP 完整流程測試在允許 localhost bind 的隔離測試環境執行；測試 subprocess 不應繼承正式 REMOTE_ACCESS_TOKEN／FRONTEND_ORIGIN／PUBLIC_API_ORIGIN，避免 fixture 被正式 Origin 拒絕。不得因此修改正式服務的認證設定。外部服務 mock、API 工作成功、真實平台連線與 Sheet 回讀各自說明，不混成「全流程已上線」。
 
-2026-10-29 起 Sheet 主資料源唯讀連線不再比對表格，快取到期改背景重載，`/api/state` 的 storage 含 loaded_at／refreshing／refresh_error；衍生結果依資料版本快取，資料變動後第一次讀取較慢屬正常。2026-10-30 起背景工作的 Sheet 寫入延後合併（60 秒或 25 筆一次、工作結束必沖刷），工作執行中 Sheet 原始分頁可能落後本機最多一分鐘，核對工作結果以 API 與工作完成後的 Sheet 為準。
+2026-10-30 起前端以 `Accept: application/vnd.simples.packed+json` 取得分欄壓縮的比價列（`workflow.comparisons_packed`，由 `state_pack.unpack` 還原）；診斷時不帶此標頭即取得原格式 `workflow.comparisons`。2026-10-29 起 Sheet 主資料源唯讀連線不再比對表格，快取到期改背景重載，`/api/state` 的 storage 含 loaded_at／refreshing／refresh_error；衍生結果依資料版本快取，資料變動後第一次讀取較慢屬正常。2026-10-30 起背景工作的 Sheet 寫入延後合併（60 秒或 25 筆一次、工作結束必沖刷），工作執行中 Sheet 原始分頁可能落後本機最多一分鐘，核對工作結果以 API 與工作完成後的 Sheet 為準。
 
 診斷前端最近工作時，失敗 detail 可能只是例外名稱，執行中可能為 null。`frontend/lib/collection-job.ts` 同時辨識收集／排程工作名稱及 JSON detail，不能只找最近成功 JSON。完整待開發項目見根目錄 `docs/IMPLEMENTATION_STATUS.md`。
 

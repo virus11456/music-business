@@ -72,7 +72,7 @@ class CachedPayloadHandlerTests(unittest.TestCase):
         with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':'x'*40,'FRONTEND_ORIGIN':'https://music-business.vercel.app','PUBLIC_API_ORIGIN':'https://api.example.com'}):access=RemoteAccess()
         calls=[]
         body=json.dumps({'records':[{'title':'B'*3000}]}).encode()
-        def payload(public):
+        def payload(public,compact=False):
             calls.append(public);return ('W/"tag-%s"'%public,body,gzip.compress(body),{'state':.002,'encode':.001,'cache':'hit'})
         return SimpleNamespace(access=access,csrf='SECRET',payload=payload,state=lambda:self.fail('state() must not be called')),calls
     def test_handler_serves_cached_payload_with_timing_and_validator(self):
@@ -87,7 +87,22 @@ class CachedPayloadHandlerTests(unittest.TestCase):
         self.assertEqual(status,200);self.assertEqual(calls[-1],False);self.assertNotIn('content-encoding',headers)
     def test_client_disconnect_is_not_reported_as_server_error(self):
         app,_=self.app()
-        def broken(public):raise BrokenPipeError()
+        def broken(public,compact=False):raise BrokenPipeError()
         app.payload=broken
         r=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app'});r.h.do_GET()
         self.assertEqual(r.h.wfile.getvalue(),b'')
+
+
+class CompactFormatHandlerTests(unittest.TestCase):
+    def test_accept_header_selects_compact_body_and_vary_lists_accept(self):
+        with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':'x'*40,'FRONTEND_ORIGIN':'https://music-business.vercel.app','PUBLIC_API_ORIGIN':'https://api.example.com'}):access=RemoteAccess()
+        seen=[]
+        def payload(public,compact=False):
+            seen.append(compact);body=b'{"ok":1}';return ('W/"%s"'%compact,body,None,{'state':0,'encode':0,'cache':'hit'})
+        app=SimpleNamespace(access=access,csrf='S',payload=payload)
+        base={'Host':'api.example.com','Origin':'https://music-business.vercel.app'}
+        r=FakeRequest(app,{**base,'Accept':'application/vnd.simples.packed+json, application/json'});status,headers,_=r.run()
+        self.assertEqual(seen[-1],True);self.assertTrue(headers['content-type'].startswith('application/vnd.simples.packed+json'))
+        self.assertIn(b'Vary: Accept, Accept-Encoding\r\n',r.h.wfile.getvalue())
+        status,headers,_=FakeRequest(app,{**base,'Accept':'application/json'}).run()
+        self.assertEqual(seen[-1],False);self.assertTrue(headers['content-type'].startswith('application/json'))

@@ -1,3 +1,11 @@
+## 2026-10-30 比價資料瘦身：欄位分欄與重複值字典（本機實作，待部署）
+
+正式匿名回應實測 6037 組比較（418 個貨源、350 個版本、8 種配對依據文字），JSON 9.05 MB，平均每組 1.5 KB，多數是相同貨源／版本資料逐列重複與欄位名稱重複。新增 `state_pack.py`：比價列改為依欄位分欄，重複值以字典加索引傳送，缺少的欄位另列索引，可完整還原。前端以 `Accept: application/vnd.simples.packed+json` 要求新格式（CORS 安全標頭、不觸發預檢），後端看到才回新格式並以 `Vary: Accept` 區分；未帶此標頭（含舊前端、curl 診斷）照舊回原格式。前端 `normalizeState` 兩種格式都能還原成相同的 `workflow.comparisons`，元件不變，前後端可任意先後部署。
+
+以正式資料驗證：Python 打包與 TypeScript 還原後與原始資料逐欄相同。比價部分原始 8.93 MB → 1.17 MB，gzip 0.50 MB → 0.16 MB；桌機 JSON 解析時間相近（原格式 26 毫秒、新格式含還原 36 毫秒），效益在傳輸量與回應字串記憶體，行動網路下較明顯。打包結果與 gzip 依資料版本快取。還原後重複值在多列間共用同一物件，前端程式已確認不會就地修改比價列。
+
+驗證：Python 7 項（還原含 null／缺欄位／布林與數字不混淆、字典化、版本拒絕、不改快取、前後端共用對照檔、兩種格式內容一致）、handler 1 項、前端 4 項；完整後端離線、前端測試、tsc 與 build 通過。未部署，需前端（Vercel 1 次）與後端。
+
 ## 2026-10-30 正式部署 1b50615（後端）與量測
 
 main 經發布守門 fast-forward 至 1b50615（PR #3），本批只有後端，Vercel 未新增部署。操作者確認 SIMPLES_Data_jobs 無 running、最新 #236（10/29 22:00）已完成後，在 srv1542946 以 44 個 .py 完整替換（manifest SHA256 e5102db9ff9ef3dc7140fe4d6a578286fe4ac3252a6305563ea6b09e4d631360），18:37:30 UTC 重啟，active、NRestarts=0；備份 /opt/music-business/backups/full-20261029T183718Z（7cc99a9 版本）。DEPLOYED_COMMIT 寫入因權限失敗，尚未更新。

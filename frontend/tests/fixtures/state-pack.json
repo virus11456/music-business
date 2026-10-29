@@ -1,0 +1,300 @@
+{
+ "rows": [
+  {
+   "key": "candidate-0-100",
+   "release_id": 100,
+   "source_url": "https://example.com/0",
+   "source_title": "Title 0",
+   "gross_margin": 0.0,
+   "evidence": [
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-1-101",
+   "release_id": 101,
+   "source_url": "https://example.com/1",
+   "source_title": "Same title",
+   "gross_margin": 0.1,
+   "evidence": [
+    "規格品番一致，仍需核對壓片",
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-2-100",
+   "release_id": 100,
+   "source_url": "https://example.com/2",
+   "source_title": "Title 2",
+   "gross_margin": 0.2,
+   "evidence": [
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": {
+    "id": 2,
+    "note": "含\"引號\"與 emoji 🎵"
+   }
+  },
+  {
+   "key": "candidate-3-101",
+   "release_id": 101,
+   "source_url": "https://example.com/0",
+   "source_title": "Same title",
+   "gross_margin": null,
+   "evidence": [
+    "規格品番一致，仍需核對壓片",
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-4-100",
+   "release_id": 100,
+   "source_url": "https://example.com/1",
+   "source_title": "Title 4",
+   "gross_margin": 0.4,
+   "evidence": [
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-5-101",
+   "release_id": 101,
+   "source_url": "https://example.com/2",
+   "source_title": "Same title",
+   "gross_margin": 0.5,
+   "evidence": [
+    "規格品番一致，仍需核對壓片",
+    "格式一致"
+   ],
+   "version_confirmed": true,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-6-100",
+   "release_id": 100,
+   "source_url": "https://example.com/0",
+   "source_title": "Title 6",
+   "gross_margin": 0.6,
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null
+  },
+  {
+   "key": "candidate-7-101",
+   "release_id": 101,
+   "source_url": "https://example.com/1",
+   "source_title": "Same title",
+   "gross_margin": 0.7,
+   "evidence": [
+    "規格品番一致，仍需核對壓片",
+    "格式一致"
+   ],
+   "version_confirmed": false,
+   "listing_status": "unlisted",
+   "offer": null,
+   "excluded": true
+  }
+ ],
+ "packed": {
+  "version": 1,
+  "n": 8,
+  "f": [
+   "key",
+   "release_id",
+   "source_url",
+   "source_title",
+   "gross_margin",
+   "evidence",
+   "version_confirmed",
+   "listing_status",
+   "offer",
+   "excluded"
+  ],
+  "c": {
+   "key": {
+    "v": [
+     "candidate-0-100",
+     "candidate-1-101",
+     "candidate-2-100",
+     "candidate-3-101",
+     "candidate-4-100",
+     "candidate-5-101",
+     "candidate-6-100",
+     "candidate-7-101"
+    ]
+   },
+   "release_id": {
+    "d": [
+     100,
+     101
+    ],
+    "i": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     1,
+     0,
+     1
+    ]
+   },
+   "source_url": {
+    "d": [
+     "https://example.com/0",
+     "https://example.com/1",
+     "https://example.com/2"
+    ],
+    "i": [
+     0,
+     1,
+     2,
+     0,
+     1,
+     2,
+     0,
+     1
+    ]
+   },
+   "source_title": {
+    "v": [
+     "Title 0",
+     "Same title",
+     "Title 2",
+     "Same title",
+     "Title 4",
+     "Same title",
+     "Title 6",
+     "Same title"
+    ]
+   },
+   "gross_margin": {
+    "v": [
+     0.0,
+     0.1,
+     0.2,
+     null,
+     0.4,
+     0.5,
+     0.6,
+     0.7
+    ]
+   },
+   "evidence": {
+    "d": [
+     [
+      "格式一致"
+     ],
+     [
+      "規格品番一致，仍需核對壓片",
+      "格式一致"
+     ],
+     null
+    ],
+    "i": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     1,
+     2,
+     1
+    ],
+    "m": [
+     6
+    ]
+   },
+   "version_confirmed": {
+    "d": [
+     false,
+     true
+    ],
+    "i": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0
+    ]
+   },
+   "listing_status": {
+    "d": [
+     "unlisted"
+    ],
+    "i": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "offer": {
+    "d": [
+     null,
+     {
+      "id": 2,
+      "note": "含\"引號\"與 emoji 🎵"
+     }
+    ],
+    "i": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "excluded": {
+    "d": [
+     null,
+     true
+    ],
+    "i": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "m": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   }
+  }
+ }
+}

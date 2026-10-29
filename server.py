@@ -84,25 +84,29 @@ class Dashboard:
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
-    def payload(self,public):
+    def payload(self,public,compact=False):
         """Serialized /api/state: (etag, json bytes, gzip bytes or None, timings). Reused while nothing in it can differ."""
         import sheet_primary,time
         started=time.perf_counter()
         state=self.state()
         built=time.perf_counter()
         version=sheet_primary.version()
+        audience=('public' if public else 'admin')+(':packed' if compact else '')
         if public:
-            key=('public',version)
+            key=(audience,version)
         else:
             # records/workflow are tied to the data version; everything else is small and hashed whole.
-            key=('admin',version,json.dumps({k:v for k,v in state.items() if k not in ('records','workflow')},ensure_ascii=False,sort_keys=True,default=str))
+            key=(audience,version,json.dumps({k:v for k,v in state.items() if k not in ('records','workflow')},ensure_ascii=False,sort_keys=True,default=str))
         cached=getattr(self,'_payloads',{})
         hit=version is not None and key in cached
         if hit:
             etag,body,packed=cached[key]
         else:
             from public_catalog import public_catalog
-            body=json.dumps(public_catalog(state) if public else state,ensure_ascii=False).encode()
+            import state_pack
+            data=public_catalog(state) if public else state
+            if compact:data=state_pack.packed_state(data)
+            body=json.dumps(data,ensure_ascii=False,separators=(',',':') if compact else None).encode()
             etag='W/"'+hashlib.sha256(body).hexdigest()[:32]+'"'
             packed=gzip.compress(body,6) if len(body)>1024 else None
             if version is not None:
@@ -380,7 +384,9 @@ def handler(dashboard):
             self.end_headers()
 
         def respond_state(self,public):
-            etag,body,packed,timings=dashboard.payload(public)
+            import state_pack
+            compact=state_pack.MEDIA_TYPE in self.headers.get('Accept','')
+            etag,body,packed,timings=dashboard.payload(public,compact)
             timing='state;dur=%.1f, encode;dur=%.1f, cache;desc=%s'%(timings['state']*1000,timings['encode']*1000,timings['cache'])
             if self.headers.get('If-None-Match')==etag:
                 self.send_response(304)
@@ -394,10 +400,10 @@ def handler(dashboard):
                 encoded=True
             else:encoded=False
             self.send_response(200)
-            self.send_header('Content-Type','application/json; charset=utf-8')
+            self.send_header('Content-Type',(state_pack.MEDIA_TYPE if compact else 'application/json')+'; charset=utf-8')
             self.send_header('ETag',etag)
             if encoded:self.send_header('Content-Encoding','gzip')
-            self.send_header('Vary','Accept-Encoding')
+            self.send_header('Vary','Accept, Accept-Encoding')
             self.send_header('Content-Length',str(len(body)))
             self.send_header('Cache-Control','no-store')
             self.send_header('X-Content-Type-Options','nosniff')

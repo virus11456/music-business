@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
-const source=await readFile(new URL('../lib/api.ts',import.meta.url),'utf8');
-const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const api=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const toUrl=code=>'data:text/javascript;base64,'+Buffer.from(ts.transpileModule(code,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64');
+const packUrl=toUrl(await readFile(new URL('../lib/state-pack.ts',import.meta.url),'utf8'));
+const source=(await readFile(new URL('../lib/api.ts',import.meta.url),'utf8')).replace("'./state-pack'","'"+packUrl+"'");
+const api=await import(toUrl(source));
 
 test('authentication stays in headers and is removed on logout',async()=>{
  const original=globalThis.fetch;const calls=[];
@@ -56,4 +57,17 @@ test('an unexpected 304 without a stored validator is an error, never silently e
  const original=globalThis.fetch;
  try{globalThis.fetch=async()=>new Response(null,{status:304});await assert.rejects(api.fetchState());}
  finally{globalThis.fetch=original;}
+});
+
+test('state reads ask for the compact format and restore the original comparison rows',async()=>{
+ const fixture=JSON.parse(await readFile(new URL('./fixtures/state-pack.json',import.meta.url),'utf8'));
+ const original=globalThis.fetch;let accept='';
+ try{
+  globalThis.fetch=async(url,options)=>{accept=options.headers.get('Accept');return new Response(JSON.stringify({records:[],workflow:{drafts:[1],comparisons_packed:fixture.packed}}),{status:200,headers:{ETag:'W/"p"'}});};
+  const result=await api.fetchState();
+  assert.match(accept,/application\/vnd\.simples\.packed\+json/);
+  assert.deepEqual(result.body,{records:[],workflow:{drafts:[1],comparisons:fixture.rows}});
+  globalThis.fetch=async()=>new Response(JSON.stringify({workflow:{comparisons:fixture.rows}}),{status:200});
+  assert.deepEqual((await api.fetchState()).body,{workflow:{comparisons:fixture.rows}});
+ }finally{globalThis.fetch=original;api.setAccessCode('');}
 });

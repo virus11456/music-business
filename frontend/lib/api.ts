@@ -1,3 +1,4 @@
+import {normalizeState,PACKED_MEDIA_TYPE} from './state-pack';
 export const hosted=typeof __HOSTED_FRONTEND__!=='undefined'&&__HOSTED_FRONTEND__;
 export const apiOrigin=typeof __API_ORIGIN__!=='undefined'?__API_ORIGIN__:'';
 let accessCode='';
@@ -26,7 +27,8 @@ export async function downloadCsv(path:string,filename:string){
 export type StateFetch={status:number;ok:boolean;unchanged:boolean;body?:unknown};
 /** Read /api/state with a validator so an unchanged server state returns 304 and no body to parse or render. */
 export async function fetchState():Promise<StateFetch>{
- const headers:Record<string,string>={};
+ // A CORS-safelisted Accept value: older servers ignore it and reply in the original shape.
+ const headers:Record<string,string>={Accept:`${PACKED_MEDIA_TYPE}, application/json`};
  if(stateEtag)headers['If-None-Match']=stateEtag;
  const response=await apiFetch('/api/state',{headers});
  if(response.status===304){
@@ -34,7 +36,7 @@ export async function fetchState():Promise<StateFetch>{
   throw Error('資料服務回應不完整，請重新整理');
  }
  if(!response.ok)return {status:response.status,ok:false,unchanged:false};
- const body=await response.json() as unknown;
+ const body=normalizeState(await response.json() as unknown);
  stateEtag=response.headers.get('ETag')||'';
  return {status:response.status,ok:true,unchanged:false,body};
 }
