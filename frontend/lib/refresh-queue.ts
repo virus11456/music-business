@@ -15,3 +15,9 @@ export function createRefreshQueue<T>(read:()=>Promise<T>,apply:(value:T)=>void)
  }
  return {refresh};
 }
+
+/** Poll again only after the previous read finished; slow or failing backends get more breathing room. */
+export function nextPollDelay(lastDurationMs:number,failed=false,base=4000,max=20000){
+ const duration=Number.isFinite(lastDurationMs)&&lastDurationMs>0?lastDurationMs:0;
+ return Math.min(max,Math.max(base,failed?base*2.5:duration*2));
+}

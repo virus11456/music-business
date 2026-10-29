@@ -54,6 +54,35 @@ class Dashboard:
         source_queue.init(settings)
 
     def state(self):
+        import sheet_primary
+        # Derived views are expensive; reuse them until the underlying data version moves.
+        version=sheet_primary.version()
+        cached=getattr(self,'_derived',None)
+        if version is not None and cached and cached[0]==version:
+            records,workflow_state=cached[1]
+        else:
+            records,workflow_state=self.derived()
+            if version is not None and sheet_primary.version()==version:
+                self._derived=(version,(records,workflow_state))
+        with connect(self.settings.db_path) as c:
+            targets=[]
+            for row in c.execute('SELECT * FROM scan_targets ORDER BY id DESC'):
+                r=dict(row)
+                r['params']=json.loads(r.pop('query_params'))
+                targets.append(r)
+            jobs=[dict(j) for j in c.execute('SELECT * FROM jobs ORDER BY id DESC LIMIT 10')]
+            fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
+            health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
+            mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
+        storage={'backend':'google_sheets' if sheet_primary.enabled() else 'sqlite','persistent_local':not sheet_primary.enabled()}
+        if sheet_primary.enabled():storage.update(sheet_primary.status())
+        return {'storage':storage,'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':workflow_state,
+            'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
+            'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs_listing_write':discogs_publish.configured() and bool(self.settings.token),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
+            'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
+                           'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
+
+    def derived(self):
         with connect(self.settings.db_path) as c:
             records=[]
             for row in c.execute('SELECT * FROM releases ORDER BY added_at DESC').fetchall():
@@ -68,20 +97,8 @@ class Dashboard:
                     cost=dict(cost) if cost else None,decision=dict(decision) if decision else None)
                 r['history']=[dict(h) for h in c.execute('SELECT captured_at,lowest_price,currency FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 30',(r['release_id'],))][::-1]
                 records.append(r)
-            targets=[]
-            for row in c.execute('SELECT * FROM scan_targets ORDER BY id DESC'):
-                r=dict(row)
-                r['params']=json.loads(r.pop('query_params'))
-                targets.append(r)
-            jobs=[dict(j) for j in c.execute('SELECT * FROM jobs ORDER BY id DESC LIMIT 10')]
-            fx=[dict(r) for r in c.execute('SELECT * FROM fx_rates ORDER BY rate_date DESC,currency LIMIT 30')]
-            health=c.execute('SELECT * FROM api_health WHERE id=1').fetchone()
-            mode=c.execute("SELECT value FROM meta WHERE key='mode'").fetchone()
-        return {'storage':{'backend':'google_sheets' if __import__('sheet_primary').enabled() else 'sqlite','persistent_local':not __import__('sheet_primary').enabled()},'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':{'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}},
-            'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
-            'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs_listing_write':discogs_publish.configured() and bool(self.settings.token),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
-            'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
-                           'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
+        workflow_state={'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}}
+        return records,workflow_state
 
     def start(self, name, operation):
         if not self.lock.acquire(blocking=False):

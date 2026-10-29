@@ -4,7 +4,7 @@ import MediaBadge from '@/components/media-badge';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowUpRight, Check, ChevronRight, CircleAlert, Disc3, Inbox, LayoutDashboard, LoaderCircle, Plus, Radar, RefreshCw, Search, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {createRefreshQueue} from '@/lib/refresh-queue';
+import {createRefreshQueue,nextPollDelay} from '@/lib/refresh-queue';
 import {apiFetch,apiOrigin,setAccessCode,accessRevision,hosted} from '@/lib/api';
 import {hasPositiveMargin,buildRecordIndex,meetsProfit,meetsMinimumUsd,hasFreshComparison} from '@/lib/comparison-sort';
 import {hasStrongMatch,matchConflicts} from '@/lib/match-evidence';
@@ -85,7 +85,19 @@ export default function Home(){
   else if(result.next){setState(result.next);if(result.next.permissions?.can_write!==false)setNeedsLogin(false);setError('')}
  });
  const load=useCallback((force=false)=>refreshQueue.current!.refresh(force),[]);
- useEffect(()=>{void load();if(hostedFrontend&&!apiOrigin)return;const id=setInterval(()=>{if(document.visibilityState==='visible')void load()},4000);return()=>clearInterval(id)},[load]);
+ useEffect(()=>{
+  // One read at a time: the next poll is scheduled after the previous one returns, and backs off when reads are slow or fail.
+  let timer:ReturnType<typeof setTimeout>|undefined,stopped=false;
+  const schedule=(delay:number)=>{if(!stopped)timer=setTimeout(tick,delay)};
+  const tick=async()=>{
+   if(document.visibilityState!=='visible'){schedule(4000);return}
+   const started=Date.now();let failed=false;
+   try{await load()}catch{failed=true}
+   schedule(nextPollDelay(Date.now()-started,failed));
+  };
+  void load().finally(()=>{if(!(hostedFrontend&&!apiOrigin))schedule(4000)});
+  return()=>{stopped=true;if(timer)clearTimeout(timer)};
+ },[load]);
  useEffect(()=>{if(selected)detailDialog.current?.showModal();else detailDialog.current?.close()},[selected]);
  useEffect(()=>{if(modal){dialog.current?.showModal();}else{dialog.current?.close();}},[modal]);
  useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(''),6500);return()=>clearTimeout(t)},[notice]);

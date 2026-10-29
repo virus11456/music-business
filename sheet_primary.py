@@ -31,16 +31,29 @@ def memory_schema():
 
 
 class PrimaryStore:
-    def __init__(self, repository, ttl=30):
+    """In-memory SQLite view of the Sheet.
+
+    Reads never compare tables: a connection only pays for a snapshot copy, and the
+    before/after table comparison runs only when the transaction changed rows. An
+    expired view is refreshed in the background while requests keep being served;
+    an unknown remote result still forces a synchronous re-read before the next use.
+    """
+    def __init__(self, repository, ttl=30, retry=10):
         self.repository = repository
         self.ttl = ttl
+        self.retry = retry
         self.lock = threading.RLock()
         self.connection = None
         self.loaded_at = 0
         self.depth = 0
+        self.generation = 0
+        self.invalid = False
+        self.writes = 0
+        self.refresh_thread = None
+        self.refresh_error = None
+        self.refresh_failed_at = None
 
-    def reload(self):
-        data = self.repository.read(list(TABLES))
+    def _build(self, data):
         fresh = memory_schema()
         try:
             fresh.execute('PRAGMA foreign_keys=OFF')
@@ -51,45 +64,100 @@ class PrimaryStore:
                 fresh.executemany(f'INSERT INTO "{name}" VALUES ({",".join("?" for _ in columns)})', rows)
             if fresh.execute('PRAGMA foreign_key_check').fetchone():
                 raise ValueError('Sheet contains broken record relationships')
-            # Local-only rate counters/cache may survive a refresh, never a process restart.
-            if self.connection is not None:
-                for table in ('api_budget', 'api_health'):
-                    for row in self.connection.execute(f'SELECT * FROM {table}'):
-                        fresh.execute(f'INSERT INTO {table} VALUES({",".join("?" for _ in row)})', tuple(row))
-                for row in self.connection.execute('SELECT key,value FROM meta'):
-                    if not allowed_meta(row[0]):
-                        fresh.execute('INSERT OR REPLACE INTO meta VALUES(?,?)', tuple(row))
             fresh.commit()
             fresh.execute('PRAGMA foreign_keys=ON')
         except BaseException:
             fresh.close()
             raise
+        return fresh
+
+    def _install(self, fresh):
+        # Local-only rate counters/cache may survive a refresh, never a process restart.
         if self.connection is not None:
+            for table in ('api_budget', 'api_health'):
+                for row in self.connection.execute(f'SELECT * FROM {table}'):
+                    fresh.execute(f'INSERT OR REPLACE INTO {table} VALUES({",".join("?" for _ in row)})', tuple(row))
+            for row in self.connection.execute('SELECT key,value FROM meta'):
+                if not allowed_meta(row[0]):
+                    fresh.execute('INSERT OR REPLACE INTO meta VALUES(?,?)', tuple(row))
+            fresh.commit()
             self.connection.close()
         self.connection = fresh
         self.loaded_at = time.monotonic()
+        self.generation += 1
+        self.invalid = False
+        self.refresh_error = None
+
+    def reload(self):
+        self._install(self._build(self.repository.read(list(TABLES))))
+
+    def refresh_in_background(self):
+        """Serve the current view while a newer Sheet read is prepared; never block a request."""
+        if self.refresh_thread is not None and self.refresh_thread.is_alive():
+            return
+        if self.refresh_failed_at is not None and time.monotonic() - self.refresh_failed_at < self.retry:
+            return
+        started_writes = self.writes
+        def worker():
+            try:
+                fresh = self._build(self.repository.read(list(TABLES)))
+            except Exception as exc:
+                with self.lock:
+                    self.refresh_error = type(exc).__name__
+                    self.refresh_failed_at = time.monotonic()
+                return
+            with self.lock:
+                # A write committed meanwhile is newer than this read; keep the local view and retry later.
+                if self.writes != started_writes or self.depth or self.invalid:
+                    fresh.close()
+                    return
+                self._install(fresh)
+        self.refresh_thread = threading.Thread(target=worker, name='sheet-refresh', daemon=True)
+        self.refresh_thread.start()
+
+    def version(self):
+        """Changes whenever the served data can differ; safe as a cache key for derived views."""
+        with self.lock:
+            return (self.generation, self.connection.total_changes if self.connection is not None else -1)
+
+    def status(self):
+        with self.lock:
+            age = None if self.connection is None else round(time.monotonic() - self.loaded_at)
+            return {'loaded_seconds_ago': age, 'refresh_error': self.refresh_error,
+                    'refreshing': bool(self.refresh_thread is not None and self.refresh_thread.is_alive())}
 
     @contextmanager
     def connect(self):
         with self.lock:
-            if self.depth == 0 and (self.connection is None or time.monotonic()-self.loaded_at >= self.ttl):
-                self.reload()
+            if self.depth == 0:
+                if self.connection is None or self.invalid:
+                    self.reload()
+                elif time.monotonic() - self.loaded_at >= self.ttl:
+                    self.refresh_in_background()
             c = self.connection
-            before = c.serialize()
-            expected = capture(c) if self.depth == 0 else None
+            before = c.serialize() if self.depth == 0 else None
+            changes = c.total_changes
             self.depth += 1
             try:
                 yield c
                 c.commit()
-                if self.depth == 1:
+                if self.depth == 1 and c.total_changes != changes:
+                    scratch = sqlite3.connect(':memory:')
+                    try:
+                        scratch.deserialize(before)
+                        expected = capture(scratch)
+                    finally:
+                        scratch.close()
                     updated = capture(c)
                     changed = {k: v for k, v in updated.items() if v != expected[k]}
                     if changed:
                         self.repository.replace({k: expected[k] for k in changed}, changed)
+                        self.writes += 1
             except BaseException:
                 c.rollback()
-                c.deserialize(before)
-                self.loaded_at = 0  # Unknown remote result is resolved by a fresh read, never blind retry.
+                if before is not None:
+                    c.deserialize(before)
+                    self.invalid = True  # Unknown remote result is resolved by a fresh read, never blind retry.
                 raise
             finally:
                 self.depth -= 1
@@ -102,6 +170,14 @@ _store_lock = threading.Lock()
 
 def enabled():
     return os.getenv('DATA_BACKEND') == 'google_sheets'
+
+
+def version():
+    return instance().version() if enabled() else None
+
+
+def status():
+    return instance().status() if enabled() else None
 
 
 def instance():
