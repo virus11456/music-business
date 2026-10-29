@@ -1,6 +1,8 @@
 """Local-only dashboard API. Shares the CLI database and business logic."""
 from fx import business_day
 import argparse
+import gzip
+import hashlib
 import json
 import secrets
 import sqlite3
@@ -82,6 +84,11 @@ class Dashboard:
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
+    def platform_state(self):
+        # Version suggestions are only shown for the listed recent candidates; do not ship every search result.
+        listed=platforms.state(self.settings)
+        return {**listed,'matches':matching.state(self.settings,[c['id'] for c in listed['candidates']])}
+
     def derived(self):
         with connect(self.settings.db_path) as c:
             records=[]
@@ -97,7 +104,7 @@ class Dashboard:
                     cost=dict(cost) if cost else None,decision=dict(decision) if decision else None)
                 r['history']=[dict(h) for h in c.execute('SELECT captured_at,lowest_price,currency FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 30',(r['release_id'],))][::-1]
                 records.append(r)
-        workflow_state={'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':{**platforms.state(self.settings),'matches':matching.state(self.settings)}}
+        workflow_state={'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':self.platform_state()}
         return records,workflow_state
 
     def start(self, name, operation):
@@ -344,8 +351,23 @@ def handler(dashboard):
 
         def respond(self,status,data):
             body=json.dumps(data,ensure_ascii=False).encode()
+            etag=None
+            if status==200 and urlsplit(self.path).path=='/api/state':
+                # Unchanged state costs the client nothing to receive and nothing to re-render.
+                etag='W/"'+hashlib.sha256(body).hexdigest()[:32]+'"'
+                if self.headers.get('If-None-Match')==etag:
+                    self.send_response(304)
+                    self.send_header('ETag',etag)
+                    self.send_header('Cache-Control','no-store')
+                    self.end_headers()
+                    return
             self.send_response(status)
             self.send_header('Content-Type','application/json; charset=utf-8')
+            if etag:self.send_header('ETag',etag)
+            if len(body)>1024 and 'gzip' in self.headers.get('Accept-Encoding','').lower():
+                body=gzip.compress(body,6)
+                self.send_header('Content-Encoding','gzip')
+            self.send_header('Vary','Accept-Encoding')
             self.send_header('Content-Length',str(len(body)))
             self.send_header('Cache-Control','no-store')
             self.send_header('X-Content-Type-Options','nosniff')

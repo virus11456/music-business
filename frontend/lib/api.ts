@@ -4,7 +4,8 @@ let accessCode='';
 let revision=0;
 const pending=new Set<AbortController>();
 export const accessRevision=()=>revision;
-export function setAccessCode(value:string){accessCode=value;revision++;for(const c of pending)c.abort();pending.clear();}
+let stateEtag='';
+export function setAccessCode(value:string){accessCode=value;revision++;stateEtag='';for(const c of pending)c.abort();pending.clear();}
 export async function apiFetch(path:string,options:RequestInit={}){
  const headers=new Headers(options.headers);
  if(accessCode)headers.set('Authorization',`Bearer ${accessCode}`);
@@ -20,4 +21,20 @@ export async function downloadCsv(path:string,filename:string){
  const blob=await response.blob();
  if(startedRevision!==accessRevision())throw Error('登入狀態已變更，已取消下載；請重新登入後核對匯出紀錄。');
  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+export type StateFetch={status:number;ok:boolean;unchanged:boolean;body?:unknown};
+/** Read /api/state with a validator so an unchanged server state returns 304 and no body to parse or render. */
+export async function fetchState():Promise<StateFetch>{
+ const headers:Record<string,string>={};
+ if(stateEtag)headers['If-None-Match']=stateEtag;
+ const response=await apiFetch('/api/state',{headers});
+ if(response.status===304){
+  if(stateEtag)return {status:304,ok:true,unchanged:true};
+  throw Error('資料服務回應不完整，請重新整理');
+ }
+ if(!response.ok)return {status:response.status,ok:false,unchanged:false};
+ const body=await response.json() as unknown;
+ stateEtag=response.headers.get('ETag')||'';
+ return {status:response.status,ok:true,unchanged:false,body};
 }

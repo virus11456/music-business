@@ -39,3 +39,21 @@ test('logout after response headers prevents a delayed CSV body from downloading
   await assert.rejects(downloading,/登入狀態已變更/);
  }finally{globalThis.fetch=original;api.setAccessCode('');}
 });
+
+test('state reads send the last validator and treat 304 as unchanged without parsing a body',async()=>{
+ const original=globalThis.fetch;const calls=[];
+ try{
+  globalThis.fetch=async(url,options)=>{calls.push(options.headers.get('If-None-Match'));
+   if(calls.length===1)return new Response('{"records":[]}',{status:200,headers:{ETag:'W/"abc"'}});
+   if(calls.length===2)return new Response(null,{status:304,headers:{ETag:'W/"abc"'}});
+   return new Response('{"records":[1]}',{status:200,headers:{ETag:'W/"def"'}});};
+  const first=await api.fetchState();assert.deepEqual([first.unchanged,first.body],[false,{records:[]}]);assert.equal(calls[0],null);
+  const second=await api.fetchState();assert.equal(second.unchanged,true);assert.equal(calls[1],'W/"abc"');
+  api.setAccessCode('x');const third=await api.fetchState();assert.equal(calls[2],null);assert.deepEqual(third.body,{records:[1]});
+ }finally{globalThis.fetch=original;api.setAccessCode('');}
+});
+test('an unexpected 304 without a stored validator is an error, never silently empty',async()=>{
+ const original=globalThis.fetch;
+ try{globalThis.fetch=async()=>new Response(null,{status:304});await assert.rejects(api.fetchState());}
+ finally{globalThis.fetch=original;}
+});

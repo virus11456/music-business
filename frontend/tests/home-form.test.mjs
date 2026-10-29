@@ -13,7 +13,7 @@ function harness(post,publicView=false){
  const state={csrf:'test',records:[record],workflow:{comparisons:[],drafts:[],offers:[]},configured:{discogs:true},jobs:[],targets:[],fx:[],active:null,schedule:{times:[]}};
  if(publicView){state.permissions={can_write:false};state.csrf='';state.workflow={comparisons:[]};}
  const slots=[];let cursor=0;
- const hooks={useEffect:()=>{},useCallback:fn=>fn,useRef:value=>{const i=cursor++;return slots[i]??={current:value}},useState:value=>{const i=cursor++;if(!(i in slots))slots[i]=i===0?state:typeof value==='function'?value():value;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next}]}};
+ const hooks={useEffect:()=>{},useCallback:fn=>fn,useMemo:fn=>fn(),useRef:value=>{const i=cursor++;return slots[i]??={current:value}},useState:value=>{const i=cursor++;if(!(i in slots))slots[i]=i===0?state:typeof value==='function'?value():value;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next}]}};
  const exports={};new Function('require','exports',js)(id=>{
   if(id==='react')return hooks;
   if(id==='@/lib/refresh-queue')return queueExports;

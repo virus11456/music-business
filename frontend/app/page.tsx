@@ -1,11 +1,11 @@
 'use client';
 import PublicCatalog from '@/components/public-catalog';
 import MediaBadge from '@/components/media-badge';
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowUpRight, Check, ChevronRight, CircleAlert, Disc3, Inbox, LayoutDashboard, LoaderCircle, Plus, Radar, RefreshCw, Search, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {createRefreshQueue,nextPollDelay} from '@/lib/refresh-queue';
-import {apiFetch,apiOrigin,setAccessCode,accessRevision,hosted} from '@/lib/api';
+import {apiFetch,apiOrigin,setAccessCode,accessRevision,hosted,fetchState} from '@/lib/api';
 import {hasPositiveMargin,buildRecordIndex,meetsProfit,meetsMinimumUsd,hasFreshComparison} from '@/lib/comparison-sort';
 import {hasStrongMatch,matchConflicts} from '@/lib/match-evidence';
 import {meetsSupply} from '@/lib/source-availability';
@@ -67,21 +67,23 @@ export default function Home(){
  useEffect(()=>{if(new URLSearchParams(window.location.hash.slice(1)).has('reset_token'))setNeedsLogin(true)},[]);
  const dialog=useRef<HTMLDialogElement>(null);
  const detailDialog=useRef<HTMLDialogElement>(null);
- type StateRead={revision:number;next?:State;error?:string;unauthorized?:boolean};
+ type StateRead={revision:number;next?:State;error?:string;unauthorized?:boolean;unchanged?:boolean};
  const refreshQueue=useRef<ReturnType<typeof createRefreshQueue<StateRead>>|null>(null);
  if(!refreshQueue.current)refreshQueue.current=createRefreshQueue<StateRead>(async()=>{
   const revision=accessRevision();
   if(hostedFrontend&&!apiOrigin)return {revision,error:'線上前端尚未設定資料服務位址，請檢查部署設定。'};
   try{
-   const r=await apiFetch('/api/state');
+   const r=await fetchState();
    if(r.status===401)return {revision,unauthorized:true};
+   if(r.unchanged)return {revision,unchanged:true};
    if(!r.ok)throw Error(hostedFrontend?'資料服務未連線，請確認後端狀態':'資料服務未連線，請確認本機服務已啟動');
-   return {revision,next:await r.json() as State};
+   return {revision,next:r.body as State};
   }catch(e){return {revision,error:e instanceof Error&&e.name==='AbortError'?'連線逾時，請稍後重試':e instanceof Error?e.message:'讀取失敗'}}
  },result=>{
   if(result.revision!==accessRevision())return;
   if(result.unauthorized){setState(null);setSourceReview(null);setNeedsLogin(true);setError('請登入工作室；也可使用原管理者存取碼')}
   else if(result.error)setError(result.error);
+  else if(result.unchanged)setError(previous=>previous?'':previous);
   else if(result.next){setState(result.next);if(result.next.permissions?.can_write!==false)setNeedsLogin(false);setError('')}
  });
  const load=useCallback((force=false)=>refreshQueue.current!.refresh(force),[]);
@@ -115,10 +117,12 @@ export default function Home(){
  const [listingFilter,setListingFilter]=useState('all'),[profitFilter,setProfitFilter]=useState('gross');
  const [supplyFilter,setSupplyFilter]=useState('regular'),[freshOnly,setFreshOnly]=useState(true),[strongOnly,setStrongOnly]=useState(false);
  const publicView=state?.permissions?.can_write===false;
+ // Index thousands of comparison rows once per data change or filter change, not on every keystroke or poll.
+ const comparisons=state?.workflow.comparisons;
+ const comparisonIndex=useMemo(()=>buildRecordIndex(comparisons||[],c=>!matchConflicts(c).length&&hasPositiveMargin(c)&&meetsMinimumUsd(c,minimum)&&meetsSupply(c,supplyFilter)&&meetsProfit(c,profitFilter)&&(!freshOnly||hasFreshComparison(c))&&(!strongOnly||hasStrongMatch(c))),[comparisons,minimum,supplyFilter,profitFilter,freshOnly,strongOnly]);
+ const listingStates=useMemo(()=>recordListingStates(comparisons||[]),[comparisons]);
  if(publicView)return <PublicCatalog records={state.records} rows={state.workflow.comparisons} error={error} onRefresh={()=>void load(true)} login={needsLogin?<LoginForm onLogin={token=>{setAccessCode(token);void load(true)}}/>:null} onLogin={()=>setNeedsLogin(!needsLogin)}/>;
- const comparisonIndex=buildRecordIndex(state?.workflow.comparisons||[],c=>!matchConflicts(c).length&&hasPositiveMargin(c)&&meetsMinimumUsd(c,minimum)&&meetsSupply(c,supplyFilter)&&meetsProfit(c,profitFilter)&&(!freshOnly||hasFreshComparison(c))&&(!strongOnly||hasStrongMatch(c)));
  const matchedFor=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.rows||[];
- const listingStates=recordListingStates(state?.workflow.comparisons||[]);
  const bestGross=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.bestGross??-Infinity;
  const bestMargin=(r:RecordRow)=>comparisonIndex.get(r.release_id)?.bestMargin??-Infinity;
  const records=state?.records||[], pairedRecords=records.filter(r=>matchedFor(r).length>0&&matchesListingStatus(r.release_id,listingStates,listingFilter)), ranked=[...pairedRecords].sort((a,b)=>recordSort==='margin'?(bestMargin(b)-bestMargin(a)||a.release_id-b.release_id):recordSort==='gross'?bestGross(b)-bestGross(a):recordSort==='score'?(b.analysis?.score||0)-(a.analysis?.score||0):(b.snapshot?.want??-1)-(a.snapshot?.want??-1));

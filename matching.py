@@ -72,6 +72,13 @@ def search(settings,candidate_id,query=None,client=None):
   c.execute('INSERT OR REPLACE INTO version_searches VALUES(?,?,?,?)',(candidate_id,json.dumps(params,ensure_ascii=False),json.dumps(results,ensure_ascii=False),now()))
  return {'candidate_id':candidate_id,'suggestions':len(results)}
 
-def state(settings):
+def state(settings,candidate_ids=None):
  with connect(settings.db_path) as c:
-  return {str(r['candidate_id']):{'query':json.loads(r['query']),'results':json.loads(r['results']),'searched_at':r['searched_at']} for r in c.execute('SELECT * FROM version_searches')}
+  if candidate_ids is None:rows=c.execute('SELECT * FROM version_searches').fetchall()
+  else:
+   ids=[int(i) for i in dict.fromkeys(candidate_ids)]
+   rows=[]
+   for start in range(0,len(ids),500):
+    chunk=ids[start:start+500]
+    rows.extend(c.execute(f'SELECT * FROM version_searches WHERE candidate_id IN ({",".join("?"*len(chunk))})',chunk).fetchall())
+  return {str(r['candidate_id']):{'query':json.loads(r['query']),'results':json.loads(r['results']),'searched_at':r['searched_at']} for r in rows}
