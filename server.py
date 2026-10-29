@@ -84,6 +84,34 @@ class Dashboard:
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
+    def payload(self,public):
+        """Serialized /api/state: (etag, json bytes, gzip bytes or None, timings). Reused while nothing in it can differ."""
+        import sheet_primary,time
+        started=time.perf_counter()
+        state=self.state()
+        built=time.perf_counter()
+        version=sheet_primary.version()
+        if public:
+            key=('public',version)
+        else:
+            # records/workflow are tied to the data version; everything else is small and hashed whole.
+            key=('admin',version,json.dumps({k:v for k,v in state.items() if k not in ('records','workflow')},ensure_ascii=False,sort_keys=True,default=str))
+        cached=getattr(self,'_payloads',{})
+        hit=version is not None and key in cached
+        if hit:
+            etag,body,packed=cached[key]
+        else:
+            from public_catalog import public_catalog
+            body=json.dumps(public_catalog(state) if public else state,ensure_ascii=False).encode()
+            etag='W/"'+hashlib.sha256(body).hexdigest()[:32]+'"'
+            packed=gzip.compress(body,6) if len(body)>1024 else None
+            if version is not None:
+                # One entry per audience is enough: older versions are never requested again.
+                self._payloads={k:v for k,v in cached.items() if k[0]!=key[0]}
+                self._payloads[key]=(etag,body,packed)
+        timings={'state':built-started,'encode':time.perf_counter()-built,'cache':'hit' if hit else 'miss'}
+        return etag,body,packed,timings
+
     def platform_state(self):
         # Version suggestions are only shown for the listed recent candidates; do not ship every search result.
         listed=platforms.state(self.settings)
@@ -351,6 +379,32 @@ def handler(dashboard):
             self.send_header('Access-Control-Max-Age','600')
             self.end_headers()
 
+        def respond_state(self,public):
+            etag,body,packed,timings=dashboard.payload(public)
+            timing='state;dur=%.1f, encode;dur=%.1f, cache;desc=%s'%(timings['state']*1000,timings['encode']*1000,timings['cache'])
+            if self.headers.get('If-None-Match')==etag:
+                self.send_response(304)
+                self.send_header('ETag',etag)
+                self.send_header('Cache-Control','no-store')
+                self.send_header('Server-Timing',timing)
+                self.end_headers()
+                return
+            if packed is not None and 'gzip' in self.headers.get('Accept-Encoding','').lower():
+                body=packed
+                encoded=True
+            else:encoded=False
+            self.send_response(200)
+            self.send_header('Content-Type','application/json; charset=utf-8')
+            self.send_header('ETag',etag)
+            if encoded:self.send_header('Content-Encoding','gzip')
+            self.send_header('Vary','Accept-Encoding')
+            self.send_header('Content-Length',str(len(body)))
+            self.send_header('Cache-Control','no-store')
+            self.send_header('X-Content-Type-Options','nosniff')
+            self.send_header('Server-Timing',timing)
+            self.end_headers()
+            self.wfile.write(body)
+
         def respond(self,status,data):
             body=json.dumps(data,ensure_ascii=False).encode()
             etag=None
@@ -382,8 +436,11 @@ def handler(dashboard):
                 status=dashboard.access.allowed(self.headers)
                 if status==401:
                     try:
+                        if hasattr(dashboard,'payload'):return self.respond_state(True)
                         from public_catalog import public_catalog
                         return self.respond(200,public_catalog(dashboard.state()))
+                    except (BrokenPipeError,ConnectionResetError):
+                        return
                     except Exception:
                         return self.respond(500,{'error':'資料讀取失敗，請稍後重試'})
             if not self.authorized():return
@@ -414,7 +471,10 @@ def handler(dashboard):
             if self.path!='/api/state':
                 return self.respond(404,{'error':'找不到頁面'})
             try:
+                if hasattr(dashboard,'payload'):return self.respond_state(False)
                 self.respond(200,dashboard.state())
+            except (BrokenPipeError,ConnectionResetError):
+                return
             except Exception:
                 self.respond(500,{'error':'資料讀取失敗，請檢查本機服務'})
 

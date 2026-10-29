@@ -1,3 +1,13 @@
+## 2026-10-30 回應序列化快取、Server-Timing 與 Sheet 重載間隔（本機實作，待部署）
+
+部署 7cc99a9 後實測匿名 `/api/state` 每次仍約 2.5 秒：每個請求都重新投影公開目錄、序列化約 9 MB JSON、再壓縮與計算 ETag。改為依資料版本快取序列化結果、gzip 內容與 ETag；匿名目錄只依資料版本，管理者另納入工作狀態、排程等小欄位。合成資料重複請求由 140 到 230 毫秒降到 1 到 2 毫秒。
+
+修正前一批的問題：管理者回應的 `storage.loaded_seconds_ago` 每秒變動，使登入後的 ETag 永遠不同、304 無效；改為固定的 `storage.loaded_at` 時間戳。回應加 `Server-Timing`（state、encode、cache 命中與否），可在瀏覽器開發工具直接看伺服器端耗時。瀏覽器先斷線時不再記為 500。
+
+Sheet 主資料背景重載間隔由 30 秒改為 5 分鐘（`SHEET_CACHE_SECONDS` 可調、最少 30 秒）。本程序是唯一寫入者，寫入衝突檢查不變；只影響直接在 Sheet 手動改原始分頁後，網站最多 5 分鐘才看到。
+
+驗證：6 項新測試（重用與命中、管理者驗證碼一秒後仍穩定且隨資料或工作變動、SQLite 模式不快取、重載間隔預設與下限、handler 使用快取與 Server-Timing、斷線不回 500），完整後端離線測試通過。前端無變更，部署只需後端。
+
 ## 2026-10-30 正式部署 7cc99a9（前端＋後端）與量測
 
 main 經發布守門 fast-forward 至 7cc99a9（含 PR #1、#2）。Vercel 正式部署 dpl_AspLJTf9TeCSG1nrFGLt9jzHiSt7 Ready，`/version.json` 讀回 7cc99a9，今日 SIMPLES Vercel 1 次。後端由操作者在 srv1542946 以 44 個 .py 完整替換（manifest SHA256 c07f626cec0a34580e2f3e4c14b93585763ceb30ec343cf05ec052f22f1a6f8c），部署前讀 log 與工作紀錄確認閒置。

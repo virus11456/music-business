@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from sheet_records import capture, decode, TABLES, allowed_meta
 from sheet_repository import SheetRepository
 
@@ -90,6 +91,7 @@ class PrimaryStore:
             self.connection.close()
         self.connection = fresh
         self.loaded_at = time.monotonic()
+        self.loaded_wall = datetime.now(timezone.utc).isoformat(timespec='seconds')
         self.generation += 1
         self.invalid = False
         self.refresh_error = None
@@ -130,8 +132,9 @@ class PrimaryStore:
 
     def status(self):
         with self.lock:
-            age = None if self.connection is None else round(time.monotonic() - self.loaded_at)
-            return {'loaded_seconds_ago': age, 'refresh_error': self.refresh_error,
+            # A fixed wall-clock stamp, not an age: an age changes every second and would defeat response validators.
+            loaded = None if self.connection is None else self.loaded_wall
+            return {'loaded_at': loaded, 'refresh_error': self.refresh_error,
                     'refreshing': bool(self.refresh_thread is not None and self.refresh_thread.is_alive()),
                     'pending_writes': self.pending_count}
 
@@ -244,5 +247,7 @@ def instance():
     global _store
     with _store_lock:
         if _store is None:
-            _store = PrimaryStore(SheetRepository(os.environ.get('GOOGLE_SPREADSHEET_ID', '')))
+            # This process is the only writer; the Sheet is re-read in the background every few minutes for manual edits.
+            ttl = int(os.environ.get('SHEET_CACHE_SECONDS', '300') or 300)
+            _store = PrimaryStore(SheetRepository(os.environ.get('GOOGLE_SPREADSHEET_ID', '')), ttl=max(30, ttl))
         return _store

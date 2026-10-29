@@ -65,3 +65,29 @@ class MatchingPayloadTests(unittest.TestCase):
    self.assertEqual(set(matching.state(s)),{'1','2','3'})
    self.assertEqual(set(matching.state(s,[3,1,3])),{'1','3'});self.assertEqual(matching.state(s,[]),{})
   finally:tmp.cleanup()
+
+
+class CachedPayloadHandlerTests(unittest.TestCase):
+    def app(self):
+        with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':'x'*40,'FRONTEND_ORIGIN':'https://music-business.vercel.app','PUBLIC_API_ORIGIN':'https://api.example.com'}):access=RemoteAccess()
+        calls=[]
+        body=json.dumps({'records':[{'title':'B'*3000}]}).encode()
+        def payload(public):
+            calls.append(public);return ('W/"tag-%s"'%public,body,gzip.compress(body),{'state':.002,'encode':.001,'cache':'hit'})
+        return SimpleNamespace(access=access,csrf='SECRET',payload=payload,state=lambda:self.fail('state() must not be called')),calls
+    def test_handler_serves_cached_payload_with_timing_and_validator(self):
+        app,calls=self.app()
+        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Accept-Encoding':'gzip'}).run()
+        self.assertEqual(status,200);self.assertEqual(calls,[True]);self.assertEqual(headers['etag'],'W/"tag-True"')
+        self.assertIn('cache;desc=hit',headers['server-timing']);self.assertIn('state;dur=2.0',headers['server-timing'])
+        self.assertEqual(json.loads(gzip.decompress(body))['records'][0]['title'],'B'*3000)
+        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','If-None-Match':'W/"tag-True"'}).run()
+        self.assertEqual((status,body),(304,b''));self.assertIn('server-timing',headers)
+        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Authorization':'Bearer '+'x'*40}).run()
+        self.assertEqual(status,200);self.assertEqual(calls[-1],False);self.assertNotIn('content-encoding',headers)
+    def test_client_disconnect_is_not_reported_as_server_error(self):
+        app,_=self.app()
+        def broken(public):raise BrokenPipeError()
+        app.payload=broken
+        r=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app'});r.h.do_GET()
+        self.assertEqual(r.h.wfile.getvalue(),b'')

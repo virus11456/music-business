@@ -87,7 +87,7 @@ class DerivedStateCacheTests(unittest.TestCase):
             # The first derivation after a data change may itself fill match caches, which moves the version once more.
             app.state();first=app.state();second=app.state()
             self.assertIs(first['workflow'],second['workflow']);self.assertIs(first['records'],second['records'])
-            self.assertEqual(first['storage']['backend'],'google_sheets');self.assertIn('loaded_seconds_ago',first['storage'])
+            self.assertEqual(first['storage']['backend'],'google_sheets');self.assertIn('loaded_at',first['storage'])
             with sheet_primary.instance().connect() as c:c.execute("UPDATE releases SET title='renamed' WHERE release_id=1")
             third=app.state()
             self.assertIsNot(second['records'],third['records']);self.assertEqual(third['records'][0]['title'],'renamed')
@@ -100,7 +100,7 @@ class DerivedStateCacheTests(unittest.TestCase):
         from server import Dashboard
         import demo
         tmp=tempfile.TemporaryDirectory();s=Settings(db_path=Path(tmp.name)/'qa.db');init(s.db_path);demo.seed(s);app=Dashboard(s)
-        try:self.assertIsNot(app.state()['workflow'],app.state()['workflow']);self.assertNotIn('loaded_seconds_ago',app.state()['storage'])
+        try:self.assertIsNot(app.state()['workflow'],app.state()['workflow']);self.assertNotIn('loaded_at',app.state()['storage'])
         finally:tmp.cleanup()
 
 class DeferredWriteTests(unittest.TestCase):
@@ -185,3 +185,55 @@ class DeferredWriteTests(unittest.TestCase):
             # job row start, coalesced data, job row finish: three writes instead of seven
             self.assertEqual(repo.writes-before,3);self.assertEqual(repo.data['releases'][1][9],'3')
             self.assertNotIn('api_budget',repo.data)
+
+
+class EncodedPayloadTests(unittest.TestCase):
+    def app(self,store):
+        from config import Settings
+        from server import Dashboard
+        return Dashboard(Settings())
+    def run_with_store(self,check):
+        repo=Repository();store=PrimaryStore(repo)
+        with patch.dict(os.environ,{'DATA_BACKEND':'google_sheets','GOOGLE_SPREADSHEET_ID':'x'*30}),patch.object(sheet_primary,'_store',store):
+            app=self.app(store);app.state();check(app,store)
+    def test_unchanged_state_reuses_encoded_body_and_validator(self):
+        def check(app,store):
+            for public in (True,False):
+                first=app.payload(public);second=app.payload(public)
+                self.assertEqual(first[0],second[0]);self.assertIs(first[1],second[1])
+                self.assertEqual(second[3]['cache'],'hit')
+            self.assertNotEqual(app.payload(True)[0],app.payload(False)[0])
+            self.assertNotIn(b'csrf":"'+app.csrf.encode(),app.payload(True)[1])
+            self.assertIn(app.csrf.encode(),app.payload(False)[1])
+        self.run_with_store(check)
+    def test_admin_validator_is_stable_over_time_and_moves_with_data_or_jobs(self):
+        def check(app,store):
+            before=app.payload(False)[0]
+            time.sleep(1.1)
+            self.assertEqual(app.payload(False)[0],before)
+            with store.connect() as c:c.execute("UPDATE releases SET title='new' WHERE release_id=1")
+            after=app.payload(False)
+            self.assertNotEqual(after[0],before);self.assertEqual(after[3]['cache'],'miss')
+            app.active={'name':'job','started_at':'now'}
+            self.assertNotEqual(app.payload(False)[0],after[0])
+            # A running job does not touch catalogue data: after one rebuild for the data change, the public body is reused.
+            app.payload(True);self.assertEqual(app.payload(True)[3]['cache'],'hit')
+        self.run_with_store(check)
+    def test_sqlite_mode_never_reuses_payloads(self):
+        import tempfile
+        from pathlib import Path
+        from config import Settings
+        from db import init
+        from server import Dashboard
+        import demo
+        tmp=tempfile.TemporaryDirectory();s=Settings(db_path=Path(tmp.name)/'qa.db');init(s.db_path);demo.seed(s);app=Dashboard(s)
+        try:self.assertEqual(app.payload(True)[3]['cache'],'miss');self.assertEqual(app.payload(True)[3]['cache'],'miss')
+        finally:tmp.cleanup()
+    def test_sheet_cache_period_defaults_to_five_minutes_with_a_floor(self):
+        from unittest.mock import MagicMock
+        for value,expected in [(None,300),('600',600),('5',30)]:
+            env={'GOOGLE_SPREADSHEET_ID':'x'*30}
+            if value is not None:env['SHEET_CACHE_SECONDS']=value
+            with patch.dict(os.environ,env,clear=False),patch.object(sheet_primary,'_store',None),patch('sheet_primary.SheetRepository',MagicMock()):
+                if value is None:os.environ.pop('SHEET_CACHE_SECONDS',None)
+                self.assertEqual(sheet_primary.instance().ttl,expected)
