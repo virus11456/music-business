@@ -1,3 +1,7 @@
+## 2026-10-29 Discogs 帳號決定：維持原帳號並申訴
+
+使用者決定不換帳號（新帳號身分驗證未通過，且停權期間另開帳號有違反 Discogs 條款的風險）。原帳號已繳清費用並提出申訴，等待 Discogs 回覆；VPS 的 DISCOGS_TOKEN 不變。停權解除前，庫存讀回與刊登送出仍回 403，其餘唯讀流程不受影響。解除後的驗收順序：先用正式網站「讀回刊登狀態」確認 identity 與庫存可讀，再部署 PR #1 後端並以一筆真實草稿用 Draft 方式驗收刊登送出。
+
 ## 2026-10-29 換 Discogs 帳號支援
 
 使用者將改用新的 Discogs 帳號。確認本程式只需該帳號的個人存取 token（`Authorization: Discogs token=`），不需申請 OAuth 應用程式。庫存讀回新增帳號切換：`/api/inventory/reset` 帶 `scope=account` 清除舊帳號快照與分頁進度、保留 published_listings；帳號不符錯誤改為指出目前 token 的帳號。前端刊登狀態面板新增「改用其他帳號重新讀回」。1 項新測試；token 更換、賣家設定與正式讀回由使用者在 VPS 完成，尚未驗收。
