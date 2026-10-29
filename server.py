@@ -229,6 +229,8 @@ class Dashboard:
             if path=='/api/listings/submissions/resolve':
                 return discogs_publish.resolve(s,data.get('draft_id'),data.get('outcome'),data.get('listing_id'))
             if path=='/api/inventory/reset':
+                if data.get('scope')=='account':
+                    return __import__('inventory_sync').switch_account(s)
                 with connect(s.db_path) as c:c.execute("DELETE FROM meta WHERE key='discogs_inventory_pending'")
                 return {'saved':True,'message':'已重設分頁進度，保留完整快照與刊登紀錄'}
             if path=='/api/drafts/suggest-note':

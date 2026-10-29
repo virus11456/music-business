@@ -11,7 +11,15 @@ def state(settings):
  with connect(settings.db_path) as c:
   saved=c.execute('SELECT value FROM meta WHERE key=?',(KEY,)).fetchone()
   pending=c.execute('SELECT value FROM meta WHERE key=?',(PENDING,)).fetchone()
- return {'supported':True,'snapshot':json.loads(saved[0]) if saved else None,'next_page':json.loads(pending[0])['next_page'] if pending else 1}
+ snapshot=json.loads(saved[0]) if saved else None
+ return {'supported':True,'snapshot':snapshot,'next_page':json.loads(pending[0])['next_page'] if pending else 1,'account':snapshot['username'] if snapshot else (json.loads(pending[0])['username'] if pending else None)}
+
+def switch_account(settings):
+ """Forget the previous account's snapshot and page progress; publishing history is kept."""
+ with connect(settings.db_path) as c:
+  previous=c.execute('SELECT value FROM meta WHERE key=?',(KEY,)).fetchone()
+  c.execute('DELETE FROM meta WHERE key IN (?,?)',(KEY,PENDING))
+ return {'saved':True,'message':('已清除 '+json.loads(previous[0])['username']+' 的庫存快照，' if previous else '')+'可用目前 token 的帳號重新讀回；已登錄的刊登紀錄保留'}
 
 def positive(value):
  if type(value) is not int or value<1:raise ValueError('Discogs 刊登資料格式無效')
@@ -25,7 +33,7 @@ def run(settings,client=None):
   pending=c.execute('SELECT value FROM meta WHERE key=?',(PENDING,)).fetchone()
   saved=c.execute('SELECT value FROM meta WHERE key=?',(KEY,)).fetchone()
  progress=json.loads(pending[0]) if pending else {'username':username,'next_page':1,'rows':[]}
- if progress['username']!=username or saved and json.loads(saved[0])['username']!=username:raise ValueError('Discogs 帳號與既有同步不同，請先核對帳號')
+ if progress['username']!=username or saved and json.loads(saved[0])['username']!=username:raise ValueError('Discogs 帳號與既有同步不同：目前 token 屬於 '+username+'；若已換帳號，請先按「改用其他帳號重新讀回」')
  page=progress['next_page']
  result=client.get('/users/'+quote(username,safe='')+'/inventory',{'page':page,'per_page':100})
  pagination=result.get('pagination');items=result.get('listings')

@@ -47,3 +47,14 @@ class InventoryTests(unittest.TestCase):
   inventory_sync.run(self.s,self.client([item]))
   self.assertEqual(inventory_sync.state(self.s)['snapshot']['linked'],1)
   with connect(self.s.db_path) as c:self.assertEqual(c.execute('SELECT listing_id FROM published_listings').fetchone()[0],'123')
+ def test_switching_account_clears_snapshot_but_keeps_publishing_history(self):
+  inventory_sync.run(self.s,self.client([self.item(1)],user='OLD'))
+  with connect(self.s.db_path) as c:c.execute("INSERT INTO published_listings VALUES('https://example.com',1,'9','2000')")
+  with self.assertRaisesRegex(ValueError,'NEW'):inventory_sync.run(self.s,self.client([self.item(2)],user='NEW'))
+  self.assertEqual(inventory_sync.state(self.s)['account'],'OLD')
+  from server import Dashboard
+  result=Dashboard(self.s).mutate('/api/inventory/reset',{'scope':'account'})
+  self.assertIn('OLD',result['message']);self.assertIsNone(inventory_sync.state(self.s)['snapshot'])
+  inventory_sync.run(self.s,self.client([self.item(2)],user='NEW'))
+  self.assertEqual(inventory_sync.state(self.s)['account'],'NEW')
+  with connect(self.s.db_path) as c:self.assertEqual(c.execute('SELECT count(*) FROM published_listings').fetchone()[0],1)

@@ -22,6 +22,12 @@
 2. 或在前端「送出到 Discogs」面板人工核對：`POST /api/listings/submissions/resolve`，`outcome=listed` 需填 Discogs 刊登編號；`outcome=not_listed` 標為 failed，草稿可重送。只能處理 `submitting`／`uncertain`。
 3. `submitting` 超過 10 分鐘仍未完成，代表最後一次寫入沒有完成（例如程序中斷或 Sheet 寫入結果不明）；前端同樣提供核對按鈕。
 
+## 驗證方式與換帳號
+
+依 Discogs 官方驗證規範，只操作自己帳號時使用個人存取 token（Settings → Developers → Generate new token），標頭為 `Authorization: Discogs token=<token>`，本程式即採此方式；不需要在「Create an Application」申請 OAuth consumer key／secret，那是代替其他使用者操作時才需要。每個請求須帶 User-Agent，認證後限速每分鐘 60 次，既有 client 已處理。
+
+換帳號：由使用者在新帳號產生 token，自行寫入 VPS `.env` 的 `DISCOGS_TOKEN`（權限 600）並重啟服務，不經對話傳遞。新帳號須先完成 Discogs 賣家設定（幣別、付款、運費政策），前端賣家幣別也要對應。庫存讀回保存舊帳號名稱，換帳號後先用「改用其他帳號重新讀回」清除舊快照，刊登登錄紀錄保留（見 INVENTORY_SYNC.md）。
+
 ## 啟用與邊界
 
 - 後端環境變數 `DISCOGS_LISTING_WRITE=1` 才啟用；未設定時 API 拒絕、前端面板顯示未啟用。只部署程式不會開始寫入。
