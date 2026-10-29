@@ -114,7 +114,9 @@ class Dashboard:
         def worker():
             try:
                 with job(self.settings.db_path,name) as detail:
-                    result=operation()
+                    # One Sheet write per minute or per 25 transactions instead of one per row.
+                    with __import__('sheet_primary').deferred():
+                        result=operation()
                     if result:
                         detail.update(result)
             except Exception:

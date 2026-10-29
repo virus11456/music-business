@@ -38,10 +38,16 @@ class PrimaryStore:
     expired view is refreshed in the background while requests keep being served;
     an unknown remote result still forces a synchronous re-read before the next use.
     """
-    def __init__(self, repository, ttl=30, retry=10):
+    def __init__(self, repository, ttl=30, retry=10, flush_after=60, flush_every=25):
         self.repository = repository
         self.ttl = ttl
         self.retry = retry
+        self.flush_after = flush_after
+        self.flush_every = flush_every
+        self.deferred_depth = 0
+        self.pending_before = None
+        self.pending_count = 0
+        self.pending_since = 0
         self.lock = threading.RLock()
         self.connection = None
         self.loaded_at = 0
@@ -95,6 +101,8 @@ class PrimaryStore:
         """Serve the current view while a newer Sheet read is prepared; never block a request."""
         if self.refresh_thread is not None and self.refresh_thread.is_alive():
             return
+        if self.pending_before is not None:
+            return  # unflushed local work must not be replaced by an older Sheet read
         if self.refresh_failed_at is not None and time.monotonic() - self.refresh_failed_at < self.retry:
             return
         started_writes = self.writes
@@ -108,7 +116,7 @@ class PrimaryStore:
                 return
             with self.lock:
                 # A write committed meanwhile is newer than this read; keep the local view and retry later.
-                if self.writes != started_writes or self.depth or self.invalid:
+                if self.writes != started_writes or self.depth or self.invalid or self.pending_before is not None:
                     fresh.close()
                     return
                 self._install(fresh)
@@ -124,7 +132,50 @@ class PrimaryStore:
         with self.lock:
             age = None if self.connection is None else round(time.monotonic() - self.loaded_at)
             return {'loaded_seconds_ago': age, 'refresh_error': self.refresh_error,
-                    'refreshing': bool(self.refresh_thread is not None and self.refresh_thread.is_alive())}
+                    'refreshing': bool(self.refresh_thread is not None and self.refresh_thread.is_alive()),
+                    'pending_writes': self.pending_count}
+
+    def _push(self, before, c):
+        """Compare the view against `before` and write every changed table to the Sheet once."""
+        scratch = sqlite3.connect(':memory:')
+        try:
+            scratch.deserialize(before)
+            expected = capture(scratch)
+        finally:
+            scratch.close()
+        updated = capture(c)
+        changed = {k: v for k, v in updated.items() if v != expected[k]}
+        if changed:
+            self.repository.replace({k: expected[k] for k in changed}, changed)
+            self.writes += 1
+
+    def flush(self):
+        """Write deferred local changes to the Sheet. An unknown result reverts the view and forces a re-read."""
+        with self.lock:
+            if self.pending_before is None:
+                return
+            before, self.pending_before, self.pending_count = self.pending_before, None, 0
+            try:
+                self._push(before, self.connection)
+            except BaseException:
+                self.connection.deserialize(before)
+                self.invalid = True
+                raise
+
+    @contextmanager
+    def deferred(self):
+        """Coalesce Sheet writes for a background job: local transactions commit at once and stay visible,
+        the Sheet receives one write per `flush_after` seconds or `flush_every` transactions, and on exit.
+        Only the job thread writes while a job runs (the dashboard lock blocks other mutations)."""
+        with self.lock:
+            self.deferred_depth += 1
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.deferred_depth -= 1
+                if self.deferred_depth == 0:
+                    self.flush()
 
     @contextmanager
     def connect(self):
@@ -142,22 +193,21 @@ class PrimaryStore:
                 yield c
                 c.commit()
                 if self.depth == 1 and c.total_changes != changes:
-                    scratch = sqlite3.connect(':memory:')
-                    try:
-                        scratch.deserialize(before)
-                        expected = capture(scratch)
-                    finally:
-                        scratch.close()
-                    updated = capture(c)
-                    changed = {k: v for k, v in updated.items() if v != expected[k]}
-                    if changed:
-                        self.repository.replace({k: expected[k] for k in changed}, changed)
-                        self.writes += 1
+                    if self.deferred_depth:
+                        if self.pending_before is None:
+                            self.pending_before, self.pending_since = before, time.monotonic()
+                        self.pending_count += 1
+                        if self.pending_count >= self.flush_every or time.monotonic() - self.pending_since >= self.flush_after:
+                            self.flush()
+                    else:
+                        self._push(before, c)
             except BaseException:
                 c.rollback()
-                if before is not None:
+                if before is not None and self.pending_before is None:
                     c.deserialize(before)
                     self.invalid = True  # Unknown remote result is resolved by a fresh read, never blind retry.
+                elif before is not None:
+                    c.deserialize(before)  # this transaction only; earlier deferred work stays pending
                 raise
             finally:
                 self.depth -= 1
@@ -178,6 +228,16 @@ def version():
 
 def status():
     return instance().status() if enabled() else None
+
+
+@contextmanager
+def deferred():
+    """Coalesced Sheet writes for a background job; a no-op outside Sheet-primary mode."""
+    if not enabled():
+        yield
+        return
+    with instance().deferred():
+        yield
 
 
 def instance():

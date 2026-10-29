@@ -34,8 +34,10 @@ def needs_check(row,instant):
     return retry<=instant
 
 def _pending_count(c,instant):
+    import identity_data
+    saved=identity_data.identities(c)
     rows=c.execute('SELECT p.*,s.fingerprint AS saved_fingerprint,s.retry_at FROM platform_candidates p LEFT JOIN source_checks s ON s.candidate_id=p.id')
-    return sum(needs_check(__import__('identity_data').enrich(c,r),instant) for r in rows)
+    return sum(needs_check(identity_data.enrich(c,r,saved),instant) for r in rows)
 
 def pending_count(settings):
     with connect(settings.db_path) as c:

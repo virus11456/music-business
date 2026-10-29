@@ -102,3 +102,86 @@ class DerivedStateCacheTests(unittest.TestCase):
         tmp=tempfile.TemporaryDirectory();s=Settings(db_path=Path(tmp.name)/'qa.db');init(s.db_path);demo.seed(s);app=Dashboard(s)
         try:self.assertIsNot(app.state()['workflow'],app.state()['workflow']);self.assertNotIn('loaded_seconds_ago',app.state()['storage'])
         finally:tmp.cleanup()
+
+class DeferredWriteTests(unittest.TestCase):
+    def test_job_writes_are_coalesced_into_one_sheet_write_and_stay_readable(self):
+        repo=Repository();store=PrimaryStore(repo);title(store)
+        with store.deferred():
+            for i in range(5):
+                with store.connect() as c:c.execute("UPDATE releases SET title=? WHERE release_id=1",(f'step {i}',))
+                self.assertEqual(title(store),f'step {i}');self.assertEqual(repo.writes,0)
+            self.assertEqual(store.status()['pending_writes'],5)
+        self.assertEqual(repo.writes,1);self.assertEqual(repo.data['releases'][1][1],'step 4');self.assertEqual(store.status()['pending_writes'],0)
+        with store.connect() as c:c.execute("UPDATE releases SET title='immediate' WHERE release_id=1")
+        self.assertEqual(repo.writes,2)
+    def test_flush_thresholds_bound_the_unwritten_work(self):
+        repo=Repository();store=PrimaryStore(repo,flush_every=3,flush_after=1000);title(store)
+        with store.deferred():
+            for i in range(7):
+                with store.connect() as c:c.execute("UPDATE releases SET notes=? WHERE release_id=1",(str(i),))
+            self.assertEqual(repo.writes,2)
+        self.assertEqual(repo.writes,3);self.assertEqual(repo.data['releases'][1][9],'6')
+        repo=Repository();store=PrimaryStore(repo,flush_every=100,flush_after=0);title(store)
+        with store.deferred():
+            with store.connect() as c:c.execute("UPDATE releases SET notes='a' WHERE release_id=1")
+            with store.connect() as c:c.execute("UPDATE releases SET notes='b' WHERE release_id=1")
+            self.assertEqual(repo.writes,2)
+    def test_failed_flush_reverts_local_work_and_forces_reread(self):
+        repo=Repository();store=PrimaryStore(repo);title(store)
+        with self.assertRaises(ValueError):
+            with store.deferred():
+                with store.connect() as c:c.execute("UPDATE releases SET title='lost' WHERE release_id=1")
+                repo.data['releases'][1][1]='edited in sheet'
+        self.assertEqual(title(store),'edited in sheet');self.assertEqual(repo.writes,0);self.assertEqual(store.status()['pending_writes'],0)
+    def test_failed_transaction_inside_job_keeps_earlier_deferred_work(self):
+        repo=Repository();store=PrimaryStore(repo);title(store)
+        with store.deferred():
+            with store.connect() as c:c.execute("UPDATE releases SET title='kept' WHERE release_id=1")
+            with self.assertRaises(RuntimeError):
+                with store.connect() as c:c.execute("UPDATE releases SET title='rolled back' WHERE release_id=1");raise RuntimeError()
+            self.assertEqual(title(store),'kept')
+        self.assertEqual(repo.data['releases'][1][1],'kept');self.assertEqual(repo.writes,1)
+    def test_exception_in_job_still_flushes_completed_work(self):
+        repo=Repository();store=PrimaryStore(repo);title(store)
+        with self.assertRaises(RuntimeError):
+            with store.deferred():
+                with store.connect() as c:c.execute("UPDATE releases SET title='partial' WHERE release_id=1")
+                raise RuntimeError('job failed later')
+        self.assertEqual(repo.data['releases'][1][1],'partial')
+    def test_background_refresh_never_replaces_unflushed_work(self):
+        repo=Repository();store=PrimaryStore(repo,ttl=0);title(store)
+        with store.deferred():
+            with store.connect() as c:c.execute("UPDATE releases SET title='pending' WHERE release_id=1")
+            for _ in range(3):self.assertEqual(title(store),'pending')
+            if store.refresh_thread:store.refresh_thread.join(5)  # a read started before the write must not replace it
+            self.assertEqual(title(store),'pending');self.assertEqual(store.generation,1)
+        self.assertEqual(repo.data['releases'][1][1],'pending');self.assertEqual(repo.writes,1)
+        title(store)
+        if store.refresh_thread:store.refresh_thread.join(5)
+        self.assertEqual(title(store),'pending')
+    def test_external_sheet_edit_during_job_is_detected_at_flush(self):
+        repo=Repository();store=PrimaryStore(repo);title(store)
+        with self.assertRaises(ValueError):
+            with store.deferred():
+                with store.connect() as c:c.execute("UPDATE releases SET title='job' WHERE release_id=1")
+                repo.data['releases'][1][1]='someone edited the sheet'
+        self.assertEqual(repo.data['releases'][1][1],'someone edited the sheet');self.assertEqual(title(store),'someone edited the sheet')
+    def test_dashboard_jobs_use_deferred_mode_and_local_only_tables_stay_local(self):
+        import time as clock
+        from config import Settings
+        from server import Dashboard
+        repo=Repository();store=PrimaryStore(repo)
+        with patch.dict(os.environ,{'DATA_BACKEND':'google_sheets','GOOGLE_SPREADSHEET_ID':'x'*30}),patch.object(sheet_primary,'_store',store):
+            app=Dashboard(Settings());before=repo.writes
+            def operation():
+                for i in range(4):
+                    with sheet_primary.instance().connect() as c:c.execute("UPDATE releases SET notes=? WHERE release_id=1",(str(i),))
+                with sheet_primary.instance().connect() as c:c.execute('INSERT OR REPLACE INTO api_budget VALUES(1,5)')
+                return {'done':4}
+            app.start('test job',operation)
+            for _ in range(300):
+                if app.active is None:break
+                clock.sleep(.01)
+            # job row start, coalesced data, job row finish: three writes instead of seven
+            self.assertEqual(repo.writes-before,3);self.assertEqual(repo.data['releases'][1][9],'3')
+            self.assertNotIn('api_budget',repo.data)

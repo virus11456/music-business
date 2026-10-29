@@ -24,12 +24,19 @@ def release_codes(c,rid):
     try:return barcodes(json.loads(row[0]))
     except (ValueError,TypeError):return []
 
-def enrich(c,source):
+def identities(c):
+    """All saved source identities keyed by candidate id, for callers that enrich many sources at once."""
+    return {key[len('source_identity_'):]:value for key,value in c.execute("SELECT key,value FROM meta WHERE key LIKE 'source_identity_%'")}
+
+def enrich(c,source,saved=None):
     source=dict(source)
-    row=c.execute('SELECT value FROM meta WHERE key=?',(f"source_identity_{source['id']}",)).fetchone()
-    if row:
+    if saved is None:
+        row=c.execute('SELECT value FROM meta WHERE key=?',(f"source_identity_{source['id']}",)).fetchone()
+        value=row[0] if row else None
+    else:value=saved.get(str(source['id']))
+    if value is not None:
         try:
-            data=json.loads(row[0])
+            data=json.loads(value)
             if data['identity']==[source[k] for k in ('title','artist','format','catalog_no')]:
                 source['barcodes']=barcodes(data.get('barcodes',[]));source['labels']=data.get('labels','') if isinstance(data.get('labels',''),str) else ''
         except (ValueError,KeyError,TypeError):pass
