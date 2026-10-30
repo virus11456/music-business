@@ -84,6 +84,20 @@ class Dashboard:
             'assumptions':{'fee_pct':str(self.settings.fee_pct),'shipping':str(self.settings.shipping),
                            'packing':str(self.settings.packing),'reserve':str(self.settings.reserve),'min_margin':str(self.settings.min_margin)}}
 
+    def warm(self):
+        """Prepare the encoded responses in the background so the next visitor does not pay for the rebuild."""
+        import sheet_primary
+        if not sheet_primary.enabled() or getattr(self,'_warming',False):return
+        self._warming=True
+        def run():
+            try:
+                for public in (True,False):self.payload(public,True)
+            except Exception:
+                pass  # The next real request rebuilds and reports any error itself.
+            finally:
+                self._warming=False
+        threading.Thread(target=run,name='state-warm',daemon=True).start()
+
     def payload(self,public,compact=False):
         """Serialized /api/state: (etag, json bytes, gzip bytes or None, timings). Reused while nothing in it can differ."""
         import sheet_primary,time
@@ -157,6 +171,7 @@ class Dashboard:
             finally:
                 self.active=None
                 self.lock.release()
+                self.warm()
         threading.Thread(target=worker,daemon=True).start()
         return {'accepted':True,'message':'工作已開始，完成後畫面會自動更新'}
 
@@ -541,6 +556,7 @@ if __name__=='__main__':
     dashboard=Dashboard(settings)
     http=ThreadingHTTPServer(('127.0.0.1',args.port),handler(dashboard))
     dashboard.scheduler.start()
+    dashboard.warm()
     print(f'Local API ready: http://127.0.0.1:{args.port}',flush=True)
     try:http.serve_forever()
     finally:

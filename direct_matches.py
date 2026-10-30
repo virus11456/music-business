@@ -14,16 +14,22 @@ def pairs(c,sources,targets):
             if data['signature']==signature:return data['pairs']
         except (ValueError,KeyError,TypeError):pass
     result=[]
+    # Normalise each target once instead of once per source; the filters below are unchanged.
+    prepared=[]
+    for target in targets:
+        catalogs=[normalized(x) for x in target['catno'].split(',') if normalized(x) not in ('','none','na','未確認')]
+        # A release without an artist cannot match by artist name (the old per-pair loop raised here instead).
+        prepared.append((target,catalogs,normalized(re.sub(r'\s+\(\d+\)$','',target['artist'] or '')),set(target.get('barcodes',[]))))
+    from identity_data import source_codes
     for source in sources:
         catalog=normalized(source_catalog(source))
         known_catalog=catalog not in ('','none','na','未確認')
         text=normalized(source['artist']+' '+source['title'])
-        for target in targets:
-            catalogs=[normalized(x) for x in target['catno'].split(',') if normalized(x) not in ('','none','na','未確認')]
+        codes=set(source_codes(source))
+        for target,catalogs,artist,target_codes in prepared:
             catalog_match=known_catalog and catalog in catalogs
             if known_catalog and catalogs and not catalog_match:continue
-            artist=normalized(re.sub(r'\s+\(\d+\)$','',target['artist']))
-            barcode_match=bool(set(__import__('identity_data').source_codes(source))&set(target.get('barcodes',[])))
+            barcode_match=bool(codes&target_codes)
             if not catalog_match and not barcode_match and (len(artist)<2 or artist not in text):continue
             reasons=evidence(source,target)
             if reasons:result.append([source['id'],target['release_id'],reasons+['已抓取資料直接交叉比對']])
