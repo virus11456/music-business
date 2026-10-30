@@ -166,6 +166,21 @@ def parse_release(data, expected_id):
             'catno':', '.join(l['catno'] for l in data.get('labels',[]) if isinstance(l,dict) and isinstance(l.get('catno'),str)),
             'have':integer(community.get('have'),'have'),'want':integer(community.get('want'),'want')}
 
+def parse_release_market(data, currency):
+    """Lowest price and supply carried on the release itself, or None when the stats call is still needed.
+
+    The release's lowest_price is always USD (curr_abbr is ignored there), so only a USD market can use it.
+    Checked against /marketplace/stats on production releases: same value and count, null when none for sale."""
+    if currency != 'USD' or 'num_for_sale' not in data or 'lowest_price' not in data:
+        return None
+    supply = integer(data['num_for_sale'],'num_for_sale')
+    price = data['lowest_price']
+    if price is None:
+        return None,None,supply
+    if isinstance(price,bool) or not isinstance(price,(int,float)):
+        raise APIError('lowest_price 格式不符')
+    return str(money(price)),'USD',supply
+
 def parse_stats(data):
     if 'num_for_sale' not in data or 'lowest_price' not in data:
         raise APIError('marketplace stats 缺少預期欄位，請重新 probe；不寫入猜測值')

@@ -14,7 +14,7 @@ import notify
 from cli import main
 from config import Settings, money
 from db import init, connect, snapshot, now, decide
-from discogs_client import DiscogsClient, APIError, parse_stats
+from discogs_client import DiscogsClient, APIError, parse_stats, parse_release_market
 from fx import convert
 
 class CoreTests(unittest.TestCase):
@@ -185,6 +185,45 @@ class CoreTests(unittest.TestCase):
         result=ingest.run(self.settings,Client())
         self.assertEqual(result['success'],3)
         self.assertEqual(result['failed'],1)
+
+    def test_market_from_release_skips_stats_call_in_usd(self):
+        calls=[]
+        class Client:
+            def get(inner,path,params=None):
+                calls.append(path)
+                if path.startswith('/releases/'):
+                    return {'id':self.rid,'title':'test','community':{'have':10,'want':20},'lowest_price':12.5,'num_for_sale':3}
+                raise AssertionError('stats endpoint should not be called')
+        ingest.fetch_one(Client(),self.settings,self.rid)
+        self.assertEqual(calls,[f'/releases/{self.rid}'])
+        with connect(self.settings.db_path) as c:row=self.latest(c)
+        self.assertEqual((row['lowest_price'],row['currency'],row['num_for_sale'],row['have'],row['want']),('12.5','USD',3,10,20))
+
+    def test_market_falls_back_to_stats_when_release_cannot_answer(self):
+        from dataclasses import replace
+        stats={'lowest_price':{'value':1800,'currency':'JPY'},'num_for_sale':2}
+        for settings,release in ((replace(self.settings,currency='JPY'),{'lowest_price':12.5,'num_for_sale':3}),(self.settings,{})):
+            calls=[]
+            class Client:
+                def get(inner,path,params=None):
+                    calls.append(path)
+                    return {'id':self.rid,'title':'test','community':{'have':1,'want':2},**release} if path.startswith('/releases/') else stats
+            ingest.fetch_one(Client(),settings,self.rid)
+            self.assertEqual(calls,[f'/releases/{self.rid}',f'/marketplace/stats/{self.rid}'])
+            with connect(self.settings.db_path) as c:row=self.latest(c)
+            self.assertEqual((row['lowest_price'],row['currency'],row['num_for_sale']),('1800','JPY',2))
+
+    def test_release_market_matches_stats_on_production_samples(self):
+        # (release lowest_price, num_for_sale) as read from Discogs on 2026-10-30 for both endpoints.
+        for price,supply in ((5.99,20),(11.01,13),(35.99,2),(11.5,6),(12.99,15),(0.67,123),(None,0)):
+            stats={'lowest_price':None if price is None else {'value':price,'currency':'USD'},'num_for_sale':supply}
+            self.assertEqual(parse_release_market({'lowest_price':price,'num_for_sale':supply},'USD'),parse_stats(stats))
+
+    def test_release_market_parsing(self):
+        self.assertEqual(parse_release_market({'lowest_price':None,'num_for_sale':0},'USD'),(None,None,0))
+        self.assertIsNone(parse_release_market({'lowest_price':5,'num_for_sale':1},'EUR'))
+        for bad in ({'lowest_price':'5','num_for_sale':1},{'lowest_price':True,'num_for_sale':1},{'lowest_price':5,'num_for_sale':-1}):
+            with self.assertRaises(APIError):parse_release_market(bad,'USD')
 
     def test_shared_rate_budget(self):
         clock=[100.0]

@@ -1,6 +1,6 @@
 import json
 from db import connect, snapshot, now
-from discogs_client import DiscogsClient, parse_release, parse_stats, APIError
+from discogs_client import DiscogsClient, parse_release, parse_release_market, parse_stats, APIError
 
 def save_release(c, r, theme=None):
     if 'barcodes' in r:c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(f"release_barcodes_{r['release_id']}",json.dumps(r['barcodes'])))
@@ -11,8 +11,11 @@ def save_release(c, r, theme=None):
       (r['release_id'],r['title'],r['artist'],r['year'],r['country'],r['format'],r['catno'],theme,now()))
 
 def fetch_one(client, settings, rid, theme=None):
-    r = parse_release(client.get(f'/releases/{rid}'),rid)
-    price,currency,supply = parse_stats(client.get(f'/marketplace/stats/{rid}',{'curr_abbr':settings.currency}))
+    data = client.get(f'/releases/{rid}')
+    r = parse_release(data,rid)
+    # One request per release instead of two: Discogs allows 60 a minute and market refresh is a scheduled-job bottleneck.
+    market = parse_release_market(data,settings.currency)
+    price,currency,supply = market or parse_stats(client.get(f'/marketplace/stats/{rid}',{'curr_abbr':settings.currency}))
     with connect(settings.db_path) as c:
         save_release(c,r,theme)
         snapshot(c,rid,now(),price,currency,supply,r['have'],r['want'])

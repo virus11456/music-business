@@ -32,7 +32,7 @@
 
 ## Discogs 與 Sheets
 
-`discogs_client.py` 是 GET-only：`/database/search`、`/releases/`、`/marketplace/stats/`。使用設定內 token 和 User-Agent；SQLite api_budget 共用 1.1 秒間隔；剩餘額度低時冷卻，429／5xx 或暫時連線問題最多 4 次嘗試，尊重 Retry-After。不要另建無節流 client 平行灌請求。
+`discogs_client.py` 是 GET-only：`/database/search`、`/releases/`、`/marketplace/stats/`。2026-10-30 起行情幣別為 USD 時，`ingest.fetch_one` 直接採用 `/releases/` 回應內的 `lowest_price`／`num_for_sale`（該欄位固定為 USD，忽略 curr_abbr；已對 7 張正式唱片與 stats 逐一比對相同），每個版本只打 1 次；其他幣別或欄位缺漏仍補打 stats。使用設定內 token 和 User-Agent；SQLite api_budget 共用 1.1 秒間隔；剩餘額度低時冷卻，429／5xx 或暫時連線問題最多 4 次嘗試，尊重 Retry-After。不要另建無節流 client 平行灌請求。
 
 `ingest.py` 保存版本與行情；`analyze.py` 分析；`comparisons.py` 算含幣別換算的價差／毛利／扣設定費用後淨利；`sheet_sync.py` 的 build_tables/sync 是唯一表格輸出契約。沿用已指定 Sheet 與應用程式管理的分頁，不能覆寫使用者其他分頁。快取命中並不代表來源報價新鮮，前端 48 小時篩選與缺值語意需保留。
 
