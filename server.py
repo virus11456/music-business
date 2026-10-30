@@ -379,6 +379,8 @@ def handler(dashboard):
         def end_headers(self):
             if dashboard.access.token and self.headers.get('Origin')==dashboard.access.origin:
                 self.send_header('Access-Control-Allow-Origin',dashboard.access.origin)
+                # Without this the browser hides ETag, so the frontend never sends If-None-Match and never gets 304.
+                self.send_header('Access-Control-Expose-Headers','ETag')
                 self.send_header('Vary','Origin')
             super().end_headers()
 
@@ -394,7 +396,7 @@ def handler(dashboard):
                 return self.respond(403,{'error':'不允許此來源連線'})
             self.send_response(204)
             self.send_header('Access-Control-Allow-Methods','GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers','Authorization, Content-Type, X-CSRF-Token')
+            self.send_header('Access-Control-Allow-Headers','Authorization, Content-Type, X-CSRF-Token, If-None-Match')
             self.send_header('Access-Control-Max-Age','600')
             self.end_headers()
 

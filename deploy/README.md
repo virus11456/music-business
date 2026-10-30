@@ -1,3 +1,13 @@
+## 2026-10-30 瀏覽器輪詢 304 修正（本機實作，待部署後端）
+
+**問題**：先前加入的「資料未變回 304、不重繪」只在 curl 生效。正式網站前端與 API 不同網域，後端沒有以 `Access-Control-Expose-Headers` 公開 `ETag`，瀏覽器讀不到 ETag，前端從未送出 `If-None-Match`；即使送出，預檢也未允許該標頭而會被擋下。結果每次輪詢（約 4 到 8 秒一次）都重新下載並解開約 1.3 MB 資料、重建整份比價並重繪。
+
+**正式網站實測（修正前，Chromium，手機寬度，CPU 4 倍降速，靜置 40 秒）**：輪詢 7 次、解壓後共 9 MB，主執行緒長任務 14 次合計 2.4 秒，每 5 到 6 秒卡住一次，最長 301 毫秒。也在正式網站確認瀏覽器取得的 ETag 為 null，帶 `If-None-Match` 的請求被 CORS 擋下。
+
+**修正**：後端回應加上 `Access-Control-Expose-Headers: ETag`，預檢允許 `If-None-Match`。前端不需改動：拿到 ETag 後會自動帶上，資料未變時回 304 空內容，不解析也不重繪。匿名訪客因此每 10 分鐘多一次預檢（`Access-Control-Max-Age: 600`）。
+
+驗證：遠端存取測試新增「公開 ETag、預檢允許 If-None-Match、帶回 ETag 得 304」；並修正同測試中已過時的斷言（匿名 `/api/state` 依設計回傳公開目錄，不是 401）。`test_dashboard`、`test_full_workflow` 15 項與離線 322 項通過。僅需部署後端；部署後須在正式網站以瀏覽器重測輪詢是否回 304。
+
 ## 2026-10-30 正式部署 52afe77（前端與後端）
 
 後端 16:25 以 45 個 .py 完整替換（manifest SHA256 130aa4de4d1e9a383148280395165198b9a60ca44e456b02a18e169330390757，備份 backups/full-20261030T082512Z），16:00 排程完成後部署；main 隨後經發布守門 fast-forward 至 52afe77（後端先從分支 SHA 部署，main 補對齊，內容相同）。前端經守門預留後以 Vercel API 建立正式部署 dpl_Ax1iSP5Tqc2tBALhd11K4uP7c8Yu，`version.json` 讀回 52afe77；當日 SIMPLES Vercel 使用 4 次（剩 16），帳號 34 次。

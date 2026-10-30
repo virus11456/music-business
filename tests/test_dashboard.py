@@ -143,10 +143,21 @@ class DashboardTests(unittest.TestCase):
         h={'Host':'api.example.com','Origin':origin}
         with urlopen(Request(self.url+'/api/state',headers=h,method='OPTIONS')) as r:
             self.assertEqual(r.status,204);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)
+            self.assertIn('If-None-Match',r.headers['Access-Control-Allow-Headers'])
+        # Anonymous /api/state is the public catalogue; everything else needs the token.
+        with urlopen(Request(self.url+'/api/state',headers=h)) as r:
+            self.assertEqual(r.status,200);self.assertFalse(json.loads(r.read())['permissions']['can_write'])
+        with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+'/api/drafts/export',headers=h))
+        self.assertEqual(error.exception.code,401);error.exception.close()
         for path in ['/api/state','/api/drafts/export']:
-            with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+path,headers=h))
-            self.assertEqual(error.exception.code,401);error.exception.close()
             with urlopen(Request(self.url+path,headers={**h,'Authorization':'Bearer '+token})) as r:
                 self.assertEqual(r.status,200);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)
+                self.assertEqual(r.headers['Access-Control-Expose-Headers'],'ETag')
+        # Browser revalidation: the exposed ETag comes back as If-None-Match and gets an empty 304.
+        auth={**h,'Authorization':'Bearer '+token}
+        with urlopen(Request(self.url+'/api/state',headers=auth)) as r:etag=r.headers['ETag']
+        self.assertTrue(etag)
+        with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+'/api/state',headers={**auth,'If-None-Match':etag}))
+        self.assertEqual(error.exception.code,304);self.assertEqual(error.exception.headers['Access-Control-Expose-Headers'],'ETag');error.exception.close()
 
 if __name__=='__main__':unittest.main()
