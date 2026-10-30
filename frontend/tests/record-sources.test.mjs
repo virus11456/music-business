@@ -30,10 +30,14 @@ test('profit chart preserves signed percentage and separates sale price from spr
  const missing=render([{...row,gross_margin:null}]);assert.ok(missing.includes('毛利率尚未取得'));assert.ok(!missing.includes('NaN'));
 });
 test('only highest known gross is outside collapsed sources, even when all offers lose money',()=>{
- const html=render([{...row,source_title:'unknown',gross_twd:null},{...row,source_url:'https://example.com/loss',source_title:'larger loss',gross_twd:'-200'},{...row,source_url:'https://example.com/best',source_title:'best offer',gross_twd:'-20'}]);
+ const rows=[{...row,source_title:'unknown',gross_twd:null},{...row,source_url:'https://example.com/loss',source_title:'larger loss',gross_twd:'-200'},{...row,source_url:'https://example.com/best',source_title:'best offer',gross_twd:'-20'}];
+ const html=render(rows);
  const [visible,collapsed]=html.split('<details>');
  assert.ok(visible.includes('best offer'));assert.ok(!visible.includes('larger loss'));assert.ok(!visible.includes('>unknown ↗</a>'));
- assert.ok(collapsed.includes('展開其餘 2 個賣場'));assert.ok(collapsed.indexOf('larger loss')<collapsed.indexOf('>unknown ↗</a>'));
+ assert.ok(collapsed.includes('展開其餘 2 個賣場'));
+ // Collapsed cards are not built until the list is opened; their order comes from sourceRows.
+ assert.ok(!collapsed.includes('larger loss'));assert.ok(!collapsed.includes('>unknown ↗</a>'));
+ assert.deepEqual(exports.sourceRows(rows).map(r=>r.source_title),['best offer','larger loss','unknown']);
  assert.ok(visible.includes('價差／毛利'));assert.ok(visible.includes('<small>毛利率</small><b>—</b>'));
 });
 test('source action shows readiness and disables while locked or market missing',()=>{
@@ -66,7 +70,8 @@ test('margin sorting promotes the highest percentage, not the largest gross amou
  const rows=[{...row,source_title:'large amount',gross_twd:'500',gross_margin:0.1},{...row,source_url:'https://example.com/rate',source_title:'best percentage',gross_twd:'100',gross_margin:0.5}];
  const html=renderToStaticMarkup(React.createElement(exports.default,{rows,sortBy:'margin'}));
  const [visible,collapsed]=html.split('<details>');
- assert.ok(visible.includes('best percentage'));assert.ok(!visible.includes('large amount'));assert.ok(collapsed.includes('large amount'));
+ assert.ok(visible.includes('best percentage'));assert.ok(!visible.includes('large amount'));assert.ok(collapsed.includes('展開其餘 1 個賣場'));
+ assert.deepEqual(exports.sourceRows(rows,'margin').map(r=>r.source_title),['best percentage','large amount']);
  assert.ok(visible.includes('預估毛利率由高到低'));
  assert.ok(render(rows).split('<details>')[0].includes('large amount'));
 });
@@ -87,4 +92,14 @@ test('a full purchase list blocks adding without disabling source review',()=>{
  const html=renderToStaticMarkup(React.createElement(exports.default,{rows:[{...row,has_market:true}],onAction:()=>{},onPurchase:()=>{},purchaseLocked:true}));
  assert.match(html,/<button[^>]*disabled=""[^>]*>加入採購清單/);
  assert.match(html,/<button type="button" class="btn secondary">核對貨源/);
+});
+
+test('shared formatters keep the exact timestamp and amount text',()=>{
+ const stamp='2026-10-29T18:05:00+00:00';
+ assert.equal(prices.taipeiTime(stamp),new Date(stamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}));
+ assert.equal(prices.marketTimestamp({market_at:stamp}),prices.taipeiTime(stamp));
+ assert.equal(prices.sourceTimestamp({source_at:'not a date'}),'時間未取得');
+ const html=render([{...row,source_price:'12345.678',gross_twd:'-1125.5'}]);
+ assert.ok(html.includes('TWD '+Number('12345.678').toLocaleString('zh-TW',{maximumFractionDigits:2})));
+ assert.ok(html.includes('NT$ '+Number('-1125.5').toLocaleString('zh-TW',{maximumFractionDigits:2})));
 });

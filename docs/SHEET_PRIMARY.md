@@ -32,7 +32,7 @@ Chrome 正式頁加入既有 Yahoo TW 商品（6967698／101758319812），Sheet
 
 舊資料庫與舊程式僅暫留作遷移回復備份，不再被正式服務讀寫。不要直接切回舊庫，否則會遺失切換後已寫進 Sheet 的資料；回復前必須匯回新資料並再核對。
 
-自動化調用請讀 `SIMPLES_Data_` 原始分頁：貨源用 platform_candidates，版本用 releases，歷史行情與 Want/Have 用 snapshots，反查結果用 version_searches，採購用 purchase_items，上架用 listing_drafts/published_listings。其他分頁保留抓取進度與審閱紀錄。分頁列數不是唯一可套利商品數。
+評分紀錄（scores）自 2026-10-30 起每個版本只保留最近 30 筆。自動化調用請讀 `SIMPLES_Data_` 原始分頁：貨源用 platform_candidates，版本用 releases，歷史行情與 Want/Have 用 snapshots，反查結果用 version_searches，採購用 purchase_items，上架用 listing_drafts/published_listings。其他分頁保留抓取進度與審閱紀錄。分頁列數不是唯一可套利商品數。
 
 
 正式批次 #91（10:30–10:39）已完成，狀態 partial：反查20件、沿用1208件快取、更新20筆行情；貨源刷新26件中25件成功，Tower 3012920 因 title_changed 保留失敗，不硬套原商品。分析 Sheet 同步成功143行。獨立直接讀原始 Sheet：source_checks=1231、snapshots=301、scores=6979、jobs=91，且工作完成明細已存在 Sheet；這些讀回證明新資料不是只存在服務記憶體。沒有新匹配不代表流程失敗；本輪20件均為 unmatched，保留供日後增量比對。

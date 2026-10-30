@@ -24,9 +24,15 @@ export function marketFreshness(row:Comparison,now=Date.now()):'fresh'|'stale'|'
  if(!Number.isFinite(age)||age<0)return 'unknown';
  return age<=48*60*60*1000?'fresh':'stale';
 }
+// One shared formatter: toLocaleString with options builds a new one on every call, which dominated card rendering.
+let taipeiFormat:Intl.DateTimeFormat|undefined;
+export function taipeiTime(stamp:string){
+ taipeiFormat??=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+ return taipeiFormat.format(new Date(stamp));
+}
 export function marketTimestamp(row:Comparison){
  if(!row.market_at||!Number.isFinite(Date.parse(row.market_at)))return '時間未取得';
- return new Date(row.market_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+ return taipeiTime(row.market_at);
 }
 
 export function sourceFreshness(row:Comparison,now=Date.now()):'fresh'|'stale'|'unknown'{
@@ -37,7 +43,7 @@ export function sourceFreshness(row:Comparison,now=Date.now()):'fresh'|'stale'|'
 }
 export function sourceTimestamp(row:Comparison){
  const stamp=row.cost_basis==='confirmed_total'?row.cost_at:row.source_at;
- return stamp&&Number.isFinite(Date.parse(stamp))?new Date(stamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'時間未取得';
+ return stamp&&Number.isFinite(Date.parse(stamp))?taipeiTime(stamp):'時間未取得';
 }
 
 export function hasDemandAndSource(row:Comparison){

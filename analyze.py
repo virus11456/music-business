@@ -5,6 +5,9 @@ from config import money
 from db import connect, now, latest_decision
 from fx import convert,business_day
 
+# Only the newest score per release is ever read; keep a short history instead of one row per run forever.
+SCORE_HISTORY = 30
+
 def clamp(x):
     return max(0., min(1., x))
 
@@ -109,4 +112,7 @@ def run(settings):
               message=excluded.message,urgent=excluded.urgent,score=excluded.score,price=excluded.price,
               currency=excluded.currency,status='pending',updated_at=excluded.updated_at''',values)
             queued += 1
-    return {'scored':count,'queued':queued,'watch_hits':watch_hits}
+        pruned = c.execute('''DELETE FROM scores WHERE id IN (SELECT id FROM (SELECT id,
+            ROW_NUMBER() OVER (PARTITION BY release_id ORDER BY id DESC) AS position FROM scores) WHERE position>?)''',
+            (SCORE_HISTORY,)).rowcount
+    return {'scored':count,'queued':queued,'watch_hits':watch_hits,'scores_pruned':pruned}

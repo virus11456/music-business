@@ -1,10 +1,12 @@
+import {useState} from 'react';
 import MediaBadge from '@/components/media-badge';
 import {matchLabel} from '@/lib/match-evidence';
 import {sourceAvailability,supplyLabels} from '@/lib/source-availability';
 import {candidateProfit,marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp} from '@/lib/comparison-sort';
 import type {Comparison} from '@/components/comparison-table';
 const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
-const money=(value:string|null|undefined)=>value==null?'—':Number(value).toLocaleString('zh-TW',{maximumFractionDigits:2});
+let numberFormat:Intl.NumberFormat|undefined;
+const money=(value:string|null|undefined)=>value==null?'—':(numberFormat??=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:2})).format(Number(value));
 type Actions={purchaseLocked?:boolean;onPurchase?:(row:Comparison)=>void;purchaseKeys?:string[];locked?:boolean;onAction?:(row:Comparison)=>void};
 function Source({row:r,locked,onAction,onPurchase,purchaseKeys,purchaseLocked}:{row:Comparison}&Actions){
  let href:string|undefined;try{const url=new URL(r.source_url);if(['https:','http:'].includes(url.protocol))href=url.href}catch{/* Invalid links stay plain text. */}
@@ -29,7 +31,13 @@ function Source({row:r,locked,onAction,onPurchase,purchaseKeys,purchaseLocked}:{
   <div className="source-card-footer"><div className="source-cost-summary"><small className={netLoss?'net-summary loss':'net-summary'}>{netKnown?`扣已設定費用後：NT$ ${money(r.net_twd)}${netLoss?' · 估算虧損':''}`:'扣費後金額待取得'}</small><small className="source-cost-note">{r.cost_basis==='confirmed_total'?`採已確認總成本（${sourceTimestamp(r)} · ${freshness(sourceFreshness(r))}）`:'尚未扣除進貨運費'}；毛利尚未扣除平台費等營運費用</small></div>{onPurchase&&<button type="button" className="btn secondary" disabled={locked||purchaseLocked||purchaseKeys?.includes(r.key)} onClick={()=>onPurchase(r)}>{purchaseKeys?.includes(r.key)?'已加入採購清單':'加入採購清單'}</button>}{onAction&&<button type="button" className="btn secondary" disabled={locked||!r.has_market} onClick={()=>onAction(r)}>{r.ready?'建立草稿':'核對貨源'}</button>}</div>
  </div>;
 }
+/** One card per source, best estimate first; the order the cards are shown in. */
+export function sourceRows(rows:Comparison[],sortBy:'gross'|'margin'='gross'){
+ return [...new Map(rows.filter(r=>!r.excluded).map(r=>[r.source_url,r])).values()].sort((a,b)=>candidateProfit(b,sortBy)-candidateProfit(a,sortBy));
+}
 export default function RecordSources({rows,locked,onAction,onPurchase,purchaseKeys,purchaseLocked,sortBy='gross'}:{rows:Comparison[];sortBy?:'gross'|'margin'}&Actions){
- const unique=[...new Map(rows.filter(r=>!r.excluded).map(r=>[r.source_url,r])).values()].sort((a,b)=>candidateProfit(b,sortBy)-candidateProfit(a,sortBy));
- return <section className="record-sources" aria-label="對應進貨賣場"><h3>對應進貨賣場 · {unique.length} 件{unique.length>1?(sortBy==='margin'?' · 預估毛利率由高到低':' · 預估毛利由高到低'):''}</h3>{unique.length?<><Source row={unique[0]} locked={locked} onAction={onAction} onPurchase={onPurchase} purchaseKeys={purchaseKeys} purchaseLocked={purchaseLocked}/>{unique.length>1&&<details><summary>展開其餘 {unique.length-1} 個賣場</summary>{unique.slice(1).map(r=><Source key={r.source_url} row={r} locked={locked} onAction={onAction} onPurchase={onPurchase} purchaseKeys={purchaseKeys} purchaseLocked={purchaseLocked}/>)}</details>}</>:<p>尚未找到對應貨源，資料會保留等待後續比對。</p>}</section>;
+ // Collapsed cards are built only after the list is opened; some releases have hundreds of sources.
+ const [open,setOpen]=useState(false);
+ const unique=sourceRows(rows,sortBy);
+ return <section className="record-sources" aria-label="對應進貨賣場"><h3>對應進貨賣場 · {unique.length} 件{unique.length>1?(sortBy==='margin'?' · 預估毛利率由高到低':' · 預估毛利由高到低'):''}</h3>{unique.length?<><Source row={unique[0]} locked={locked} onAction={onAction} onPurchase={onPurchase} purchaseKeys={purchaseKeys} purchaseLocked={purchaseLocked}/>{unique.length>1&&<details open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary>展開其餘 {unique.length-1} 個賣場</summary>{open&&unique.slice(1).map(r=><Source key={r.source_url} row={r} locked={locked} onAction={onAction} onPurchase={onPurchase} purchaseKeys={purchaseKeys} purchaseLocked={purchaseLocked}/>)}</details>}</>:<p>尚未找到對應貨源，資料會保留等待後續比對。</p>}</section>;
 }
