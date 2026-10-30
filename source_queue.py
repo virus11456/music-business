@@ -144,7 +144,8 @@ def run(settings,query=None,selected=None,limit=20,source_platform=None):
     try:result['fx']=refresh_reference(settings)
     except Exception as exc:result['errors'].append({'step':'fx','error':type(exc).__name__})
     lap('fx')
-    analyze.run(settings)
+    # Keep the pruned count in the job record; it is the only trace of score-history deletion.
+    result['scores_pruned']=(analyze.run(settings) or {}).get('scores_pruned',0)
     lap('analyze')
     try:result['sheet_sync']=sheet_sync.sync(settings)
     except Exception as exc:result['errors'].append(__import__('sync_failure').report(exc))

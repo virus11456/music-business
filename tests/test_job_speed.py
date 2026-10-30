@@ -87,7 +87,7 @@ class ParallelCollectionTests(unittest.TestCase):
             return {'candidates':0 if failed else 3,'failed_platforms':int(failed),'platforms':[{'platform':selected[0],'count':3,'status':'failed' if failed else 'success','has_more':selected[0]=='tower'}]}
         with connect(self.s.db_path) as c:c.execute("INSERT INTO source_pages VALUES('Artist','yahoo_jp',4)")
         started=time.perf_counter()
-        with patch('source_queue.platforms.search',side_effect=search),patch('source_refresh.run',return_value={'failed':0,'missing':0}),patch('source_queue.analyze.run'),patch('source_queue.sheet_sync.sync',return_value={'synced':True}),patch('fx.refresh_reference',return_value={'cached':True}),patch('source_queue.DiscogsClient'):
+        with patch('source_queue.platforms.search',side_effect=search),patch('source_refresh.run',return_value={'failed':0,'missing':0}),patch('source_queue.analyze.run',return_value={'scored':2,'scores_pruned':7}),patch('source_queue.sheet_sync.sync',return_value={'synced':True}),patch('fx.refresh_reference',return_value={'cached':True}),patch('source_queue.DiscogsClient'):
             result=source_queue.run(self.s,'Artist',['tower','yahoo_jp','ruten'])
         elapsed=time.perf_counter()-started
         self.assertLess(elapsed,.5)
@@ -98,6 +98,7 @@ class ParallelCollectionTests(unittest.TestCase):
         self.assertEqual(pages,{'tower':2,'yahoo_jp':1})  # failed site keeps no page progress
         self.assertEqual(set(result['timings']),{'collect','source_refresh','reverse_match','market','fx','analyze','sheet_sync'})
         self.assertTrue(all(isinstance(v,float) and v>=0 for v in result['timings'].values()))
+        self.assertEqual(result['scores_pruned'],7)
 
 class WarmTests(unittest.TestCase):
     def test_warm_prepares_both_encoded_responses(self):
