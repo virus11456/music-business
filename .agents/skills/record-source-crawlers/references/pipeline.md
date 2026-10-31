@@ -38,7 +38,7 @@
 2. `demand_queue.run`：取最新快照 Want ≥ 50 且 Want/Have ≥ `DEMAND_MIN_RATIO`（2）的版本，依「歌手＋專輯名」合併為專輯；Discogs 無人在售者優先，再依最高比值、Want 排序；每晚最多 `DEMAND_ALBUMS`（100）張，同專輯 7 天內不重搜（meta `demand_search:*`）。每張專輯以 `sourcing.find_many` 對 Yahoo TW／JP、露天、Tower 搜一次（Rotten Blues 僅篩目錄單頁，不納入），對該專輯所有追蹤版本套用 `source_match.evidence`。本次回傳的商品寫入 source_checks（已配對 matched、其餘 unmatched，30 天），不進反查佇列；反查佇列已檢查過的商品保留原狀態。
 3. 重新評分與 Sheet 同步；結果含 scan／demand 統計與 `timings`（scan、demand、analyze、sheet_sync）。
 
-白天 10/16/22 反查每輪由 20 件提高為 60 件（`REVERSE_LIMIT`）；手動批次維持 1–40 件。`direct_matches.compute` 改用目錄號、條碼、歌手索引，只比對可能通過的組合，輸出與逐一比對相同（測試以舊迴圈對照）；3000 版本 × 4000 貨源由約 55 秒降為 0.7 秒。
+依名單找貨另排除 Discogs 在售數 ≥ `DEMAND_MAX_FOR_SALE`（10）的版本（供給充足、套利空間小）。白天 10/16/22 反查每輪由 20 件提高為 60 件（`REVERSE_LIMIT`）；手動批次維持 1–40 件。`direct_matches.compute` 改用目錄號、條碼、歌手索引，只比對可能通過的組合，輸出與逐一比對相同（測試以舊迴圈對照）；3000 版本 × 4000 貨源由約 55 秒降為 0.7 秒。
 
 ## Discogs 與 Sheets
 

@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 const require=createRequire(import.meta.url),cache={};
 function load(name){if(cache[name])return cache[name];const out=cache[name]={};new Function('require','exports',ts.transpileModule(readFileSync(new URL('../'+name,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>id==='@/components/ui/button'?{Button:props=>React.createElement('button',props)}:id.startsWith('@/')?load(id.slice(2)+(id.startsWith('@/components/')?'.tsx':'.ts')):require(id),out);return out;}
 const View=load('components/comparison-table.tsx').default;
-const row={market_at:new Date().toISOString(),source_at:new Date().toISOString(),want:10,format:'CD',source_format:'CD',gross_twd:'100',gross_margin:0.2,source_price:'500',source_currency:'TWD',market_price:'20',market_currency:'USD',issues:[],version_confirmed:false,has_market:true,offer:null,listing_status:'unlisted'};
+const row={market_at:new Date().toISOString(),source_at:new Date().toISOString(),want:10,format:'CD',source_format:'CD',gross_twd:'100',gross_margin:0.2,source_price:'500',source_currency:'TWD',market_price:'20',market_currency:'USD',issues:[],version_confirmed:false,source_catalog_no:'CAT-1',catalog_no:'CAT-1',has_market:true,offer:null,listing_status:'unlisted'};
 const render=n=>renderToStaticMarkup(React.createElement(View,{rows:Array.from({length:n},(_,i)=>({...row,key:String(i).padStart(4,'0'),source_title:'item-'+i,release_title:'Album',source_url:'https://example.com/'+i,release_id:i+1})),locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
 test('large comparison sets render at most 50 rows while preserving the total and pagination',()=>{
  const html=render(121),tbody=html.split('<tbody>')[1].split('</tbody>')[0];
@@ -37,4 +37,13 @@ test('listing status is an independent control and unknown rows are not labeled 
  const tbody=html.split('<tbody>')[1].split('</tbody>')[0];
  assert.ok(tbody.includes('<b>刊登狀態待確認</b>'));assert.ok(!tbody.includes('<b>未上架</b>'));
  const quality=html.split('aria-label="篩選配對"')[1].split('</select>')[0];assert.ok(!quality.includes('value="unlisted"'));
+});
+
+test('by default only catalogue- or barcode-matched or confirmed pairings are listed',()=>{
+ const base={...row,key:'k',release_title:'Album',source_url:'https://example.com/item',release_id:1};
+ const rows=[{...base,key:'catalog',source_title:'catalog-match'},{...base,key:'name',source_title:'name-only',source_catalog_no:'',catalog_no:'CAT-1'},
+  {...base,key:'confirmed',source_title:'confirmed-match',source_catalog_no:'',version_confirmed:true}];
+ const html=renderToStaticMarkup(React.createElement(View,{rows,locked:false,send:async()=>true,onReview:()=>{},onDraft:()=>{}}));
+ for(const t of ['catalog-match','confirmed-match','只看編號或條碼一致、已核對版本'])assert.ok(html.includes(t),t);
+ assert.ok(!html.includes('name-only'));
 });

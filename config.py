@@ -72,6 +72,8 @@ class Settings:
     scan_min_want: int = field(default_factory=lambda: int(os.getenv('SCAN_MIN_WANT') or '50'))
     demand_min_ratio: float = field(default_factory=lambda: float(os.getenv('DEMAND_MIN_RATIO') or '2'))
     demand_albums: int = field(default_factory=lambda: int(os.getenv('DEMAND_ALBUMS') or '100'))
+    # Versions with this many or more copies for sale on Discogs are left out of the nightly sourcing list.
+    demand_max_for_sale: int = field(default_factory=lambda: int(os.getenv('DEMAND_MAX_FOR_SALE') or '10'))
     scan_budget: int = field(default_factory=lambda: int(os.getenv('SCAN_REQUEST_BUDGET') or '600'))
     scan_max_new: int = field(default_factory=lambda: int(os.getenv('SCAN_MAX_NEW') or '150'))
     price_drop: float = field(default_factory=lambda: float(os.getenv('PRICE_DROP', '.20')))

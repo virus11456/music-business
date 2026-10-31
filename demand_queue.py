@@ -28,6 +28,7 @@ def scarcity(settings,min_want=None,min_ratio=None):
             JOIN snapshots s ON s.id=(SELECT id FROM snapshots WHERE release_id=r.release_id ORDER BY captured_at DESC LIMIT 1)''').fetchall()
     for r in rows:
         if r['want'] is None or r['have'] is None or r['want']<min_want:continue
+        if r['num_for_sale'] is not None and r['num_for_sale']>=settings.demand_max_for_sale:continue
         ratio=r['want']/max(r['have'],1)
         if ratio<min_ratio:continue
         key=album_key(r['artist'],r['title'])
