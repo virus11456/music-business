@@ -1,3 +1,11 @@
+## 2026-10-31 費用設定拆出 PayPal（本機實作，待部署：先後端後前端）
+
+費用原本只有一個「平台／收款合計費率」，無法表示 PayPal 每筆固定費。改為三項：Discogs 手續費率、PayPal 收款＋換匯費率、PayPal 每筆固定費（TWD），再加原有運費、包材、風險準備；比價、評分與進貨報價三處改用同一個 `config.fees`。參考值（設定頁顯示）：Discogs 手續費 2026 年報導為 9% 且含運費抽成；PayPal 台灣商業帳戶收海外款 4.40% + 每筆 US$0.30（約 NT$10），美元提領至台灣銀行另 2.5% 換匯，合計約 6.9% + NT$10（PayPal 台灣官方費用頁）。
+
+相容：之前儲存的設定沒有 PayPal 欄位，視為「合計費率已含 PayPal」，PayPal 兩欄以 0 計，部署後數字不變，需到「掃描與設定 → 費用與最低利潤」改填 Discogs 9%、PayPal 6.9%、NT$10 才生效。新的 Google Sheet Inputs 合計費率含 PayPal 百分比；既有工作表的 Inputs 屬使用者，不覆寫。
+
+驗證：PayPal 百分比與固定費使淨利精確減少、儲存後重啟仍保留、舊格式設定不重複計算、合計費率須小於 100% 與不可為負；後端離線 354 項、連線 18 項、前端 118 項、tsc、build 通過。
+
 ## 2026-10-31 正式部署 7d9108e、eBay 啟用並實測成功
 
 後端 21:36 以 48 個 .py 完整替換（manifest SHA256 e2f8220621aefcf557ff8c5f5cc81c143ab9f289375dd63e42c02996021518c1，備份 backups/full-20261031T133619Z）；`.env` 新增 `EBAY_VERIFICATION_TOKEN`（48 字元）與 `EBAY_DELETION_ENDPOINT`（備份 .env.bak-20261031T133557Z，權限 600 music）。正式自我測試 challenge 回 64 字元 challengeResponse。

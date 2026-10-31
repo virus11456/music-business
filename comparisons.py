@@ -172,7 +172,7 @@ def calculate(c,s,o,source,confirmed_offer,lookups=None):
  estimated_cost=cost if o['amount'] is not None else buy
  row.update(sale_twd=amount(sale),source_twd=amount(buy),cost_twd=amount(cost),spread_twd=amount(sale-buy) if sale is not None and buy is not None else None)
  if sale is not None and estimated_cost is not None and sale>0:
-  gross=sale-estimated_cost;fees=sale*s.fee_pct+s.shipping+s.packing+s.reserve;net=gross-fees
+  gross=sale-estimated_cost;fees=__import__('config').fees(s,sale);net=gross-fees
   row.update(gross_twd=amount(gross),gross_margin=float(gross/sale),fees_twd=amount(fees),net_twd=amount(net),net_margin=float(net/sale))
  if not o['version_confirmed']:issues.append('待核對版本')
  if o['amount'] is None:issues.append('依来源標價估算，未含進貨運費與代購費')

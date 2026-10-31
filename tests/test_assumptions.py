@@ -1,4 +1,5 @@
 import unittest,tempfile
+from decimal import Decimal
 from pathlib import Path
 from config import Settings
 from db import init,connect
@@ -28,3 +29,24 @@ class AssumptionTests(unittest.TestCase):
    with self.subTest(key=key),self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,key:value})
   self.assertEqual(self.app.state()['assumptions'],before)
   with connect(self.path) as c:self.assertIsNone(c.execute("SELECT 1 FROM meta WHERE key='business_assumptions'").fetchone())
+
+class PaymentFeeTests(AssumptionTests):
+ def test_paypal_percentage_and_fixed_fee_reduce_net(self):
+  from decimal import Decimal
+  self.app.mutate('/api/assumptions',self.values)
+  before=self.app.state()['workflow']['comparisons'][0]
+  self.app.mutate('/api/assumptions',{**self.values,'payment_pct':'.069','payment_fixed':'10'})
+  after=self.app.state()['workflow']['comparisons'][0]
+  sale=Decimal(after['sale_twd'])
+  self.assertEqual(Decimal(before['net_twd'])-Decimal(after['net_twd']),(sale*Decimal('.069')+10).quantize(Decimal('.01')))
+  self.assertEqual(Decimal(after['fees_twd']),(sale*Decimal('.169')+10+150).quantize(Decimal('.01')))
+  saved=Dashboard(Settings(db_path=self.path)).state()['assumptions']
+  self.assertEqual((saved['payment_pct'],saved['payment_fixed']),('0.069','10'))
+ def test_settings_saved_before_the_split_keep_their_combined_rate(self):
+  import json
+  with connect(self.path) as c:c.execute("INSERT OR REPLACE INTO meta VALUES('business_assumptions',?)",(json.dumps(self.values),))
+  s=Settings(db_path=self.path)
+  self.assertEqual((s.fee_pct,s.payment_pct,s.payment_fixed),(Decimal('.10'),0,0))
+ def test_combined_rate_must_stay_below_one_and_payment_not_negative(self):
+  for extra in ({'fee_pct':'.5','payment_pct':'.5'},{'payment_pct':'-0.01'},{'payment_fixed':'-1'}):
+   with self.subTest(extra=extra),self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,**extra})

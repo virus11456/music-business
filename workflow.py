@@ -76,7 +76,7 @@ def get_workflow(settings):
                     day=business_day()
                     sale,_=convert(c,row['sale_price'] or s['lowest_price'],row['sale_currency'] if row['sale_price'] else s['currency'],day)
                     purchase,_=convert(c,row['amount'],row['currency'],day)
-                    net=sale-purchase-sale*settings.fee_pct-settings.shipping-settings.packing-settings.reserve
+                    net=sale-purchase-__import__('config').fees(settings,sale)
                     offer.update(net_twd=str(net.quantize(money('.01'))),margin=float(net/sale) if sale>0 else None)
                     stale=(datetime.now(timezone.utc)-datetime.fromisoformat(s['captured_at'])).days>2
                     offer['status']='行情已過期' if stale else '待核對版本' if not row['version_confirmed'] else '待核對品相與售價' if net>0 else '暫無利潤'

@@ -33,7 +33,7 @@ def evaluate(c, s, settings, at=None):
             purchase, b = convert(c,cost['cost_amount'],cost['cost_currency'],business_day(at),settings.fx_max_age_days)
             fx_used = [a,b]
             if sale > 0:
-                net = sale-purchase-sale*settings.fee_pct-settings.shipping-settings.packing-settings.reserve
+                net = sale-purchase-__import__('config').fees(settings,sale)
                 margin = float(net/sale)
         except ValueError as exc:
             warnings.append(str(exc)+'：不計算淨利')
@@ -61,8 +61,8 @@ def evaluate(c, s, settings, at=None):
     return {'score':score,'parts':parts,'weights':settings.weights,'ratio':ratio,'liquidity':liquid,
             'net_twd':str(net.quantize(money('.01'))) if net is not None else None,
             'margin':margin,'drop_7d':drop,'rules':rules,'warnings':warnings,'fx':fx_used,
-            'assumptions':{'fee_pct':str(settings.fee_pct),'shipping':str(settings.shipping),
-                           'packing':str(settings.packing),'reserve':str(settings.reserve)},'stale':stale}
+            'assumptions':{'fee_pct':str(settings.fee_pct),'payment_pct':str(settings.payment_pct),'payment_fixed':str(settings.payment_fixed),
+                           'shipping':str(settings.shipping),'packing':str(settings.packing),'reserve':str(settings.reserve)},'stale':stale}
 
 def message(release, s, result):
     return (f"SIMPLES 選品提醒｜{result['score']} 分\n{release['artist']} — {release['title']}\n"

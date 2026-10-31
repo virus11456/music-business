@@ -34,8 +34,17 @@ def business_values(data):
     fields=('fee_pct','shipping','packing','reserve','min_margin')
     if any(k not in data for k in fields):raise ValueError('請填齊所有費用設定')
     result={k:money(data[k]) for k in fields}
-    if result['fee_pct']>=1 or result['min_margin']>1:raise ValueError('費率須小於 100%，最低淨利率不可超過 100%')
+    # Saved settings from before the PayPal split have no payment fields: their fee_pct was the combined rate,
+    # so the payment part reads as zero instead of being counted twice.
+    for k in ('payment_pct','payment_fixed'):result[k]=money(data.get(k) or 0)
+    if result['fee_pct']+result['payment_pct']>=1 or result['min_margin']>1:raise ValueError('費率合計須小於 100%，最低淨利率不可超過 100%')
+    if min(result.values())<0:raise ValueError('費用設定不可為負數')
     return result
+
+def fees(settings, sale):
+    """Selling costs in TWD for one item sold at `sale` TWD: Discogs fee, PayPal percentage (receiving and
+    conversion) and fixed fee, shipping, packing and risk reserve."""
+    return sale*(settings.fee_pct+settings.payment_pct)+settings.payment_fixed+settings.shipping+settings.packing+settings.reserve
 
 @dataclass
 class Settings:
@@ -44,6 +53,9 @@ class Settings:
     user_agent: str = field(default_factory=lambda: os.getenv('DISCOGS_USER_AGENT', 'SimplesRecordResearch/0.1'))
     currency: str = field(default_factory=lambda: os.getenv('MARKET_CURRENCY', 'USD').upper())
     fee_pct: Decimal = field(default_factory=lambda: money(os.getenv('TOTAL_FEE_PCT', '0.12')))
+    # PayPal: percentage of the sale (receiving + currency conversion) and a fixed fee per order in TWD.
+    payment_pct: Decimal = field(default_factory=lambda: money(os.getenv('PAYMENT_FEE_PCT') or '0'))
+    payment_fixed: Decimal = field(default_factory=lambda: money(os.getenv('PAYMENT_FIXED_TWD') or '0'))
     shipping: Decimal = field(default_factory=lambda: money(os.getenv('SHIPPING_COST_TWD', '600')))
     packing: Decimal = field(default_factory=lambda: money(os.getenv('PACKING_COST_TWD', '50')))
     reserve: Decimal = field(default_factory=lambda: money(os.getenv('RISK_RESERVE_TWD', '0')))
@@ -84,7 +96,7 @@ class Settings:
                     if row:
                         for key,value in business_values(json.loads(row[0])).items():
                             setattr(self,key,float(value) if key=='min_margin' else value)
-        if not 0 <= self.fee_pct < 1 or not 0 <= self.min_margin <= 1:
+        if not 0 <= self.fee_pct+self.payment_pct < 1 or self.payment_pct < 0 or self.payment_fixed < 0 or not 0 <= self.min_margin <= 1:
             raise ValueError('費率與淨利率門檻必須介於 0 與 1')
         if len(self.weights) != 4 or abs(sum(self.weights) - 1) > 1e-9:
             raise ValueError('四個權重的總和必須為 1')
