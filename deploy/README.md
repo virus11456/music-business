@@ -1,3 +1,9 @@
+## 2026-10-31 Discogs 帳號停權解除（正式 API 唯讀驗證）
+
+VPS srv1542946 以正式 token 檢查：`/oauth/identity` 200（PinnacleRecords）；`/users/PinnacleRecords/inventory` 200、362 筆刊登（10/30 仍為 403 suspended）；對 `/marketplace/listings` 送出刻意缺欄位的空內容得 422「Invalid release_id」，表示上架端點已進入欄位檢查，帳號具上架權限，未建立任何商品。公開庫存另可見 347 件 For Sale。未修改 .env、未開啟 `DISCOGS_LISTING_WRITE`、未重啟服務。
+
+尚未完成：系統內的庫存讀回（`POST /api/inventory/sync`）尚未對這個帳號跑過，362 筆刊登與本系統紀錄的關聯未驗證；系統上架仍關閉，正式送出一件商品並讀回核對前不宣稱上架流程已驗收。
+
 ## 2026-10-31 正式部署 6db41ce（後端）
 
 main 經發布守門於 10/31 00:07 fast-forward 至 6db41ce（PR #8），Vercel 當日 0 次。後端 00:08 以 45 個 .py 完整替換（manifest SHA256 fc3b17613479884cc7412ae049b8642cf809b68e2955d439045a3940c3391bdc，備份 backups/full-20261030T160851Z 為 06a4151）。部署後外部量測 `/api/state` 伺服器 12–35 毫秒命中快取，瀏覽器帶 ETag 仍回 304。
