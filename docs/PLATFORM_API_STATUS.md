@@ -10,8 +10,8 @@
 | Yahoo 日本拍賣 | 解析公開搜尋頁 | 舊 Auction Web API 已於 2018-02-22 結束；不可拿 Shopping API 當拍賣 API |
 | 露天 | 使用網站前端查詢與商品明細介面 | 有官方 Open API 廠商規格與申請金鑰流程；全站其他賣家搜尋的授權範圍待確認 |
 | Tower | 解析公開搜尋頁 | 尚未找到公開可申請的商品搜尋 API |
-| 日本樂天市場 | 尚未接通 | 有官方 Ichiba Item Search API，最新查核版本 2026-07-01，需自己的 applicationId 與 accessKey |
-| eBay | 尚未接通 | 有官方 Browse API，支援關鍵字與商品資料查詢，需要開發者應用程式憑證及 application token，正式權限依帳號與 API 規則確認 |
+| 日本樂天市場 | 2026-10-31 已接官方 Ichiba 商品搜尋 API（待正式實測） | 有官方 Ichiba Item Search API，最新查核版本 2026-07-01，需自己的 applicationId 與 accessKey |
+| eBay | 2026-10-31 已接官方 Browse API（待正式實測） | 有官方 Browse API，支援關鍵字與商品資料查詢，需要開發者應用程式憑證及 application token，正式權限依帳號與 API 規則確認 |
 | Mercari | 尚未接通 | 找到 Mercari Shops API，products 限自己的店鋪；不能作為全站個人二手市場搜尋的證據 |
 | Disk Union、HMV 中古、Record City | 只有通路連結，未接通 | 公開全站搜尋 API 尚未確認 |
 

@@ -52,6 +52,11 @@ class Settings:
     max_supply: int = field(default_factory=lambda: int(os.getenv('MAX_SUPPLY', '3')))
     # Demand scan and demand-first sourcing: Want floor, Want/Have floor, albums per night, Discogs calls per night.
     # An empty value (as copied from .env.example) means the default.
+    # Official marketplace APIs; empty means the platform reports a missing key instead of searching.
+    rakuten_app_id: str = field(default_factory=lambda: os.getenv('RAKUTEN_APPLICATION_ID', ''))
+    rakuten_access_key: str = field(default_factory=lambda: os.getenv('RAKUTEN_ACCESS_KEY', ''))
+    ebay_client_id: str = field(default_factory=lambda: os.getenv('EBAY_CLIENT_ID', ''))
+    ebay_client_secret: str = field(default_factory=lambda: os.getenv('EBAY_CLIENT_SECRET', ''))
     scan_min_want: int = field(default_factory=lambda: int(os.getenv('SCAN_MIN_WANT') or '50'))
     demand_min_ratio: float = field(default_factory=lambda: float(os.getenv('DEMAND_MIN_RATIO') or '2'))
     demand_albums: int = field(default_factory=lambda: int(os.getenv('DEMAND_ALBUMS') or '100'))

@@ -87,3 +87,15 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 正式驗收補記：VPS 的首頁解析40件（Vinyl 5、CD 32、Cassette 3）；首件 variant 53256229159093 目錄 TWD1290 與 .js 分價換算1290一致，名稱與預購狀態一致。後端6檔部署至既有服務，仍為 Google Sheet 主資料，無第二程序。Vercel HaA5u8xkteadS4ccR4vGaoQoSzTp 成功。
 
 正式工作 #92 已收集40件並寫入 Sheet；獨立讀回 platform_candidates 確認40筆、同一格式數量與前兩筆價格／預購狀態。source_topics 已保存「Rotten Blues 全部唱片」及 rottenblues，source_pages 的 next_page=2。Chrome正式網站已顯示新平台選項、保存主題、40筆收集成功紀錄及商品；不是只有本機測試。排程仍啟用每日10/16/22，依既有主題與待比對佇列輪替，並不保證每時段輪到新來源。#92 後續反查仍在執行（驗收時總待首次檢查72件），不宣稱這40件已全部匹配Discogs或有正毛利。
+
+## 2026-10-31 樂天市場（rakuten）與 eBay（ebay）官方 API
+
+實作在 `api_sources.py`，由 `platforms.search` 以 `api_sources.request` 產生帶認證標頭的 `Request` 交給同一個 `fetch`，再由 `api_sources.parse` 轉成共用的 platform_candidates 欄位；`PARSERS` 已含兩者，伺服器平台驗證與前端選單自動支援。
+
+- 樂天：`https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701`，`applicationId` 在查詢參數、`accessKey` 放標頭（不進網址）；`keyword` 依 UTF-8 截到 128 bytes，`hits=30`、`formatVersion=2`、`availability=1`（只要可購買）。頁數 1–100，`pageCount` 決定 has_more。商品 ID 用 `itemCode`（允許 `:`），連結限 `*.rakuten.co.jp` HTTPS；JPY 標價，`availability` 1 為有庫存、0 為缺貨。後台設定允許 IP 為 VPS（72.60.110.37），其他主機呼叫會被拒。
+- eBay：Client Credentials 取得應用程式 token（`api_scope`），快取到到期前 60 秒；`/buy/browse/v1/item_summary/search` 限音樂分類 `category_ids=11233`、`X-EBAY-C-MARKETPLACE-ID: EBAY_US`、每頁 40、offset 上限 9950。ID 用 `legacyItemId`（無則取 `itemId` 中段），連結限 `*.ebay.com` HTTPS；有 FIXED_PRICE 為標價與有庫存，只有 AUCTION 時用 `currentBidPrice`、標為拍賣中。幣別依回應（通常 USD）。
+- 金鑰：`.env` 的 `RAKUTEN_APPLICATION_ID`、`RAKUTEN_ACCESS_KEY`、`EBAY_CLIENT_ID`、`EBAY_CLIENT_SECRET`；缺少時該平台記為讀取失敗，不影響其他平台。
+- 夜間依名單找貨（`demand_queue.PLATFORMS`）已含兩者。已存商品的報價刷新（source_refresh）尚未支援這兩個平台：48 小時後在「只看近 48 小時」篩選中會被隱藏，直到同專輯 7 天後再被搜尋。
+- 格式由標題判定（`source_match.identified_format`）；樂天標題常見「レコード」但未納入黑膠關鍵字（會誤判唱片公司字樣），只有含 LP／アナログ等才辨識。
+
+測試：`tests/test_api_sources.py`（解析、金鑰位置、token 快取、請求參數、整合搜尋）。正式驗收需在 VPS 實際搜尋並回讀，fixture 不代表 API 可用。

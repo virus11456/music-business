@@ -12,7 +12,7 @@ import source_queue
 PREFIX='demand_search:'
 RECENT=timedelta(days=7)
 # Rotten Blues search only filters one catalogue page, so an album query there finds almost nothing.
-PLATFORMS=['yahoo_tw','yahoo_jp','ruten','tower']
+PLATFORMS=['yahoo_tw','yahoo_jp','ruten','tower','rakuten','ebay']
 
 def album_key(artist,title):
     text=unicodedata.normalize('NFKC',f'{artist or ""}|{title or ""}').casefold()

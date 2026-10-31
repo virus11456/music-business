@@ -4,7 +4,7 @@ import {matchLabel} from '@/lib/match-evidence';
 import {sourceAvailability,supplyLabels} from '@/lib/source-availability';
 import {candidateProfit,marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp} from '@/lib/comparison-sort';
 import type {Comparison} from '@/components/comparison-table';
-const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片'};
+const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片',rakuten:'樂天市場',ebay:'eBay'};
 let numberFormat:Intl.NumberFormat|undefined;
 const money=(value:string|null|undefined)=>value==null?'—':(numberFormat??=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:2})).format(Number(value));
 type Actions={purchaseLocked?:boolean;onPurchase?:(row:Comparison)=>void;purchaseKeys?:string[];locked?:boolean;onAction?:(row:Comparison)=>void};

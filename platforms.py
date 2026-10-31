@@ -17,7 +17,8 @@ CATALOG=[
  {'id':'ruten','name':'露天市集','url':'https://www.ruten.com.tw/','supported':True},
  {'id':'rottenblues','name':'Rotten Blues 爛調唱片','url':'https://www.rottenblues.com/','supported':True},
  {'id':'mercari','name':'Mercari 日本','url':'https://jp.mercari.com/','supported':False},
- {'id':'rakuten','name':'樂天市場日本','url':'https://www.rakuten.co.jp/','supported':False},
+ {'id':'rakuten','name':'樂天市場日本','url':'https://www.rakuten.co.jp/','supported':True},
+ {'id':'ebay','name':'eBay','url':'https://www.ebay.com/','supported':True},
  {'id':'diskunion','name':'Disk Union 專業唱片通路','url':'https://diskunion.net/','supported':False},
  {'id':'hmv','name':'HMV 日本中古唱片','url':'https://www.hmv.co.jp/used/','supported':False},
  {'id':'recordcity','name':'Record City 專業唱片通路','url':'https://www.recordcity.jp/en/','supported':False},
@@ -135,7 +136,13 @@ def parse_ruten(raw):
 def parse_rottenblues(raw):
  return __import__('rottenblues').parse_catalog(raw)[0]
 
-PARSERS={'rottenblues':parse_rottenblues,'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten}
+def parse_rakuten(raw):
+ return __import__('api_sources').parse('rakuten',raw)[0]
+
+def parse_ebay(raw):
+ return __import__('api_sources').parse('ebay',raw)[0]
+
+PARSERS={'rottenblues':parse_rottenblues,'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten,'rakuten':parse_rakuten,'ebay':parse_ebay}
 def search_url(platform,query,page=1):
  q=quote(query,safe='')
  if not isinstance(page,int) or not 1<=page<=1000:raise ValueError('搜尋頁數無效')
@@ -146,7 +153,9 @@ def search_url(platform,query,page=1):
          'ruten':f'https://rtapi.ruten.com.tw/api/search/v4/index.php/core/prod?q={q}&type=direct&sort=rnk%2Fdc&limit=40&offset={(page-1)*40+1}'}[platform]
 
 def fetch(url):
- req=Request(url,headers={'User-Agent':'SimplesRecordResearch/0.1','Accept':'text/html'})
+ # Official APIs pass a prepared Request (with their own auth headers); sites pass a URL.
+ req=url if isinstance(url,Request) else Request(url,headers={'User-Agent':'SimplesRecordResearch/0.1','Accept':'text/html'})
+ url=req.full_url
  opener=urlopen
  if urlsplit(url).hostname=='tw.bid.yahoo.com':
   from yahoo_transport import open_yahoo
@@ -169,7 +178,8 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
     from datetime import datetime,timezone
     elapsed=(datetime.now(timezone.utc)-datetime.fromisoformat(previous[0])).total_seconds()
     if elapsed<3:time.sleep(3-elapsed)
-   raw=fetcher(search_url(platform,query,page))
+   api=platform in __import__('api_sources').PLATFORMS
+   raw=fetcher(__import__('api_sources').request(settings,platform,query,page) if api else search_url(platform,query,page))
    if platform=='ruten':
     hits=json.loads(raw)['Rows']
     ids=[str(h['Id']) for h in hits[:40]]
@@ -180,6 +190,7 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
     else:raw='[]'
    more=None
    if platform=='rottenblues':rows,more=__import__('rottenblues').parse_catalog(raw,query)
+   elif api:rows,more=__import__('api_sources').parse(platform,raw,page)
    else:rows=PARSERS[platform](raw)[:50 if platform=='yahoo_jp' and (page>1 or full_page) else 40]
    total_pages=tower_pages(raw) if platform=='tower' and full_page else None
    if platform=='tower' and full_page and total_pages is None:raise ValueError('Tower 分頁結構改變，停止推進頁碼')
@@ -196,7 +207,7 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
     c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,len(rows),'完成' if rows else '沒有符合商品',stamp))
    total+=len(rows)
    report={'platform':platform,'count':len(rows),'status':'success' if rows else 'empty'}
-   if more is not None:report.update(has_more=more,search_scope='catalog_page')
+   if more is not None:report.update(has_more=more,**({} if api else {'search_scope':'catalog_page'}))
    if total_pages is not None:report.update(has_more=page<total_pages,total_pages=total_pages)
    reports.append(report)
   except Exception as e:
