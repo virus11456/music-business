@@ -83,3 +83,11 @@ export function buildRecordIndex(rows:Comparison[],accept:(row:Comparison)=>bool
 export function hasPositiveMargin(row:Pick<Comparison,'gross_twd'|'gross_margin'>):boolean{
  return candidateProfit(row,'margin')>0&&candidateProfit(row,'gross')>0;
 }
+
+/** Want per Have: high means many collectors want it and few own it. Have 0 counts as 1 so a single Want is not infinite. */
+export function wantHaveRatio(want:unknown,have:unknown):number|null{
+ if(want===null||want===undefined||have===null||have===undefined||String(want).trim()===''||String(have).trim()==='')return null;
+ const w=Number(want),h=Number(have);
+ return Number.isFinite(w)&&Number.isFinite(h)&&w>=0&&h>=0?w/Math.max(h,1):null;
+}
+export function ratioLabel(ratio:number|null){return ratio===null?'—':ratio>=10?ratio.toFixed(0):ratio.toFixed(1)}

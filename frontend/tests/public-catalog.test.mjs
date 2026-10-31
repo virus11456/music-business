@@ -19,3 +19,11 @@ test('public catalogue hides losses and conflicting formats while preserving the
  const rows=[{...row,source_format:'Vinyl'},{...row,key:'negative',gross_twd:'-1',gross_margin:-.1}];
  const before=JSON.stringify(rows),html=render(rows);assert.ok(html.includes('目前沒有符合條件的唱片'));assert.equal(JSON.stringify(rows),before);
 });
+
+test('public catalogue can rank by Want/Have and shows Have with the ratio',()=>{
+ const View2=load('components/public-catalog.tsx').default;
+ const records=[{release_id:1,artist:'Common',title:'Owned',format:'CD'},{release_id:2,artist:'Scarce',title:'Wanted',format:'CD'}];
+ const rows=[{...row,want:300,have:600},{...row,key:'candidate-2',release_id:2,want:90,have:2,source_url:'https://example.com/item2'}];
+ const html=renderToStaticMarkup(React.createElement(View2,{records,rows,login:null,onLogin:()=>{},error:'',onRefresh:()=>{}}));
+ for(const text of ['Have 600 人','比值 0.5','Have 2 人','比值 45','Want／Have 比'])assert.ok(html.includes(text),text);
+});

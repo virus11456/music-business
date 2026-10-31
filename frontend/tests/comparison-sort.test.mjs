@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {hasPositiveMargin,buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {hasPositiveMargin,buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison,wantHaveRatio,ratioLabel}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -100,4 +100,12 @@ test('positive-margin shortlist excludes losses zero and missing values before r
  const rows=[base,{...base,release_id:2,gross_twd:'200',gross_margin:.1},{...base,release_id:3,gross_twd:'300',gross_margin:-.1}];
  const index=buildRecordIndex(rows,hasPositiveMargin);
  assert.deepEqual([...index.keys()].sort((a,b)=>index.get(b).bestGross-index.get(a).bestGross),[2,1]);
+});
+
+test('Want/Have ratio treats Have 0 as 1 and rejects missing or invalid counts',()=>{
+ assert.equal(wantHaveRatio(318,1),318);
+ assert.equal(wantHaveRatio(87,0),87);
+ assert.equal(wantHaveRatio(150,300),.5);
+ for(const [w,h] of [[null,1],[1,null],[undefined,1],['',2],[5,-1],['x',1]])assert.equal(wantHaveRatio(w,h),null);
+ assert.equal(ratioLabel(null),'—');assert.equal(ratioLabel(2.345),'2.3');assert.equal(ratioLabel(25.45),'25');
 });

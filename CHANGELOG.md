@@ -1,3 +1,11 @@
+## 2026-10-31 Want／Have 比排序（本機實作，待部署前端）
+
+公開目錄與管理者唱片清單新增排序「Want／Have 比：高到低」，每張唱片顯示 Want、Have 與比值（Want ÷ Have，Have 為 0 時以 1 計，避免單一 Want 變成無限大；缺值排最後，同比值依 Want 多到少）。Want／Have 來自 Discogs 版本的收藏數字，比值高代表想要的人多、擁有的人少，不代表成交價或實際銷量。只動前端；後端原本就提供 have。
+
+範圍：這兩個清單仍只列「已配對且毛利為正」的唱片（公開目錄正式資料 79 張），尚未涵蓋全部 362 個追蹤版本。以比值名單反向找貨（需求優先批次）待樂天／eBay API 金鑰到位後實作。
+
+驗證：比值計算與顯示新增 2 項測試，前端 119 項、tsc、build 通過。以本機建置版本掛在正式網址、讀正式 API，在 Chromium 切換新排序，前幾名為 Rubber Soul 日版 CD 2011（Want 318／Have 1）、同版另一張（323／2）、2014（253／2）、Casiopea Mint Jams 1991（286／8），與 API 計算一致。正式網站尚未部署。
+
 ## 2026-10-31 Discogs 帳號停權解除（正式 API 唯讀驗證）
 
 VPS srv1542946 以正式 token 檢查：`/oauth/identity` 200（PinnacleRecords）；`/users/PinnacleRecords/inventory` 200、362 筆刊登（10/30 仍為 403 suspended）；對 `/marketplace/listings` 送出刻意缺欄位的空內容得 422「Invalid release_id」，表示上架端點已進入欄位檢查，帳號具上架權限，未建立任何商品。公開庫存另可見 347 件 For Sale。未修改 .env、未開啟 `DISCOGS_LISTING_WRITE`、未重啟服務。
