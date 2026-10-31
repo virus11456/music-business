@@ -133,6 +133,23 @@ class DashboardTests(unittest.TestCase):
             urlopen(self.url+f"/api/drafts/quicklister?currency=JPY&id={draft['id']}")
         self.assertEqual(err.exception.code,400);err.exception.close()
 
+    def test_ebay_account_deletion_challenge_and_notice(self):
+        import hashlib,os
+        from unittest.mock import patch
+        with self.assertRaises(HTTPError) as error:urlopen(self.url+'/api/ebay/account-deletion?challenge_code=abc')
+        self.assertEqual(error.exception.code,404);error.exception.close()  # not configured
+        token='t'*40;endpoint='https://srv1542946.hstgr.cloud/api/ebay/account-deletion'
+        with patch.dict(os.environ,{'EBAY_VERIFICATION_TOKEN':token,'EBAY_DELETION_ENDPOINT':endpoint}):
+            with urlopen(self.url+'/api/ebay/account-deletion?challenge_code=a8628072-3d33-45ee-9004-bee86830a22d') as r:
+                self.assertEqual(r.headers['Content-Type'],'application/json')
+                expected=hashlib.sha256(('a8628072-3d33-45ee-9004-bee86830a22d'+token+endpoint).encode()).hexdigest()
+                self.assertEqual(json.loads(r.read()),{'challengeResponse':expected})
+            notice=json.dumps({'metadata':{'topic':'MARKETPLACE_ACCOUNT_DELETION'},'notification':{'data':{'username':'x','userId':'y'}}}).encode()
+            with urlopen(Request(self.url+'/api/ebay/account-deletion',data=notice,headers={'Content-Type':'application/json'})) as r:
+                self.assertEqual(r.status,204)  # no session, no CSRF: eBay posts it directly
+            with self.assertRaises(HTTPError) as error:urlopen(self.url+'/api/ebay/account-deletion?challenge_code=%3Cscript%3E')
+            self.assertEqual(error.exception.code,400);error.exception.close()
+
     def test_history_endpoint_returns_one_release_and_rejects_bad_ids(self):
         with urlopen(self.url+'/api/history?release_id=900000001') as r:
             data=json.loads(r.read())

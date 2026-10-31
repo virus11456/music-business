@@ -3,6 +3,7 @@ from fx import business_day
 import argparse
 import gzip
 import hashlib
+import re
 import json
 import secrets
 import sqlite3
@@ -463,7 +464,24 @@ def handler(dashboard):
             self.end_headers()
             self.wfile.write(body)
 
+        def ebay_deletion(self,method):
+            """eBay's account-deletion callback: unauthenticated by design, answers the challenge or acknowledges."""
+            import ebay_notifications
+            config=ebay_notifications.configured()
+            if not config:return self.respond(404,{'error':'找不到頁面'})
+            if method=='GET':
+                code=parse_qs(urlsplit(self.path).query).get('challenge_code',[''])[0]
+                if not re.fullmatch(r'[A-Za-z0-9_-]{1,200}',code):return self.respond(400,{'error':'challenge_code 無效'})
+                body=ebay_notifications.challenge_response(code,*config).encode()
+                self.send_response(200);self.send_header('Content-Type','application/json')
+                self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+            try:length=int(self.headers.get('Content-Length','0'))
+            except ValueError:length=0
+            if length>0:self.rfile.read(min(length,65536))  # No eBay user data is stored, so nothing to delete.
+            self.send_response(204);self.end_headers()
+
         def do_GET(self):
+            if urlsplit(self.path).path=='/api/ebay/account-deletion':return self.ebay_deletion('GET')
             # Nothing is readable without signing in, including the catalogue (anonymous /api/state is 401).
             if not self.authorized():return
             if urlsplit(self.path).path=='/api/drafts/quicklister':
@@ -505,6 +523,7 @@ def handler(dashboard):
                 self.respond(500,{'error':'資料讀取失敗，請檢查本機服務'})
 
         def do_POST(self):
+            if urlsplit(self.path).path=='/api/ebay/account-deletion':return self.ebay_deletion('POST')
             if self.path in ('/api/login','/api/account/reset'):
                 if not dashboard.access.token or self.headers.get('Origin')!=dashboard.access.origin or dashboard.access.allowed(self.headers)==403:
                     return self.respond(403,{'error':'不允許此來源連線'})

@@ -99,3 +99,4 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 - 格式由標題判定（`source_match.identified_format`）；樂天標題常見「レコード」但未納入黑膠關鍵字（會誤判唱片公司字樣），只有含 LP／アナログ等才辨識。
 
 測試：`tests/test_api_sources.py`（解析、金鑰位置、token 快取、請求參數、整合搜尋）。正式驗收需在 VPS 實際搜尋並回讀，fixture 不代表 API 可用。
+- 2026-10-31 補充：eBay Production keyset 建立時為 disabled，須先處理 Marketplace Account Deletion。本服務會保存 eBay 商品標題／價格／連結，不符合「Not persisting eBay data」豁免，改為訂閱通知：`GET /api/ebay/account-deletion?challenge_code=` 回 `{"challengeResponse": sha256(code+EBAY_VERIFICATION_TOKEN+EBAY_DELETION_ENDPOINT)}`（application/json），`POST` 同路徑直接回 204（未保存 eBay 使用者資料，無需刪除）。兩個環境變數未設定時回 404；此端點不需登入。啟用前 eBay 搜尋會回 401。

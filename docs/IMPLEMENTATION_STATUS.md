@@ -1,3 +1,11 @@
+## 2026-10-31 正式部署 e91b9d3、樂天實測成功；eBay 帳戶刪除通知端點（本機實作，待部署後端）
+
+**部署**：後端 21:18 以 47 個 .py 完整替換（manifest SHA256 47e5ed6145cbbabedffc165fa31b9ab3a8ac51707f7b07cde443ba03c06b5229，備份 backups/full-20261031T131813Z）；前端 Vercel dpl_FWFLvkDc5vvaERK2wP6Rfumx3Q7z，`version.json` 讀回 e91b9d3。手機版比價表卡片（2f2c2bd，dpl_4ivT9zWQr2WXMpUyPsSbGoUTNyfg）已於 20:25 上線。
+
+**正式實測（VPS 唯讀搜尋）**：樂天「カシオペア MINT JAMS」取得 11 筆（Joshin、HMV 等，JPY，連結正常）。eBay 回 HTTP 401：官方通知信指出 Production keyset 建立時為 disabled，須訂閱 Marketplace Account Deletion 通知或申請豁免後才啟用。
+
+**eBay 通知端點**：本服務保存 eBay 商品標題、價格與連結，不符合「不保存 eBay 資料」豁免，改為訂閱通知。新增 `GET /api/ebay/account-deletion?challenge_code=`，依 eBay 規格回 `challengeResponse = SHA-256(challenge code + 驗證 token + 端點網址)`（application/json）；`POST` 同路徑回 204 確認（未保存任何 eBay 使用者資料，無需刪除）。需在 `.env` 設定 `EBAY_VERIFICATION_TOKEN`（32–80 字）與 `EBAY_DELETION_ENDPOINT`（與 eBay 後台登記的網址完全一致），未設定時回 404。此端點不需登入。驗證：挑戰回應、通知確認、未設定與非法 challenge_code 測試；後端離線 348 項、連線 18 項通過。
+
 ## 2026-10-31 新增樂天市場與 eBay 官方 API 來源（本機實作，待部署：先後端後前端）
 
 使用者已在 VPS `.env` 存入樂天（Ichiba 商品搜尋）與 eBay（Browse，Production）金鑰。新增 `api_sources.py`：樂天以 `applicationId` 查詢參數＋`accessKey` 標頭呼叫 2026-07-01 版搜尋 API；eBay 以 Client Credentials 取得應用程式 token（快取至到期前 60 秒）後，在音樂分類（11233）、美國站搜尋。兩者轉成與既有平台相同的貨源欄位（樂天 JPY、eBay 依回應幣別，通常 USD；拍賣只有出價時標為拍賣中），接上手動跨平台搜尋、主題收集與夜間依名單找貨（每張專輯一次）。商品連結限官方網域 HTTPS；金鑰缺少時該平台記為失敗，不影響其他平台。
