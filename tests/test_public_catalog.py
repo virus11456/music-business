@@ -20,8 +20,8 @@ class PublicCatalogTests(unittest.TestCase):
   with patch.dict(os.environ,{'REMOTE_ACCESS_TOKEN':'x'*40,'FRONTEND_ORIGIN':'https://music-business.vercel.app','PUBLIC_API_ORIGIN':'https://api.example.com'}):access=RemoteAccess()
   app=SimpleNamespace(access=access,csrf='SECRET',state=self.fixture)
   h=object.__new__(handler(app));h.path=path;h.headers={'Host':host,'Origin':origin,'Authorization':auth};result=[];h.respond=lambda code,data:result.append((code,data));getattr(h,'do_'+method)();return result[0]
- def test_anonymous_can_read_only_catalogue(self):
-  code,data=self.request();self.assertEqual(code,200);self.assertFalse(data['permissions']['can_write'])
+ def test_anonymous_cannot_read_the_catalogue(self):
+  code,data=self.request();self.assertEqual(code,401);self.assertNotIn('records',data)
  def test_private_exports_and_writes_stay_blocked(self):
   for path in ['/api/drafts/export','/api/drafts/quicklister?id=1','/api/state?private=1']:
    self.assertEqual(self.request(path)[0],401)

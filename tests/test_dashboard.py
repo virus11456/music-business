@@ -152,11 +152,10 @@ class DashboardTests(unittest.TestCase):
         with urlopen(Request(self.url+'/api/state',headers=h,method='OPTIONS')) as r:
             self.assertEqual(r.status,204);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)
             self.assertIn('If-None-Match',r.headers['Access-Control-Allow-Headers'])
-        # Anonymous /api/state is the public catalogue; everything else needs the token.
-        with urlopen(Request(self.url+'/api/state',headers=h)) as r:
-            self.assertEqual(r.status,200);self.assertFalse(json.loads(r.read())['permissions']['can_write'])
-        with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+'/api/drafts/export',headers=h))
-        self.assertEqual(error.exception.code,401);error.exception.close()
+        # Nothing is readable without signing in, the catalogue included.
+        for path in ['/api/state','/api/drafts/export']:
+            with self.assertRaises(HTTPError) as error:urlopen(Request(self.url+path,headers=h))
+            self.assertEqual(error.exception.code,401);self.assertNotIn(b'records',error.exception.read());error.exception.close()
         for path in ['/api/state','/api/drafts/export']:
             with urlopen(Request(self.url+path,headers={**h,'Authorization':'Bearer '+token})) as r:
                 self.assertEqual(r.status,200);self.assertEqual(r.headers['Access-Control-Allow-Origin'],origin)

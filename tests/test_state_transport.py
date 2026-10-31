@@ -35,15 +35,11 @@ class TransportTests(unittest.TestCase):
   app.state=lambda:{**json.loads(json.dumps(STATE)),'active':{'name':'job'}}
   status,headers,body=FakeRequest(app,self.headers(**{'If-None-Match':etag})).run()
   self.assertEqual(status,200);self.assertNotEqual(headers['etag'],etag);self.assertEqual(json.loads(body)['active'],{'name':'job'})
- def test_anonymous_catalogue_also_validates_and_never_matches_admin_tag(self):
+ def test_anonymous_request_gets_401_and_no_validator(self):
   app=self.app()
-  _,admin,_=FakeRequest(app,self.headers()).run()
-  status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app'}).run()
-  self.assertEqual(status,200);self.assertNotIn('SECRET',body.decode());self.assertNotEqual(headers['etag'],admin['etag'])
-  status,_,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','If-None-Match':headers['etag']}).run()
-  self.assertEqual((status,body),(304,b''))
-  status,_,_=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','If-None-Match':admin['etag']}).run()
-  self.assertEqual(status,200)
+  for extra in ({},{'If-None-Match':'W/"anything"'}):
+   status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app',**extra}).run()
+   self.assertEqual(status,401);self.assertNotIn('etag',headers);self.assertNotIn(b'records',body)
  def test_small_error_bodies_are_not_compressed_and_other_paths_have_no_validator(self):
   app=self.app()
   r=FakeRequest(app,self.headers(**{'Accept-Encoding':'gzip'}));r.h.path='/api/nothing';status,headers,body=r.run()
@@ -77,11 +73,11 @@ class CachedPayloadHandlerTests(unittest.TestCase):
         return SimpleNamespace(access=access,csrf='SECRET',payload=payload,state=lambda:self.fail('state() must not be called')),calls
     def test_handler_serves_cached_payload_with_timing_and_validator(self):
         app,calls=self.app()
-        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Accept-Encoding':'gzip'}).run()
-        self.assertEqual(status,200);self.assertEqual(calls,[True]);self.assertEqual(headers['etag'],'W/"tag-True"')
+        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Accept-Encoding':'gzip','Authorization':'Bearer '+'x'*40}).run()
+        self.assertEqual(status,200);self.assertEqual(calls,[False]);self.assertEqual(headers['etag'],'W/"tag-False"')
         self.assertIn('cache;desc=hit',headers['server-timing']);self.assertIn('state;dur=2.0',headers['server-timing'])
         self.assertEqual(json.loads(gzip.decompress(body))['records'][0]['title'],'B'*3000)
-        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','If-None-Match':'W/"tag-True"'}).run()
+        status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','If-None-Match':'W/"tag-False"','Authorization':'Bearer '+'x'*40}).run()
         self.assertEqual((status,body),(304,b''));self.assertIn('server-timing',headers)
         status,headers,body=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Authorization':'Bearer '+'x'*40}).run()
         self.assertEqual(status,200);self.assertEqual(calls[-1],False);self.assertNotIn('content-encoding',headers)
@@ -89,7 +85,7 @@ class CachedPayloadHandlerTests(unittest.TestCase):
         app,_=self.app()
         def broken(public,compact=False):raise BrokenPipeError()
         app.payload=broken
-        r=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app'});r.h.do_GET()
+        r=FakeRequest(app,{'Host':'api.example.com','Origin':'https://music-business.vercel.app','Authorization':'Bearer '+'x'*40});r.h.do_GET()
         self.assertEqual(r.h.wfile.getvalue(),b'')
 
 
@@ -100,7 +96,7 @@ class CompactFormatHandlerTests(unittest.TestCase):
         def payload(public,compact=False):
             seen.append(compact);body=b'{"ok":1}';return ('W/"%s"'%compact,body,None,{'state':0,'encode':0,'cache':'hit'})
         app=SimpleNamespace(access=access,csrf='S',payload=payload)
-        base={'Host':'api.example.com','Origin':'https://music-business.vercel.app'}
+        base={'Host':'api.example.com','Origin':'https://music-business.vercel.app','Authorization':'Bearer '+'x'*40}
         r=FakeRequest(app,{**base,'Accept':'application/vnd.simples.packed+json, application/json'});status,headers,_=r.run()
         self.assertEqual(seen[-1],True);self.assertTrue(headers['content-type'].startswith('application/vnd.simples.packed+json'))
         self.assertIn(b'Vary: Accept, Accept-Encoding\r\n',r.h.wfile.getvalue())

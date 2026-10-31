@@ -112,7 +112,7 @@ class ParallelCollectionTests(unittest.TestCase):
         self.assertEqual(result['scores_pruned'],7)
 
 class WarmTests(unittest.TestCase):
-    def test_warm_prepares_both_encoded_responses(self):
+    def test_warm_prepares_the_signed_in_response(self):
         import sheet_primary
         from sheet_primary import PrimaryStore
         from tests.test_state_performance import Repository
@@ -124,7 +124,7 @@ class WarmTests(unittest.TestCase):
                 if not app._warming:break
                 time.sleep(.01)
             self.assertFalse(app._warming)
-            self.assertEqual(app.payload(True,True)[3]['cache'],'hit');self.assertEqual(app.payload(False,True)[3]['cache'],'hit')
+            self.assertEqual(app.payload(False,True)[3]['cache'],'hit')
     def test_warm_does_nothing_without_the_sheet_store(self):
         from server import Dashboard
         tmp=tempfile.TemporaryDirectory();s=Settings(db_path=Path(tmp.name)/'w.db');init(s.db_path);demo.seed(s)

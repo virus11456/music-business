@@ -57,10 +57,10 @@ test('editing an existing watch preserves target currency rather than market cur
  assert.equal(find(form,n=>n.type==='input'&&n.props.name==='target').props.defaultValue,'3000');
 });
 
-test('public catalogue renders without a login form or admin data and offers optional admin login',()=>{
- const h=harness(()=>{throw Error('public browsing must not write')},true);
- const tree=h.render();assert.equal(tree.props.login,null);
- assert.ok(Array.isArray(tree.props.records));assert.deepEqual(tree.props.rows,[]);
- assert.equal(find(tree,text('加入唱片')),undefined);
- tree.props.onLogin();assert.ok(h.render().props.login);
+test('signed-out view shows only the sign-in form, no navigation or catalogue data',()=>{
+ const h=harness(()=>{throw Error('signed-out view must not write')},true);
+ const tree=h.render();
+ assert.ok(find(tree,text('登入工作室')));assert.ok(find(tree,text('需登入才能查看資料。')));
+ for(const label of ['加入唱片','今日總覽','唱片清單','Album','Artist'])assert.equal(find(tree,text(label)),undefined,label);
+ assert.equal(find(tree,node=>node.props?.records!==undefined),undefined);
 });
