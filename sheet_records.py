@@ -19,7 +19,7 @@ META_KEYS = {'mode', 'google_sheet_id', 'business_assumptions', 'last_sheet_sync
              'discogs_inventory_pending', 'purchase_list_v1', 'purchase_revision'}
 META_PREFIXES = ('release_labels_', 'release_barcodes_', 'source_identity_',
                  'purchase_priority_', 'schedule_slot:', 'watch_hit:', 'listing_submission:',
-                 'demand_search:')
+                 'demand_search:', 'scan_cursor:')
 PREFIX = 'SIMPLES_Data_'
 NULLS = '__null_columns'
 

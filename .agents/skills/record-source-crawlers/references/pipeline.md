@@ -34,6 +34,7 @@
 
 `scheduler.py` 另有 03:00 夜間時段（`night()`，flow=`demand_night`），不跑反查佇列：
 1. `ingest.scan`：依已啟用的掃描主題（可只填格式＋國別、不填歌手）分頁搜尋 Discogs。搜尋結果自帶的 community want/have 若存在，先排除 Want < `SCAN_MIN_WANT`（50）或 Want/Have < 主題比值者，不打單張請求；通過者以 `/releases/` 回應決定是否加入，並同時寫入 USD 行情快照。每晚 Discogs 請求上限 `SCAN_REQUEST_BUDGET`（600）、新增版本上限 `SCAN_MAX_NEW`（150），各主題平分；中途用完時不推進頁碼，下次同頁接續（已存版本略過）。手動「掃描與抓價」同樣套用 Want 下限。
+   - 2026-10-31 補充：Discogs 搜尋每組條件最多 200 頁（1 萬筆），第 201 頁回 404。掃描一律帶 `sort=want&sort_order=desc`（正式實測有效：日本黑膠第 1 頁 Want 11,980 起，第 200 頁約 227）。未指定歌手或年份的主題依序掃「全部年份的前 1 萬筆」再逐年（1950 至今年）；一頁最低 Want 已低於門檻或到最後一頁即換下一年，全部掃完回到開頭。進度存在 meta `scan_cursor:{主題 id}`（segment、page），`scan_targets.next_page` 同步顯示頁碼。指定歌手或年份的主題只有一段。
 2. `demand_queue.run`：取最新快照 Want ≥ 50 且 Want/Have ≥ `DEMAND_MIN_RATIO`（2）的版本，依「歌手＋專輯名」合併為專輯；Discogs 無人在售者優先，再依最高比值、Want 排序；每晚最多 `DEMAND_ALBUMS`（100）張，同專輯 7 天內不重搜（meta `demand_search:*`）。每張專輯以 `sourcing.find_many` 對 Yahoo TW／JP、露天、Tower 搜一次（Rotten Blues 僅篩目錄單頁，不納入），對該專輯所有追蹤版本套用 `source_match.evidence`。本次回傳的商品寫入 source_checks（已配對 matched、其餘 unmatched，30 天），不進反查佇列；反查佇列已檢查過的商品保留原狀態。
 3. 重新評分與 Sheet 同步；結果含 scan／demand 統計與 `timings`（scan、demand、analyze、sheet_sync）。
 

@@ -40,7 +40,8 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(self.releases(),{3:'日本卡帶',5:'日本卡帶'})
         with connect(self.s.db_path) as c:
             snaps={r['release_id']:(r['lowest_price'],r['currency'],r['num_for_sale'],r['want'],r['have']) for r in c.execute('SELECT * FROM snapshots')}
-            self.assertEqual(c.execute('SELECT next_page FROM scan_targets').fetchone()[0],2)
+            # The page dropped below Want 50 (results are most-wanted first), so the next run starts the first year.
+            self.assertEqual(json.loads(c.execute("SELECT value FROM meta WHERE key LIKE 'scan_cursor:%'").fetchone()[0]),{'segment':1,'page':1})
         self.assertEqual(snaps,{3:('12.5','USD',3,120,10),5:(None,None,0,80,0)})
     def test_budget_and_new_release_cap_stop_mid_page_without_skipping_it(self):
         page={'pagination':{'pages':5},'results':[{'type':'release','id':i,'community':{'want':100,'have':1}} for i in (1,2,3)]}
@@ -56,6 +57,45 @@ class ScanTests(unittest.TestCase):
         client=Client({2:{'pagination':{'pages':5},'results':[{'type':'release','id':i,'community':{'want':100,'have':1}} for i in (7,8)]}},{i:release(i,100,1) for i in (7,8)})
         self.assertEqual(ingest.scan(self.s,pages=1,client=client,max_new=1)['discovered'],1)
         self.assertEqual(sorted(self.releases()),[1,2,3,7])
+
+class SegmentTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.s=Settings(db_path=Path(self.tmp.name)/'t.db',token='t');init(self.s.db_path)
+    def tearDown(self):self.tmp.cleanup()
+    def target(self,params):
+        with connect(self.s.db_path) as c:c.execute('INSERT INTO scan_targets(name,query_params,min_want_have) VALUES(?,?,2)',('t',json.dumps(params)))
+    def test_sorted_by_want_and_walks_years_after_the_overall_top(self):
+        self.target({'format':'Vinyl','country':'Japan'})
+        seen=[]
+        class Sorted:
+            def get(inner,path,params=None):
+                seen.append({k:params.get(k) for k in ('year','page','sort','sort_order')})
+                # Overall: two pages above the floor, then a page that dips under it. Each year: one page under it.
+                if params.get('year') is None:
+                    want={1:500,2:300,3:40}[params['page']]
+                else:want=30
+                return {'pagination':{'pages':200},'results':[{'type':'release','id':params['page']*1000+int(params.get('year') or 0),'community':{'want':want,'have':want}}]}
+        ingest.scan(self.s,pages=6,client=Sorted())
+        self.assertTrue(all(p['sort']=='want' and p['sort_order']=='desc' for p in seen))
+        self.assertEqual([(p['year'],p['page']) for p in seen],[(None,1),(None,2),(None,3),('1950',1),('1951',1),('1952',1)])
+        with connect(self.s.db_path) as c:cursor=json.loads(c.execute("SELECT value FROM meta WHERE key LIKE 'scan_cursor:%'").fetchone()[0])
+        self.assertEqual(cursor,{'segment':4,'page':1})
+    def test_artist_target_has_one_segment_and_wraps_after_the_last_page(self):
+        self.target({'artist':'Casiopea','country':'Japan','format':'CD'})
+        seen=[]
+        class Two:
+            def get(inner,path,params=None):
+                seen.append((params.get('year'),params['page']))
+                return {'pagination':{'pages':2},'results':[{'type':'release','id':params['page'],'community':{'want':900,'have':900}}]}
+        ingest.scan(self.s,pages=5,client=Two())
+        self.assertEqual(seen,[(None,1),(None,2)])  # stops after a full cycle instead of looping
+        ingest.scan(self.s,pages=1,client=Two())
+        self.assertEqual(seen[-1],(None,1))
+    def test_years_cover_through_this_year(self):
+        from datetime import date
+        years=ingest.segments({'format':'Cassette'})
+        self.assertEqual((years[0],years[1],years[-1]),(None,'1950',str(date.today().year)))
+        self.assertEqual(ingest.segments({'format':'CD','year':'1975'}),[None])
 
 class SharedBudgetTests(ScanTests):
     def test_each_target_gets_an_equal_share_of_the_night(self):

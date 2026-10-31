@@ -32,6 +32,16 @@ def run(settings, client=None):
             failures.append({'release_id':rid,'error':type(exc).__name__})
     return {'success':len(ids)-len(failures),'failed':len(failures),'failures':failures}
 
+# Discogs search serves at most 200 pages (10,000 results) per query. A target without an artist or year is
+# walked as: all years together (the 10,000 most wanted), then one segment per year, newest last.
+FIRST_YEAR = 1950
+
+def segments(params):
+    if params.get('artist') or params.get('year'):
+        return [None]
+    from datetime import date
+    return [None]+[str(y) for y in range(FIRST_YEAR, date.today().year+1)]
+
 def scan(settings, pages=2, client=None, budget=None, min_want=None, max_new=None):
     """Discover tracked releases from enabled scan targets.
 
@@ -61,18 +71,32 @@ def scan(settings, pages=2, client=None, budget=None, min_want=None, max_new=Non
         if spent():
             break
         try:
-            page = target['next_page']
+            base = json.loads(target['query_params'])
+            segs = segments(base)
+            key = f"scan_cursor:{target['id']}"
+            with connect(settings.db_path) as c:
+                saved = c.execute('SELECT value FROM meta WHERE key=?',(key,)).fetchone()
+            try:
+                cursor = json.loads(saved[0]) if saved else {'segment':0,'page':target['next_page']}
+                seg, page = int(cursor['segment']), int(cursor['page'])
+            except (ValueError,KeyError,TypeError):
+                seg, page = 0, 1
+            if not 0 <= seg < len(segs) or page < 1:
+                seg, page = 0, 1
             for _ in range(pages):
                 if spent():
                     break
-                params = json.loads(target['query_params'])
-                params.update(type='release',page=page,per_page=50)
+                params = {**base,'type':'release','page':page,'per_page':50,'sort':'want','sort_order':'desc'}
+                if segs[seg]:
+                    params['year'] = segs[seg]
                 result = call('/database/search',params)
                 if not isinstance(result.get('results'),list) or not isinstance(result.get('pagination'),dict):
                     raise APIError('search 回傳格式不符')
                 total_pages = result['pagination'].get('pages')
                 if not isinstance(total_pages,int) or total_pages < 0:
                     raise APIError('pagination.pages 格式不符')
+                counts = [x['community'].get('want') for x in result['results'] if isinstance(x,dict) and isinstance(x.get('community'),dict)]
+                counts = [v for v in counts if isinstance(v,int) and not isinstance(v,bool)]
                 finished = True
                 for item in result['results']:
                     rid = item.get('id')
@@ -105,11 +129,18 @@ def scan(settings, pages=2, client=None, budget=None, min_want=None, max_new=Non
                         failed += 1
                 if not finished:
                     break
-                page = 1 if page>=total_pages else page+1
+                # Results come most-wanted first: once a page drops below the Want floor, the rest of
+                # this segment cannot qualify, so move on to the next year.
+                done = page >= total_pages or (counts and min(counts) < min_want)
+                if done:
+                    seg, page = (seg+1) % len(segs), 1
+                else:
+                    page += 1
                 with connect(settings.db_path) as c:
+                    c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(key,json.dumps({'segment':seg,'page':page})))
                     c.execute('UPDATE scan_targets SET next_page=?,last_run_at=? WHERE id=?',(page,now(),target['id']))
-                if page == 1:
-                    break
+                if done and seg == 0:
+                    break  # Whole cycle covered; the next run starts again from the most-wanted overall.
         except (APIError,ValueError,TypeError,KeyError):
             failed += 1
     exhausted = (budget is not None and requests >= budget) or (max_new is not None and found >= max_new)

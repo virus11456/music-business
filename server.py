@@ -26,7 +26,7 @@ import sourcing
 import discogs_publish
 from cli import currency
 from config import Settings, load_env, money
-from db import connect, decide, init, job, latest_decision, now
+from db import connect, decide, init, job, now
 from discogs_client import APIError, DiscogsClient
 
 def release_id(value):
@@ -138,20 +138,28 @@ class Dashboard:
     def derived(self):
         with connect(self.settings.db_path) as c:
             records=[]
+            # Latest row per release in one query each, instead of five queries per release. Price history is
+            # served on demand by /api/history: only the detail view uses it and it grows 30 rows per release.
+            def latest(table,order):
+                rows=c.execute(f'SELECT * FROM (SELECT *,ROW_NUMBER() OVER (PARTITION BY release_id ORDER BY {order}) AS position FROM {table}) WHERE position=1')
+                return {row['release_id']:{k:row[k] for k in row.keys() if k!='position'} for row in rows}
+            snaps=latest('snapshots','captured_at DESC');scores=latest('scores','id DESC')
+            costs=latest('costs','recorded_at DESC,id DESC');decisions=latest('decisions','id DESC')
             for row in c.execute('SELECT * FROM releases ORDER BY added_at DESC').fetchall():
-                r=dict(row)
-                snap=c.execute('SELECT * FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 1',(r['release_id'],)).fetchone()
-                score=c.execute('SELECT * FROM scores WHERE release_id=? ORDER BY id DESC LIMIT 1',(r['release_id'],)).fetchone()
-                cost=c.execute('SELECT * FROM costs WHERE release_id=? ORDER BY recorded_at DESC,id DESC LIMIT 1',(r['release_id'],)).fetchone()
-                decision=latest_decision(c,r['release_id'])
-                r.update(snapshot=dict(snap) if snap else None,
+                r=dict(row);rid=r['release_id']
+                score=scores.get(rid)
+                r.update(snapshot=snaps.get(rid),
                     analysis=json.loads(score['components']) if score else None,
                     scored_at=score['scored_at'] if score else None,
-                    cost=dict(cost) if cost else None,decision=dict(decision) if decision else None)
-                r['history']=[dict(h) for h in c.execute('SELECT captured_at,lowest_price,currency FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 30',(r['release_id'],))][::-1]
+                    cost=costs.get(rid),decision=decisions.get(rid))
                 records.append(r)
         workflow_state={'purchase_list':__import__('purchase_store').state(self.settings),'notifications':__import__('notification_review').state(self.settings),'inventory':__import__('inventory_sync').state(self.settings),'listing_submissions':discogs_publish.state(self.settings),**workflow.get_workflow(self.settings),'comparisons':comparisons.build(self.settings),'source_queue':source_queue.state(self.settings),'platforms':self.platform_state()}
         return records,workflow_state
+
+    def history(self, rid):
+        """Last 30 daily snapshots of one release, oldest first, for the detail view."""
+        with connect(self.settings.db_path) as c:
+            return [dict(h) for h in c.execute('SELECT captured_at,lowest_price,currency FROM snapshots WHERE release_id=? ORDER BY captured_at DESC LIMIT 30',(rid,))][::-1]
 
     def start(self, name, operation):
         if not self.lock.acquire(blocking=False):
@@ -482,6 +490,10 @@ def handler(dashboard):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if urlsplit(self.path).path=='/api/history':
+                try:rid=release_id(parse_qs(urlsplit(self.path).query).get('release_id',[''])[0])
+                except (ValueError,TypeError):return self.respond(400,{'error':'版本編號無效'})
+                return self.respond(200,{'release_id':rid,'history':dashboard.history(rid)})
             if self.path!='/api/state':
                 return self.respond(404,{'error':'找不到頁面'})
             try:
