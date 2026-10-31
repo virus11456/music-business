@@ -1,3 +1,9 @@
+## 2026-10-31 正式部署 7d9108e、eBay 啟用並實測成功
+
+後端 21:36 以 48 個 .py 完整替換（manifest SHA256 e2f8220621aefcf557ff8c5f5cc81c143ab9f289375dd63e42c02996021518c1，備份 backups/full-20261031T133619Z）；`.env` 新增 `EBAY_VERIFICATION_TOKEN`（48 字元）與 `EBAY_DELETION_ENDPOINT`（備份 .env.bak-20261031T133557Z，權限 600 music）。正式自我測試 challenge 回 64 字元 challengeResponse。
+
+eBay 開發者後台：先儲存聯絡 Email，再儲存端點，顯示「Marketplace account deletion notification endpoint settings successfully saved」，keyset 的 Non Compliant 標示消失，「Send Test Notification」顯示成功；豁免開關未開啟。VPS 唯讀實測 eBay「Casiopea Mint Jams」取得 40 筆（USD、FIXED_PRICE、有下一頁），先前 401 為 keyset 啟用前的停用狀態。樂天（11 筆）與 eBay 皆已可用，納入手動搜尋與 03:00 依名單找貨。
+
 ## 2026-10-31 正式部署 e91b9d3、樂天實測成功；eBay 帳戶刪除通知端點（本機實作，待部署後端）
 
 **部署**：後端 21:18 以 47 個 .py 完整替換（manifest SHA256 47e5ed6145cbbabedffc165fa31b9ab3a8ac51707f7b07cde443ba03c06b5229，備份 backups/full-20261031T131813Z）；前端 Vercel dpl_FWFLvkDc5vvaERK2wP6Rfumx3Q7z，`version.json` 讀回 e91b9d3。手機版比價表卡片（2f2c2bd，dpl_4ivT9zWQr2WXMpUyPsSbGoUTNyfg）已於 20:25 上線。
