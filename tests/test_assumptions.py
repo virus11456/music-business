@@ -50,3 +50,33 @@ class PaymentFeeTests(AssumptionTests):
  def test_combined_rate_must_stay_below_one_and_payment_not_negative(self):
   for extra in ({'fee_pct':'.5','payment_pct':'.5'},{'payment_pct':'-0.01'},{'payment_fixed':'-1'}):
    with self.subTest(extra=extra),self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,**extra})
+
+class OrderFeeTests(AssumptionTests):
+ def settings(self,**values):
+  s=Settings(db_path=self.path)
+  base={'fee_pct':'.09','payment_pct':'.044','payment_fixed':'.30','conversion_pct':'0','tax_pct':'0','buyer_shipping':'0','shipping':'0','packing':'0','reserve':'0'}
+  for k,v in {**base,**values}.items():setattr(s,k,Decimal(v))
+  return s
+ def test_real_discogs_paypal_statements_are_reproduced(self):
+  import config
+  # Three PayPal statements for Discogs orders (USD): item, buyer shipping, buyer tax, seller net.
+  for item,ship,tax,net in (('325','28','28.24','304.16'),('19','28','10.81','39.93'),('15','13','5.60','23.70')):
+   with self.subTest(item=item):
+    s=self.settings(buyer_shipping=ship,tax_pct=str(Decimal(tax)/(Decimal(item)+Decimal(ship))))
+    self.assertEqual((Decimal(item)-config.fees(s,Decimal(item))).quantize(Decimal('.01')),Decimal(net))
+ def test_conversion_applies_after_discogs_and_paypal(self):
+  import config
+  s=self.settings(conversion_pct='.025')
+  # 100 sale: Discogs 9, PayPal 4.70, conversion 2.5% of 86.30.
+  self.assertEqual(config.fees(s,Decimal(100)).quantize(Decimal('.0001')),(Decimal('13.70')+Decimal('86.30')*Decimal('.025')).quantize(Decimal('.0001')))
+ def test_buyer_shipping_offsets_postage_and_is_saved(self):
+  self.app.mutate('/api/assumptions',self.values)
+  before=Decimal(self.app.state()['workflow']['comparisons'][0]['net_twd'])
+  self.app.mutate('/api/assumptions',{**self.values,'buyer_shipping':'100'})
+  after=Decimal(self.app.state()['workflow']['comparisons'][0]['net_twd'])
+  # Discogs takes 10% of the shipping charged too, so the buyer's NT$100 adds NT$90.
+  self.assertEqual(after-before,Decimal('90.00'))
+  self.assertEqual(Dashboard(Settings(db_path=self.path)).state()['assumptions']['buyer_shipping'],'100')
+ def test_order_fields_are_validated(self):
+  for extra in ({'tax_pct':'1.01'},{'conversion_pct':'.9'},{'buyer_shipping':'-1'}):
+   with self.subTest(extra=extra),self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,**extra})

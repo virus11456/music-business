@@ -61,8 +61,7 @@ def evaluate(c, s, settings, at=None):
     return {'score':score,'parts':parts,'weights':settings.weights,'ratio':ratio,'liquidity':liquid,
             'net_twd':str(net.quantize(money('.01'))) if net is not None else None,
             'margin':margin,'drop_7d':drop,'rules':rules,'warnings':warnings,'fx':fx_used,
-            'assumptions':{'fee_pct':str(settings.fee_pct),'payment_pct':str(settings.payment_pct),'payment_fixed':str(settings.payment_fixed),
-                           'shipping':str(settings.shipping),'packing':str(settings.packing),'reserve':str(settings.reserve)},'stale':stale}
+            'assumptions':__import__('config').assumptions(settings),'stale':stale}
 
 def message(release, s, result):
     return (f"SIMPLES 選品提醒｜{result['score']} 分\n{release['artist']} — {release['title']}\n"

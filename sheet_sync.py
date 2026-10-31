@@ -35,7 +35,8 @@ def build_tables(settings):
         offers=c.execute('SELECT * FROM sourcing_offers ORDER BY id').fetchall()
         for r in offers:
             sources.append([r['id'],r['release_id'],r['vendor'],float(r['amount']),r['currency'],r['media_cond'],r['sleeve_cond'],bool(r['version_confirmed']),r['recorded_at'],r['source_url'],float(r['sale_price']) if r['sale_price'] else None,r['sale_currency'],bool(r['owned_confirmed']),bool(r['supply_confirmed']),r['dispatch_days']])
-        inputs=[['參數','數值','說明'],['合計費率',float(settings.fee_pct+settings.payment_pct),'Discogs 手續費＋PayPal 收款與換匯費率；PayPal 每筆固定費未含，請按實際費用調整'],['淨出貨運費 TWD',float(settings.shipping),'賣家自行承擔部分'],
+        rate,constant=__import__('config').fee_terms(settings)
+        inputs=[['參數','數值','說明'],['合計費率',float(rate),'Discogs 手續費（含運費）＋PayPal（含運費與稅）＋換匯，換算為售價比例'],['淨出貨運費 TWD',float(constant-settings.packing-settings.reserve),'郵資＋PayPal 固定費−向買家收取運費扣除其費用後的淨額（可為負）'],
                 ['包材 TWD',float(settings.packing),'每件包材'],['風險準備 TWD',float(settings.reserve),'每件預留費用'],['最低淨利率',settings.min_margin,'初始篩選門檻'],
                 ['','', ''],['幣別','1 外幣 = TWD','匯率日期 YYYY-MM-DD']]
         for cc in ('TWD','USD','JPY','EUR','GBP'):

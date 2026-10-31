@@ -36,15 +36,34 @@ def business_values(data):
     result={k:money(data[k]) for k in fields}
     # Saved settings from before the PayPal split have no payment fields: their fee_pct was the combined rate,
     # so the payment part reads as zero instead of being counted twice.
-    for k in ('payment_pct','payment_fixed'):result[k]=money(data.get(k) or 0)
-    if result['fee_pct']+result['payment_pct']>=1 or result['min_margin']>1:raise ValueError('費率合計須小於 100%，最低淨利率不可超過 100%')
+    # Settings saved before the order-level fields read them as zero, which reproduces the earlier formula.
+    for k in OPTIONAL_FIELDS:result[k]=money(data.get(k) or 0)
+    if result['fee_pct']+result['payment_pct']+result['conversion_pct']>=1 or result['min_margin']>1:raise ValueError('費率合計須小於 100%，最低淨利率不可超過 100%')
+    if result['tax_pct']>1:raise ValueError('買家稅率不可超過 100%')
     if min(result.values())<0:raise ValueError('費用設定不可為負數')
     return result
 
+OPTIONAL_FIELDS=('payment_pct','payment_fixed','buyer_shipping','tax_pct','conversion_pct')
+
+def fee_terms(settings):
+    """Selling costs as `rate*sale + constant` (TWD), following real Discogs/PayPal statements:
+    Discogs takes fee_pct of item + shipping charged to the buyer; PayPal takes payment_pct of item + shipping +
+    buyer tax plus payment_fixed; withdrawing USD to TWD costs conversion_pct of what remains after both fees (the
+    tax is remitted through Discogs). The shipping charged to the buyer is income set against the actual postage."""
+    d,p,x,t=settings.fee_pct,settings.payment_pct,settings.conversion_pct,settings.tax_pct
+    rate=d+p*(1+t)+x*(1-d-p*(1+t))
+    constant=settings.payment_fixed*(1-x)+settings.shipping+settings.packing+settings.reserve-settings.buyer_shipping*(1-rate)
+    return rate,constant
+
+ASSUMPTION_FIELDS=('fee_pct',)+OPTIONAL_FIELDS+('shipping','packing','reserve')
+
+def assumptions(settings):
+    return {k:str(getattr(settings,k)) for k in ASSUMPTION_FIELDS}
+
 def fees(settings, sale):
-    """Selling costs in TWD for one item sold at `sale` TWD: Discogs fee, PayPal percentage (receiving and
-    conversion) and fixed fee, shipping, packing and risk reserve."""
-    return sale*(settings.fee_pct+settings.payment_pct)+settings.payment_fixed+settings.shipping+settings.packing+settings.reserve
+    """Selling costs in TWD for one item sold at `sale` TWD (negative when buyer-paid shipping exceeds them)."""
+    rate,constant=fee_terms(settings)
+    return sale*rate+constant
 
 @dataclass
 class Settings:
@@ -56,6 +75,11 @@ class Settings:
     # PayPal: percentage of the sale (receiving + currency conversion) and a fixed fee per order in TWD.
     payment_pct: Decimal = field(default_factory=lambda: money(os.getenv('PAYMENT_FEE_PCT') or '0'))
     payment_fixed: Decimal = field(default_factory=lambda: money(os.getenv('PAYMENT_FIXED_TWD') or '0'))
+    # Order-level terms: shipping charged to the buyer (TWD equivalent), buyer tax rate PayPal also charges on,
+    # and the USD-to-TWD withdrawal conversion rate.
+    buyer_shipping: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_SHIPPING_TWD') or '0'))
+    tax_pct: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_TAX_PCT') or '0'))
+    conversion_pct: Decimal = field(default_factory=lambda: money(os.getenv('CONVERSION_FEE_PCT') or '0'))
     shipping: Decimal = field(default_factory=lambda: money(os.getenv('SHIPPING_COST_TWD', '600')))
     packing: Decimal = field(default_factory=lambda: money(os.getenv('PACKING_COST_TWD', '50')))
     reserve: Decimal = field(default_factory=lambda: money(os.getenv('RISK_RESERVE_TWD', '0')))
@@ -98,7 +122,7 @@ class Settings:
                     if row:
                         for key,value in business_values(json.loads(row[0])).items():
                             setattr(self,key,float(value) if key=='min_margin' else value)
-        if not 0 <= self.fee_pct+self.payment_pct < 1 or self.payment_pct < 0 or self.payment_fixed < 0 or not 0 <= self.min_margin <= 1:
+        if not 0 <= self.fee_pct+self.payment_pct+self.conversion_pct < 1 or self.tax_pct > 1 or not 0 <= self.min_margin <= 1:
             raise ValueError('費率與淨利率門檻必須介於 0 與 1')
         if len(self.weights) != 4 or abs(sum(self.weights) - 1) > 1e-9:
             raise ValueError('四個權重的總和必須為 1')
