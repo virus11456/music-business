@@ -1,3 +1,7 @@
+## 2026-11-01 Discogs 上架 API 正式驗證（建立草稿 → 讀回 → 刪除）
+
+VPS 以正式 token 直接呼叫 Discogs API：`POST /marketplace/listings` 建立 Draft 刊登（release 13668328、Near Mint、US$999、allow_offers false）回 201，listing 4443871782；`GET` 讀回 Draft、版本、品相、價格皆一致；`DELETE` 回 204；再讀回 404「Item not found」。PinnacleRecords 具 API 上架與刪除權限，測試刊登未留存。此測試未經網站「送出到 Discogs」流程，`DISCOGS_LISTING_WRITE` 仍未開啟；網站上架流程待使用者以實際要賣的商品驗收。
+
 ## 2026-11-01 正式部署 3778c42（PayPal 費用與可信配對預設）
 
 main 經發布守門於 11/01 00:00 fast-forward 至 3778c42（PR #16）；前端 Vercel 正式部署 dpl_735QUDYtAAF7w7NMfpYt2MumMw2o，`version.json` 讀回 3778c42。後端由使用者端操作部署（48 個 .py，manifest SHA256 b0fac9eccebbbea76fcdc21e8a51ea685f946b48212a05229e23252c7cf33b63），備份目錄未回報。正式網站以新版表單儲存費用設定：Discogs 9%、PayPal 收款＋換匯 6.9%、PayPal 每筆 NT$10，重新整理後 PayPal 兩欄仍為 6.9 與 10，確認新後端已接受並保存。

@@ -1,3 +1,7 @@
+## 2026-11-01 Discogs 上架 API 正式驗證（建立草稿 → 讀回 → 刪除）
+
+VPS 以正式 token 直接呼叫 Discogs API：`POST /marketplace/listings` 建立 Draft 刊登（release 13668328、Near Mint、US$999、allow_offers false）回 201，listing 4443871782；`GET` 讀回 Draft、版本、品相、價格皆一致；`DELETE` 回 204；再讀回 404「Item not found」。PinnacleRecords 具 API 上架與刪除權限，測試刊登未留存。此測試未經網站「送出到 Discogs」流程，`DISCOGS_LISTING_WRITE` 仍未開啟；網站上架流程待使用者以實際要賣的商品驗收。
+
 ## 2026-10-31 Discogs 帳號停權解除（正式 API 唯讀驗證）
 
 VPS srv1542946 以正式 token 檢查：`/oauth/identity` 200（PinnacleRecords）；`/users/PinnacleRecords/inventory` 200、362 筆刊登（10/30 仍為 403 suspended）；對 `/marketplace/listings` 送出刻意缺欄位的空內容得 422「Invalid release_id」，表示上架端點已進入欄位檢查，帳號具上架權限，未建立任何商品。公開庫存另可見 347 件 For Sale。未修改 .env、未開啟 `DISCOGS_LISTING_WRITE`、未重啟服務。
