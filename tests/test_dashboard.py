@@ -133,6 +133,14 @@ class DashboardTests(unittest.TestCase):
             urlopen(self.url+f"/api/drafts/quicklister?currency=JPY&id={draft['id']}")
         self.assertEqual(err.exception.code,400);err.exception.close()
 
+    def test_scan_target_artist_is_optional(self):
+        with self.post('/api/targets',{'name':'日本卡帶稀缺','country':'Japan','format':'Cassette','ratio':2}):pass
+        with self.post('/api/targets',{'name':'日本披頭四','artist':'The Beatles','country':'Japan','format':'Vinyl','ratio':1.5}):pass
+        with connect(self.settings.db_path) as c:
+            rows={r[0]:(json.loads(r[1]),r[2]) for r in c.execute('SELECT name,query_params,min_want_have FROM scan_targets')}
+        self.assertEqual(rows['日本卡帶稀缺'],({'country':'Japan','format':'Cassette'},2))
+        self.assertEqual(rows['日本披頭四'][0]['artist'],'The Beatles')
+
     def test_remote_auth_preflight_and_csv(self):
         import os
         from unittest.mock import patch

@@ -53,7 +53,7 @@ def state(settings):
 def run(settings,query=None,selected=None,limit=20,source_platform=None):
     if source_platform is not None and (not isinstance(source_platform,str) or source_platform not in platforms.PARSERS or query):raise ValueError('指定來源只能比對已保存商品')
     init(settings)
-    if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=40:raise ValueError('每批比對 1 至 40 件')
+    if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=60:raise ValueError('每批比對 1 至 60 件')
     result={'flow':'source_first','checked':0,'cached':0,'matched':0,'unmatched':0,'market_updated':0,'errors':[],'sheet_sync':None}
     import time
     from concurrent.futures import ThreadPoolExecutor

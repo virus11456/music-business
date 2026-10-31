@@ -350,7 +350,9 @@ class Dashboard:
                     ratio=float(data.get('ratio',1.5))
                     if not 0<=ratio<=1000000:
                         raise ValueError('請填有效需求比值')
-                    params={'artist':required(data,'artist'),'country':required(data,'country'),'format':required(data,'format')}
+                    # Artist is optional: a format + country target scans a whole pressing category.
+                    params={'country':required(data,'country'),'format':required(data,'format')}
+                    if str(data.get('artist') or '').strip():params['artist']=required(data,'artist')
                     c.execute('INSERT INTO scan_targets(name,query_params,min_want_have) VALUES(?,?,?)',
                         (required(data,'name'),json.dumps(params),ratio))
                 elif path=='/api/targets/toggle':

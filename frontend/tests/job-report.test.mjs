@@ -81,3 +81,12 @@ test('unclassified sync failures and unreadable detail do not advise blind retry
   const text=jobReport(detail).join('\n');assert.match(text,/勿直接重送/);assert.doesNotMatch(text,/設定後重試|TimeoutError/);
  }
 });
+
+test('night demand batch shows the scan and the scarcity-list search',()=>{
+ const detail=JSON.stringify({scheduled_slot:'schedule_slot:2026-11-01T03:00:00+08:00',versions:362,failed:0,batches:[{flow:'demand_night',failed:0,errors:[],
+  scan:{discovered:40,failed:0,requests:600,prefiltered:1800,budget_exhausted:true},
+  demand:{albums:24,versions:98,eligible_albums:24,skipped_recent:0,candidates:610,linked:150,failed_platforms:1,errors:[{step:'demand_search',album:'The Beatles Rubber Soul',error:'HTTPError'}]},
+  sheet_sync:{synced:true}}]});
+ const text=jobReport(detail).join('\n');
+ for(const part of ['新增 40 個版本','600 次請求','先篩掉 1800 筆','已達今晚上限','搜尋 24 張專輯','98 個版本','取得 610 件候選','可能配對 150 組','1 次平台未完成','找貨未完成：The Beatles Rubber Soul','Google Sheets 同步完成'])assert.ok(text.includes(part),part);
+});

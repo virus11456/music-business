@@ -35,17 +35,26 @@ class SchedulerTests(unittest.TestCase):
         self.assertFalse(self.scheduler.tick(datetime(2026,9,10,16,15,tzinfo=TZ)))
     def test_next_day_and_timezone(self):
         state=self.scheduler.state(datetime(2026,9,10,23,0,tzinfo=TZ))
-        self.assertEqual(state['next_run'],'2026-09-11T10:00:00+08:00')
+        self.assertEqual(state['next_run'],'2026-09-11T03:00:00+08:00')
+        self.assertEqual(state['times'],['03:00','10:00','16:00','22:00'])
     def test_backlog_pauses_collection_but_keeps_matching(self):
         with connect(self.settings.db_path) as c:
             c.execute('INSERT INTO source_topics VALUES(?,?,?)',('Beatles','["tower"]','2026-09-10'))
         with patch('scheduler.source_queue.pending_count',return_value=21),patch('scheduler.source_queue.run',return_value={'failed':0}) as run:
             self.scheduler.tick(datetime(2026,9,10,10,0,tzinfo=TZ))
-            self.assertEqual(run.call_args.args,(self.settings,None,None))
+            self.assertEqual(run.call_args.args,(self.settings,None,None,60))
             self.assertTrue(self.app.calls[-1]['collection_paused'])
         with patch('scheduler.source_queue.pending_count',return_value=20),patch('scheduler.source_queue.run',return_value={'failed':0}) as run:
             self.scheduler.tick(datetime(2026,9,10,16,0,tzinfo=TZ))
-            self.assertEqual(run.call_args.args,(self.settings,'Beatles',['tower']))
+            self.assertEqual(run.call_args.args,(self.settings,'Beatles',['tower'],60))
+    def test_night_slot_runs_scan_and_demand_search_not_the_reverse_queue(self):
+        night={'flow':'demand_night','failed':0,'errors':[]}
+        with patch('scheduler.night',return_value=night) as run_night,patch('scheduler.source_queue.run') as reverse:
+            self.assertTrue(self.scheduler.tick(datetime(2026,9,10,3,5,tzinfo=TZ)))
+        run_night.assert_called_once_with(self.settings);reverse.assert_not_called()
+        self.assertEqual(self.app.calls[-1]['batches'],[night])
+        self.assertEqual(self.scheduler.state(datetime(2026,9,10,3,30,tzinfo=TZ))['last_run'],{'at':'2026-09-10T03:00:00+08:00','status':'complete'})
+        self.assertFalse(self.scheduler.tick(datetime(2026,9,10,3,10,tzinfo=TZ)))
     def test_demo_does_not_run(self):
         with connect(self.settings.db_path) as c:c.execute("INSERT INTO meta VALUES('mode','demo')")
         self.assertFalse(self.scheduler.tick(datetime(2026,9,10,10,0,tzinfo=TZ)))

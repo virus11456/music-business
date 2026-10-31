@@ -30,6 +30,15 @@
 
 每批共用 Discogs client，同一版本不重抓；行情不足 6 小時時沿用，另輪替最多 20 個既有版本更新行情。`scheduler.py` 按 Asia/Taipei 每日 10:00／16:00／22:00 執行；待處理多於 20 時先消化佇列，否則輪替已保存主題。這是主題分頁收集，不是全站庫存鏡像。以 API 的 enabled、last_run、next_run 驗證執行情況，不僅看設定文字。
 
+### 2026-10-31 03:00 稀缺掃描與依名單找貨
+
+`scheduler.py` 另有 03:00 夜間時段（`night()`，flow=`demand_night`），不跑反查佇列：
+1. `ingest.scan`：依已啟用的掃描主題（可只填格式＋國別、不填歌手）分頁搜尋 Discogs。搜尋結果自帶的 community want/have 若存在，先排除 Want < `SCAN_MIN_WANT`（50）或 Want/Have < 主題比值者，不打單張請求；通過者以 `/releases/` 回應決定是否加入，並同時寫入 USD 行情快照。每晚 Discogs 請求上限 `SCAN_REQUEST_BUDGET`（600）、新增版本上限 `SCAN_MAX_NEW`（150），各主題平分；中途用完時不推進頁碼，下次同頁接續（已存版本略過）。手動「掃描與抓價」同樣套用 Want 下限。
+2. `demand_queue.run`：取最新快照 Want ≥ 50 且 Want/Have ≥ `DEMAND_MIN_RATIO`（2）的版本，依「歌手＋專輯名」合併為專輯；Discogs 無人在售者優先，再依最高比值、Want 排序；每晚最多 `DEMAND_ALBUMS`（100）張，同專輯 7 天內不重搜（meta `demand_search:*`）。每張專輯以 `sourcing.find_many` 對 Yahoo TW／JP、露天、Tower 搜一次（Rotten Blues 僅篩目錄單頁，不納入），對該專輯所有追蹤版本套用 `source_match.evidence`。本次回傳的商品寫入 source_checks（已配對 matched、其餘 unmatched，30 天），不進反查佇列；反查佇列已檢查過的商品保留原狀態。
+3. 重新評分與 Sheet 同步；結果含 scan／demand 統計與 `timings`（scan、demand、analyze、sheet_sync）。
+
+白天 10/16/22 反查每輪由 20 件提高為 60 件（`REVERSE_LIMIT`）；手動批次維持 1–40 件。`direct_matches.compute` 改用目錄號、條碼、歌手索引，只比對可能通過的組合，輸出與逐一比對相同（測試以舊迴圈對照）；3000 版本 × 4000 貨源由約 55 秒降為 0.7 秒。
+
 ## Discogs 與 Sheets
 
 `discogs_client.py` 是 GET-only：`/database/search`、`/releases/`、`/marketplace/stats/`。2026-10-30 起行情幣別為 USD 時，`ingest.fetch_one` 直接採用 `/releases/` 回應內的 `lowest_price`／`num_for_sale`（該欄位固定為 USD，忽略 curr_abbr；已對 7 張正式唱片與 stats 逐一比對相同），每個版本只打 1 次；其他幣別或欄位缺漏仍補打 stats。使用設定內 token 和 User-Agent；SQLite api_budget 共用 1.1 秒間隔；剩餘額度低時冷卻，429／5xx 或暫時連線問題最多 4 次嘗試，尊重 Retry-After。不要另建無節流 client 平行灌請求。

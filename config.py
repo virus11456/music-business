@@ -50,6 +50,13 @@ class Settings:
     min_margin: float = field(default_factory=lambda: float(os.getenv('MIN_MARGIN', '.15')))
     hot_ratio: float = field(default_factory=lambda: float(os.getenv('HOT_RATIO', '3')))
     max_supply: int = field(default_factory=lambda: int(os.getenv('MAX_SUPPLY', '3')))
+    # Demand scan and demand-first sourcing: Want floor, Want/Have floor, albums per night, Discogs calls per night.
+    # An empty value (as copied from .env.example) means the default.
+    scan_min_want: int = field(default_factory=lambda: int(os.getenv('SCAN_MIN_WANT') or '50'))
+    demand_min_ratio: float = field(default_factory=lambda: float(os.getenv('DEMAND_MIN_RATIO') or '2'))
+    demand_albums: int = field(default_factory=lambda: int(os.getenv('DEMAND_ALBUMS') or '100'))
+    scan_budget: int = field(default_factory=lambda: int(os.getenv('SCAN_REQUEST_BUDGET') or '600'))
+    scan_max_new: int = field(default_factory=lambda: int(os.getenv('SCAN_MAX_NEW') or '150'))
     price_drop: float = field(default_factory=lambda: float(os.getenv('PRICE_DROP', '.20')))
     min_score: float = field(default_factory=lambda: float(os.getenv('MIN_SCORE', '60')))
     urgent_score: float = 85

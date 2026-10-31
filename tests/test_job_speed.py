@@ -38,6 +38,17 @@ class DirectMatchTests(unittest.TestCase):
         expected=reference_pairs(sources,targets)
         self.assertTrue(expected)
         self.assertEqual(direct_matches.pairs(c,sources,targets),expected)
+    def test_indexed_matching_equals_the_reference_loop_across_seeds_and_scales(self):
+        artists=['The Beatles','Queen','ABBA','Prince (2)','A','Pink Floyd','Casiopea','山下達郎','Sleep']
+        for seed in range(5):
+            random.seed(seed)
+            targets=[{'release_id':i,'title':f'Album {i%13}','artist':random.choice(artists+[None,'']),'format':random.choice(['Vinyl, LP','CD','Cassette']),
+                      'catno':random.choice(['',f'CAT-{i%11:04d}',f'CAT-{i%11:04d}, ALT-{i%5:03d}','none','未確認']),'labels':'','barcodes':random.choice([[],['04988006123456'],['4988006000017']])} for i in range(1,300)]
+            sources=[{'id':j,'title':f'{random.choice(artists)} Album {j%13} '+random.choice(['LP','CD','カセット',f'CAT-{j%11:04d} LP','ALT-002','']),'artist':random.choice(['',random.choice(artists)]),
+                      'format':random.choice(['LP','CD','','Cassette']),'catalog_no':random.choice(['',f'CAT-{j%11:04d}','未確認','none']),'barcodes':random.choice([[],['04988006123456'],['4988006000017']]),'labels':''} for j in range(1,400)]
+            safe=[{**t,'artist':t['artist'] or ''} for t in targets]  # the reference loop predates the None-artist guard
+            self.assertEqual(direct_matches.compute(sources,targets),reference_pairs(sources,safe),seed)
+
     def test_release_without_artist_is_skipped_by_name_instead_of_failing(self):
         c=sqlite3.connect(':memory:');c.execute('CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)')
         targets=[{'release_id':1,'title':'Album','artist':None,'format':'CD','catno':'','labels':'','barcodes':[]},

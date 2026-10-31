@@ -13,25 +13,42 @@ def pairs(c,sources,targets):
             data=json.loads(cached[0])
             if data['signature']==signature:return data['pairs']
         except (ValueError,KeyError,TypeError):pass
-    result=[]
-    # Normalise each target once instead of once per source; the filters below are unchanged.
-    prepared=[]
-    for target in targets:
+    result=compute(sources,targets)
+    c.execute("INSERT OR REPLACE INTO meta VALUES('direct_matches_v4',?)",(json.dumps({'signature':signature,'pairs':result},ensure_ascii=False),))
+    return result
+
+def compute(sources,targets):
+    """Same pairs and order as checking every source against every target, without the full cross product.
+
+    A pair can only pass on a shared catalogue number, a shared barcode or the artist name appearing in the
+    source text, so each source only visits the targets indexed under those keys."""
+    from identity_data import source_codes
+    prepared=[];by_catalog={};by_barcode={};by_artist={}
+    for index,target in enumerate(targets):
         catalogs=[normalized(x) for x in target['catno'].split(',') if normalized(x) not in ('','none','na','未確認')]
         # A release without an artist cannot match by artist name (the old per-pair loop raised here instead).
-        prepared.append((target,catalogs,normalized(re.sub(r'\s+\(\d+\)$','',target['artist'] or '')),set(target.get('barcodes',[]))))
-    from identity_data import source_codes
+        artist=normalized(re.sub(r'\s+\(\d+\)$','',target['artist'] or ''))
+        codes=set(target.get('barcodes',[]))
+        prepared.append((target,catalogs,artist,codes))
+        for catalog in set(catalogs):by_catalog.setdefault(catalog,[]).append(index)
+        for code in codes:by_barcode.setdefault(code,[]).append(index)
+        if len(artist)>=2:by_artist.setdefault(artist,[]).append(index)
+    result=[]
     for source in sources:
         catalog=normalized(source_catalog(source))
         known_catalog=catalog not in ('','none','na','未確認')
         text=normalized(source['artist']+' '+source['title'])
         codes=set(source_codes(source))
-        for target,catalogs,artist,target_codes in prepared:
+        reach=set(by_catalog.get(catalog,[])) if known_catalog else set()
+        for code in codes:reach.update(by_barcode.get(code,[]))
+        for artist,indexes in by_artist.items():
+            if artist in text:reach.update(indexes)
+        for index in sorted(reach):
+            target,catalogs,artist,target_codes=prepared[index]
             catalog_match=known_catalog and catalog in catalogs
             if known_catalog and catalogs and not catalog_match:continue
             barcode_match=bool(codes&target_codes)
             if not catalog_match and not barcode_match and (len(artist)<2 or artist not in text):continue
             reasons=evidence(source,target)
             if reasons:result.append([source['id'],target['release_id'],reasons+['已抓取資料直接交叉比對']])
-    c.execute("INSERT OR REPLACE INTO meta VALUES('direct_matches_v4',?)",(json.dumps({'signature':signature,'pairs':result},ensure_ascii=False),))
     return result
