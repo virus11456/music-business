@@ -15,6 +15,9 @@ RECENT=timedelta(days=7)
 # Tower answers every request from the server with HTTP 403 (since 11/01), so the nightly run leaves it out;
 # it remains available for manual searches.
 PLATFORMS=['yahoo_tw','yahoo_jp','ruten','rakuten','ebay']
+# Catalogue-number searches: platforms whose search matches item titles, where sellers write the number.
+CATALOG_PLATFORMS=['yahoo_jp','yahoo_tw','rakuten','ebay']
+CATALOG_PER_ALBUM=3
 
 def album_key(artist,title):
     text=unicodedata.normalize('NFKC',f'{artist or ""}|{title or ""}').casefold()
@@ -26,7 +29,7 @@ def scarcity(settings,min_want=None,min_ratio=None):
     min_ratio=settings.demand_min_ratio if min_ratio is None else min_ratio
     albums={}
     with connect(settings.db_path) as c:
-        rows=c.execute('''SELECT r.release_id,r.artist,r.title,s.want,s.have,s.num_for_sale FROM releases r
+        rows=c.execute('''SELECT r.release_id,r.artist,r.title,r.catno,s.want,s.have,s.num_for_sale FROM releases r
             JOIN snapshots s ON s.id=(SELECT id FROM snapshots WHERE release_id=r.release_id ORDER BY captured_at DESC LIMIT 1)''').fetchall()
     for r in rows:
         if r['want'] is None or r['have'] is None or r['want']<min_want:continue
@@ -34,8 +37,10 @@ def scarcity(settings,min_want=None,min_ratio=None):
         ratio=r['want']/max(r['have'],1)
         if ratio<min_ratio:continue
         key=album_key(r['artist'],r['title'])
-        album=albums.setdefault(key,{'key':key,'artist':r['artist'],'title':r['title'],'release_ids':[],'ratio':0,'want':0,'unsold':False})
+        album=albums.setdefault(key,{'key':key,'artist':r['artist'],'title':r['title'],'release_ids':[],'ratio':0,'want':0,'unsold':False,'catnos':[]})
         album['release_ids'].append(r['release_id'])
+        for catno in catalog_queries(r['catno']):
+            if catno not in album['catnos'] and len(album['catnos'])<CATALOG_PER_ALBUM:album['catnos'].append(catno)
         album['ratio']=max(album['ratio'],ratio);album['want']=max(album['want'],r['want'])
         album['unsold']=album['unsold'] or not r['num_for_sale']
     # Nobody selling on Discogs first, then the scarcest version, then the largest demand.
@@ -44,13 +49,49 @@ def scarcity(settings,min_want=None,min_ratio=None):
 def _meta_key(key):
     return PREFIX+hashlib.sha256(key.encode()).hexdigest()[:16]
 
+def _search(settings,album,query,selected,result,instant,step):
+    """One platform search linked against every version of the album; returned items stay out of the reverse queue."""
+    try:
+        found=sourcing.find_many(settings,album['release_ids'],selected,query)
+    except Exception as exc:
+        result['errors'].append({'step':step,'album':query[:80],'error':type(exc).__name__});return False
+    result['candidates']+=found['candidates'];result['linked']+=found['possible_matches'];result['failed_platforms']+=found['failed_platforms']
+    if step=='catalog_search':
+        result['catalog_candidates']+=found['candidates'];result['catalog_linked']+=found['possible_matches']
+    # Per platform: searches that returned items, came back empty or failed (with the error kind), and items found.
+    for report in found.get('platforms',[]):
+        stats=result['platforms'].setdefault(report['platform'],{'success':0,'empty':0,'failed':0,'items':0,'errors':{}})
+        stats[report['status']]=stats.get(report['status'],0)+1;stats['items']+=report.get('count',0)
+        if report.get('error'):stats['errors'][report['error']]=stats['errors'].get(report['error'],0)+1
+    ids=found.get('returned_ids',[])
+    with connect(settings.db_path) as c:
+        linked={r[0] for r in c.execute(f"SELECT candidate_id FROM version_searches WHERE candidate_id IN ({','.join('?'*len(ids))})",ids)} if ids else set()
+        # This search already linked what it could; keep new items out of the reverse-match queue for 30 days.
+        # Items the reverse queue checked before keep their own status.
+        for cid in ids:
+            # Same enriched identity the reverse queue fingerprints, or the item would look changed and be due again.
+            row=identity_data.enrich(c,c.execute('SELECT * FROM platform_candidates WHERE id=?',(cid,)).fetchone())
+            c.execute('INSERT OR IGNORE INTO source_checks VALUES(?,?,?,?,?)',(cid,source_queue.fingerprint(row),'matched' if cid in linked else 'unmatched',now(),(instant+timedelta(days=30)).isoformat()))
+    return True
+
+def catalog_queries(catno):
+    """Searchable catalogue numbers from a Discogs catno field: specific ones only (letters and digits, 4+ chars)."""
+    out=[]
+    for part in str(catno or '').split(','):
+        text=unicodedata.normalize('NFKC',part).strip()
+        compact=re.sub(r'[^0-9A-Za-z]','',text)
+        if len(compact)<4 or not re.search(r'\d',compact) or text.casefold() in ('none','n/a','na'):continue
+        if text not in out:out.append(text[:40])
+    return out
+
 def run(settings,limit=None,selected=None,instant=None):
     limit=settings.demand_albums if limit is None else limit
     if not isinstance(limit,int) or isinstance(limit,bool) or not 1<=limit<=500:raise ValueError('每次找貨 1 至 500 張專輯')
     selected=selected or PLATFORMS
     instant=instant or datetime.now(timezone.utc)
     source_queue.init(settings)
-    result={'albums':0,'versions':0,'eligible_albums':0,'skipped_recent':0,'candidates':0,'linked':0,'failed_platforms':0,'errors':[],'platforms':{}}
+    result={'albums':0,'versions':0,'eligible_albums':0,'skipped_recent':0,'candidates':0,'linked':0,'failed_platforms':0,'errors':[],'platforms':{},
+            'catalog_searches':0,'catalog_candidates':0,'catalog_linked':0}
     albums=scarcity(settings);result['eligible_albums']=len(albums)
     for album in albums:
         if result['albums']>=limit:break
@@ -62,26 +103,16 @@ def run(settings,limit=None,selected=None,instant=None):
                 result['skipped_recent']+=1;continue
         except (ValueError,KeyError,TypeError):pass
         query=f"{album['artist']} {album['title']}".strip()[:120]
-        try:
-            found=sourcing.find_many(settings,album['release_ids'],selected,query)
-        except Exception as exc:
-            result['errors'].append({'step':'demand_search','album':query[:80],'error':type(exc).__name__});continue
+        if not _search(settings,album,query,selected,result,instant,'demand_search'):continue
         result['albums']+=1;result['versions']+=len(album['release_ids'])
-        result['candidates']+=found['candidates'];result['linked']+=found['possible_matches'];result['failed_platforms']+=found['failed_platforms']
-        # Per platform: searches that returned items, came back empty or failed (with the error kind), and items found.
-        for report in found.get('platforms',[]):
-            stats=result['platforms'].setdefault(report['platform'],{'success':0,'empty':0,'failed':0,'items':0,'errors':{}})
-            stats[report['status']]=stats.get(report['status'],0)+1;stats['items']+=report.get('count',0)
-            if report.get('error'):stats['errors'][report['error']]=stats['errors'].get(report['error'],0)+1
-        ids=found.get('returned_ids',[])
+        # Catalogue numbers find listings the name search misses (Japanese sellers often title items by catalogue
+        # number) and what they find is a catalogue match. Only on platforms that search item titles well.
+        for catno in album.get('catnos',[]):
+            platforms_for_catalog=[p for p in selected if p in CATALOG_PLATFORMS]
+            if not platforms_for_catalog:break
+            if _search(settings,album,catno,platforms_for_catalog,result,instant,'catalog_search'):
+                result['catalog_searches']+=1
         with connect(settings.db_path) as c:
-            linked={r[0] for r in c.execute(f"SELECT candidate_id FROM version_searches WHERE candidate_id IN ({','.join('?'*len(ids))})",ids)} if ids else set()
-            # This album search already linked what it could; keep new items out of the reverse-match queue for 30 days.
-            # Items the reverse queue checked before keep their own status.
-            for cid in ids:
-                # Same enriched identity the reverse queue fingerprints, or the item would look changed and be due again.
-                row=identity_data.enrich(c,c.execute('SELECT * FROM platform_candidates WHERE id=?',(cid,)).fetchone())
-                c.execute('INSERT OR IGNORE INTO source_checks VALUES(?,?,?,?,?)',(cid,source_queue.fingerprint(row),'matched' if cid in linked else 'unmatched',now(),(instant+timedelta(days=30)).isoformat()))
             c.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(meta,json.dumps({'at':instant.isoformat(),'query':query},ensure_ascii=False)))
     result['failed']=len(result['errors'])+result['failed_platforms']
     return result

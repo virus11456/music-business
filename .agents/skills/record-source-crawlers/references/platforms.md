@@ -117,3 +117,9 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 - 每日排程的 Claude 工作階段執行即時檢測；解析壞掉時修解析器、補測試與本 reference，推到新分支並開草稿 PR，部署仍待使用者同意。
 
 - 2026-11-01 14:11 部署後伺服器檢測：Yahoo TW／JP 正常，露天與 Tower 對伺服器 IP 回 HTTP 403（露天本機連線正常）。`platform_probe.py` 改為只從 `.env`／環境讀取樂天、eBay 四個 API 金鑰，不建立完整 Settings（會開啟業務資料庫）；缺任一平台的金鑰時該平台標 skipped。
+
+## 2026-11-01 品番搜尋與標題品番
+
+- 夜間找貨加做品番搜尋（見 pipeline.md）；品番需含字母與數字、去符號後至少 4 碼，同專輯去重最多 3 個。
+- `source_match.title_catalog`：標題中無連字號或被空白分開的品番（RAL8801、RAL 8801）以完整字詞比對 Discogs catno（去符號後 ≥ 5 碼、含字母與數字），符合時 evidence 加「規格品番一致」與「取自賣場標題」；`comparisons` 以此補 `source_catalog_no`，`source_catalog_from_title=true`。
+- 前端 `matchLevel` 新增 `title_catalog`（標題品番與版本一致、格式一致、無衝突），計入「只看編號一致或已核對版本」；進貨清單仍標示壓片待核對。

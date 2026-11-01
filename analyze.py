@@ -11,7 +11,7 @@ SCORE_HISTORY = 30
 def clamp(x):
     return max(0., min(1., x))
 
-def evaluate(c, s, settings, at=None):
+def evaluate(c, s, settings, at=None, fmt=None):
     at = at or datetime.now(timezone.utc)
     captured = datetime.fromisoformat(s['captured_at'])
     warnings = ['售價採最低掛牌價；未校正品相，並非成交保證']
@@ -33,7 +33,7 @@ def evaluate(c, s, settings, at=None):
             purchase, b = convert(c,cost['cost_amount'],cost['cost_currency'],business_day(at),settings.fx_max_age_days)
             fx_used = [a,b]
             if sale > 0:
-                net = sale-purchase-__import__('config').fees(settings,sale)
+                net = sale-purchase-__import__('config').fees(settings,sale,fmt)
                 margin = float(net/sale)
         except ValueError as exc:
             warnings.append(str(exc)+'：不計算淨利')
@@ -81,7 +81,7 @@ def run(settings):
                 continue
             import watch_alerts
             watch_hits += int(watch_alerts.record(c,r,s,settings))
-            result = evaluate(c,s,settings)
+            result = evaluate(c,s,settings,fmt=__import__('source_match').identified_format(r['format']))
             c.execute('INSERT INTO scores(release_id,snapshot_id,scored_at,opportunity_score,components) VALUES(?,?,?,?,?)',
                       (r['release_id'],s['id'],now(),result['score'],json.dumps(result,ensure_ascii=False)))
             count += 1

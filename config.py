@@ -38,31 +38,46 @@ def business_values(data):
     # so the payment part reads as zero instead of being counted twice.
     # Settings saved before the order-level fields read them as zero, which reproduces the earlier formula.
     for k in OPTIONAL_FIELDS:result[k]=money(data.get(k) or 0)
+    # Per-format shipping: blank means "same as the general (vinyl) values".
+    for k in FORMAT_FIELDS:result[k]=None if data.get(k) in (None,'') else money(data[k])
     if result['fee_pct']+result['payment_pct']+result['conversion_pct']>=1 or result['min_margin']>1:raise ValueError('費率合計須小於 100%，最低淨利率不可超過 100%')
     if result['tax_pct']>1:raise ValueError('買家稅率不可超過 100%')
-    if min(result.values())<0:raise ValueError('費用設定不可為負數')
+    if min(v for v in result.values() if v is not None)<0:raise ValueError('費用設定不可為負數')
     return result
 
 OPTIONAL_FIELDS=('payment_pct','payment_fixed','buyer_shipping','tax_pct','conversion_pct')
+FORMAT_FIELDS=('buyer_shipping_cd','shipping_cd','buyer_shipping_cassette','shipping_cassette')
 
-def fee_terms(settings):
+def shipping_for(settings,fmt=None):
+    """(shipping charged to the buyer, actual postage) for a format; CD and cassette fall back to the general values."""
+    suffix={'CD':'cd','Cassette':'cassette'}.get(fmt)
+    buyer=getattr(settings,'buyer_shipping_'+suffix,None) if suffix else None
+    postage=getattr(settings,'shipping_'+suffix,None) if suffix else None
+    return (settings.buyer_shipping if buyer is None else buyer, settings.shipping if postage is None else postage)
+
+def fee_terms(settings,fmt=None):
     """Selling costs as `rate*sale + constant` (TWD), following real Discogs/PayPal statements:
     Discogs takes fee_pct of item + shipping charged to the buyer; PayPal takes payment_pct of item + shipping +
     buyer tax plus payment_fixed; withdrawing USD to TWD costs conversion_pct of what remains after both fees (the
     tax is remitted through Discogs). The shipping charged to the buyer is income set against the actual postage."""
     d,p,x,t=settings.fee_pct,settings.payment_pct,settings.conversion_pct,settings.tax_pct
+    buyer,postage=shipping_for(settings,fmt)
     rate=d+p*(1+t)+x*(1-d-p*(1+t))
-    constant=settings.payment_fixed*(1-x)+settings.shipping+settings.packing+settings.reserve-settings.buyer_shipping*(1-rate)
+    constant=settings.payment_fixed*(1-x)+postage+settings.packing+settings.reserve-buyer*(1-rate)
     return rate,constant
 
 ASSUMPTION_FIELDS=('fee_pct',)+OPTIONAL_FIELDS+('shipping','packing','reserve')
 
 def assumptions(settings):
-    return {k:str(getattr(settings,k)) for k in ASSUMPTION_FIELDS}
+    out={k:str(getattr(settings,k)) for k in ASSUMPTION_FIELDS}
+    for k in FORMAT_FIELDS:
+        value=getattr(settings,k,None);out[k]='' if value is None else str(value)
+    return out
 
-def fees(settings, sale):
-    """Selling costs in TWD for one item sold at `sale` TWD (negative when buyer-paid shipping exceeds them)."""
-    rate,constant=fee_terms(settings)
+def fees(settings, sale, fmt=None):
+    """Selling costs in TWD for one item of format `fmt` (Vinyl/CD/Cassette) sold at `sale` TWD; negative when
+    buyer-paid shipping exceeds them."""
+    rate,constant=fee_terms(settings,fmt)
     return sale*rate+constant
 
 @dataclass
@@ -80,6 +95,11 @@ class Settings:
     buyer_shipping: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_SHIPPING_TWD') or '0'))
     tax_pct: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_TAX_PCT') or '0'))
     conversion_pct: Decimal = field(default_factory=lambda: money(os.getenv('CONVERSION_FEE_PCT') or '0'))
+    # CD and cassette shipping (TWD); None means the general values above apply.
+    buyer_shipping_cd: object = None
+    shipping_cd: object = None
+    buyer_shipping_cassette: object = None
+    shipping_cassette: object = None
     shipping: Decimal = field(default_factory=lambda: money(os.getenv('SHIPPING_COST_TWD', '600')))
     packing: Decimal = field(default_factory=lambda: money(os.getenv('PACKING_COST_TWD', '50')))
     reserve: Decimal = field(default_factory=lambda: money(os.getenv('RISK_RESERVE_TWD', '0')))

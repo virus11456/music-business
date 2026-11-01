@@ -131,11 +131,15 @@ def calculate(c,s,o,source,confirmed_offer,lookups=None):
  lookups=lookups or QueryLookups(c)
  release=lookups.release(o['release_id'])
  snapshot=lookups.snapshot(o['release_id'])
+ source_cat=source_catalog(source) if source else ''
+ if source and not source_cat and release:
+  # A catalogue number written without its hyphen (RAL8801) is still the release's number, read from the title.
+  source_cat=__import__('source_match').title_catalog(source['title'],release['catno'])
  row={'key':f"offer-{o['id']}" if confirmed_offer else f"candidate-{source['id']}-{o['release_id']}",'offer':o if confirmed_offer else None,
       'candidate_id':source['id'] if source else None,'source_title':source['title'] if source else o['title'],
       'format':identified_format(release['format']) if release else None,'source_format':identified_format(source['format'],source['title']) if source else None,
       'barcodes':lookups.codes(o['release_id']),'source_barcodes':__import__('identity_data').source_codes(source) if source else [],
-      'catalog_no':release['catno'] if release else '', 'source_catalog_no':source_catalog(source) if source else '', 'source_catalog_from_title':bool(source and source_catalog(source) and source_catalog(source)!=str(source['catalog_no'] or '').strip()),
+      'catalog_no':release['catno'] if release else '', 'source_catalog_no':source_cat, 'source_catalog_from_title':bool(source and source_cat and source_cat!=str(source['catalog_no'] or '').strip()),
       'release_id':o['release_id'],'release_title':o['title'],'vendor':o['vendor'],'source_url':o['source_url'],
       'source_at':source['captured_at'] if source else None,'cost_at':o['recorded_at'],
       'source_price':source['price'] if source else None,'source_currency':source['currency'] if source else o['currency'],
@@ -172,7 +176,7 @@ def calculate(c,s,o,source,confirmed_offer,lookups=None):
  estimated_cost=cost if o['amount'] is not None else buy
  row.update(sale_twd=amount(sale),source_twd=amount(buy),cost_twd=amount(cost),spread_twd=amount(sale-buy) if sale is not None and buy is not None else None)
  if sale is not None and estimated_cost is not None and sale>0:
-  gross=sale-estimated_cost;fees=__import__('config').fees(s,sale);net=gross-fees
+  gross=sale-estimated_cost;fees=__import__('config').fees(s,sale,row['format']);net=gross-fees
   row.update(gross_twd=amount(gross),gross_margin=float(gross/sale),fees_twd=amount(fees),net_twd=amount(net),net_margin=float(net/sale))
  if not o['version_confirmed']:issues.append('待核對版本')
  if o['amount'] is None:issues.append('依来源標價估算，未含進貨運費與代購費')

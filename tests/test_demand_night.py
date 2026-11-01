@@ -162,10 +162,24 @@ class DemandTests(unittest.TestCase):
             report['platforms']+= [{'platform':'tower','count':0,'status':'failed','error':'HTTP 403'},{'platform':'ebay','count':0,'status':'empty'}]
             report['failed_platforms']=1
             return report
-        with patch('demand_queue.sourcing.platforms.search',side_effect=search):
+        with patch('demand_queue.sourcing.platforms.search',side_effect=search),patch('demand_queue.CATALOG_PLATFORMS',[]):
             result=demand_queue.run(self.s,selected=['ruten','tower','ebay'])
         self.assertEqual(result['platforms'],{'ruten':{'success':2,'empty':0,'failed':0,'items':6,'errors':{}},
             'tower':{'success':0,'empty':0,'failed':2,'items':0,'errors':{'HTTP 403':2}},'ebay':{'success':0,'empty':2,'failed':0,'items':0,'errors':{}}})
+    def test_catalogue_numbers_are_searched_on_title_search_platforms(self):
+        calls=[]
+        def search(s,query,selected,**kw):
+            calls.append((query,list(selected)))
+            return self.fake_search(s,query,selected)
+        with patch('demand_queue.sourcing.platforms.search',side_effect=search):
+            result=demand_queue.run(self.s,selected=['ruten','yahoo_jp','ebay'])
+        self.assertEqual(calls,[('The Beatles Rubber Soul',['ruten','yahoo_jp','ebay']),('TOCP-1',['yahoo_jp','ebay']),('AP-8156',['yahoo_jp','ebay']),
+                                ('Casiopea Mint Jams',['ruten','yahoo_jp','ebay']),('ALCA-1',['yahoo_jp','ebay'])])
+        self.assertEqual((result['albums'],result['catalog_searches'],result['catalog_candidates']),(2,3,9))
+    def test_catalogue_queries_keep_only_specific_numbers(self):
+        self.assertEqual(demand_queue.catalog_queries('RAL-8801, RAL8801'),['RAL-8801','RAL8801'])
+        self.assertEqual(demand_queue.catalog_queries('none'),[]);self.assertEqual(demand_queue.catalog_queries('LP-1'),[])
+        self.assertEqual(demand_queue.catalog_queries('ＴＯＣＰ－１２３'),['TOCP-123'])
     def test_nightly_platforms_leave_out_tower(self):
         self.assertNotIn('tower',demand_queue.PLATFORMS)
         self.assertEqual(set(demand_queue.PLATFORMS),{'yahoo_tw','yahoo_jp','ruten','rakuten','ebay'})

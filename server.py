@@ -304,7 +304,7 @@ class Dashboard:
             if path=='/api/assumptions':
                 from config import business_values
                 values=business_values(data)
-                with connect(s.db_path) as c:c.execute("INSERT OR REPLACE INTO meta VALUES('business_assumptions',?)",(json.dumps({k:str(v) for k,v in values.items()}),))
+                with connect(s.db_path) as c:c.execute("INSERT OR REPLACE INTO meta VALUES('business_assumptions',?)",(json.dumps({k:'' if v is None else str(v) for k,v in values.items()}),))
                 for key,value in values.items():setattr(s,key,float(value) if key=='min_margin' else value)
                 analyze.run(s)
                 return {'saved':True,'message':'費用設定已儲存並重新計算；Sheets Inputs 保留原設定'}

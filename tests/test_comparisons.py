@@ -50,3 +50,17 @@ class ComparisonTests(unittest.TestCase):
  def test_manual_cost_timestamp_is_distinct_from_missing_source(self):
   self.save();r=comparisons.build(self.s)[0]
   self.assertIsNone(r['source_at']);self.assertEqual(r['cost_at'],r['offer']['recorded_at'])
+
+class TitleCatalogTests(ComparisonTests):
+ def source(self,title):
+  return {'id':7,'platform':'yahoo_jp','external_id':'a7','title':title,'artist':'','format':'未確認','catalog_no':'','price':'1000','currency':'JPY',
+          'price_kind':'listed','availability':'即決價','source_url':'https://auctions.yahoo.co.jp/jp/auction/a7','captured_at':now()}
+ def row(self,title):
+  o={'id':None,'release_id':900000001,'title':'Japan pressing','vendor':'yahoo_jp','source_url':'https://auctions.yahoo.co.jp/jp/auction/a7','version_confirmed':0,'owned_confirmed':0,
+     'sale_price':None,'sale_currency':None,'amount':None,'currency':'JPY','media_cond':'未確認','sleeve_cond':'未確認','recorded_at':now()}
+  with connect(self.s.db_path) as c:return comparisons.calculate(c,self.s,o,self.source(title),False)
+ def test_catalogue_number_without_hyphen_in_title_is_read_as_the_release_number(self):
+  r=self.row('LP DEMO900000001 帯付')
+  self.assertEqual((r['source_catalog_no'],r['source_catalog_from_title']),('DEMO-900000001',True))
+  r=self.row('LP DEMO-900000002')
+  self.assertEqual(r['source_catalog_no'],'')  # not this release's number: no catalogue claimed

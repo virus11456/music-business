@@ -80,3 +80,19 @@ class OrderFeeTests(AssumptionTests):
  def test_order_fields_are_validated(self):
   for extra in ({'tax_pct':'1.01'},{'conversion_pct':'.9'},{'buyer_shipping':'-1'}):
    with self.subTest(extra=extra),self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,**extra})
+
+class FormatShippingTests(AssumptionTests):
+ def test_cd_and_cassette_use_their_own_shipping_and_fall_back_when_blank(self):
+  import config
+  self.app.mutate('/api/assumptions',{**self.values,'buyer_shipping':'900','shipping':'600','buyer_shipping_cd':'420','shipping_cd':'250','buyer_shipping_cassette':'','shipping_cassette':''})
+  s=Settings(db_path=self.path)
+  self.assertEqual(config.shipping_for(s,'Vinyl'),(Decimal('900'),Decimal('600')))
+  self.assertEqual(config.shipping_for(s,'CD'),(Decimal('420'),Decimal('250')))
+  self.assertEqual(config.shipping_for(s,'Cassette'),(Decimal('900'),Decimal('600')))  # blank: same as vinyl
+  self.assertEqual(config.shipping_for(s,None),(Decimal('900'),Decimal('600')))
+  # Same sale: the CD keeps less buyer shipping but pays less postage.
+  self.assertNotEqual(config.fees(s,Decimal(1000),'CD'),config.fees(s,Decimal(1000),'Vinyl'))
+  saved=Dashboard(Settings(db_path=self.path)).state()['assumptions']
+  self.assertEqual((saved['buyer_shipping_cd'],saved['shipping_cd'],saved['shipping_cassette']),('420','250',''))
+ def test_negative_format_shipping_is_rejected(self):
+  with self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,'shipping_cd':'-1'})

@@ -14,8 +14,15 @@ test('missing, conflicting, partial identifiers and cross-format candidates are 
  assert.ok(!hasStrongMatch({...row,source_catalog_no:''}));
 });
 
-test('title-derived identifiers never strengthen an unverified match and conflicts override old confirmation',()=>{
- assert.equal(matchLevel({...row,source_catalog_from_title:true}),'candidate');
+test('a title catalogue number equal to the release counts for filtering but stays labelled as from the title',()=>{
+ const titled={...row,source_catalog_from_title:true};
+ assert.equal(matchLevel(titled),'title_catalog');assert.ok(hasStrongMatch(titled));
+ assert.equal(matchLabel(titled),'標題品番與 Discogs 一致 · 壓片待核對');
+ assert.equal(matchLevel({...titled,source_catalog_no:'TOCP-9999'}),'candidate');
+ assert.equal(matchLevel({...titled,source_format:'Vinyl'}),'candidate');
+});
+
+test('conflicts override old confirmation',()=>{
  assert.equal(matchLevel({...row,version_confirmed:true,source_format:'Vinyl'}),'candidate');
  assert.equal(matchLevel({...row,version_confirmed:true,source_catalog_no:'OTHER-1'}),'candidate');
  assert.match(matchLabel({...row,version_confirmed:true,source_format:'Cassette'}),/格式衝突/);

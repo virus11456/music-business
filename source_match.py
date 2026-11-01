@@ -22,6 +22,19 @@ def source_catalog(source):
     values={prefix+'-'+number for prefix,number in matches if prefix not in ('CD','LP','SACD','DVD','BLU','ISBN','JAN','EAN','UPC')}
     return next(iter(values)) if len(values)==1 else ''
 
+def title_catalog(title,catno):
+    """The release catalogue number written in the title without the usual hyphen (RAL8801, RAL 8801), or ''.
+    Whole tokens only, so TOCP-1 never matches TOCP-123; numbers need letters, digits and five or more characters."""
+    tokens=re.findall(r'[A-Z0-9]+',unicodedata.normalize('NFKC',str(title or '')).upper())
+    candidates=set(tokens)|{a+b for a,b in zip(tokens,tokens[1:])}
+    for part in str(catno or '').split(','):
+        compact=re.sub(r'[^0-9A-Z]','',unicodedata.normalize('NFKC',part).upper())
+        if len(compact)>=5 and re.search(r'[A-Z]',compact) and re.search(r'\d',compact) and compact in candidates:return part.strip()
+    return ''
+
+def title_has_catalog(title,catno):
+    return bool(title_catalog(title,catno))
+
 def evidence(source,release):
     title=source['title']
     if MERCH.search(title):return []
@@ -36,6 +49,8 @@ def evidence(source,release):
     if catalog and catalog not in ('none','na') and catalog in [normalized(x) for x in release['catno'].split(',')]:
         reasons.append('規格品番一致，仍需核對壓片')
         if not source['catalog_no']:reasons.append('唱片編號取自賣場標題，仍需核對實物')
+    elif not catalog and title_has_catalog(title,release['catno']):
+        reasons.append('規格品番一致，仍需核對壓片');reasons.append('唱片編號取自賣場標題，仍需核對實物')
     target_catalogs=[normalized(x) for x in release['catno'].split(',') if normalized(x) not in ('','none','na','未確認')]
     if catalog not in ('','none','na','未確認') and target_catalogs and catalog not in target_catalogs:return []
     # Discogs can include translated titles separated by '='; either complete title is evidence.
