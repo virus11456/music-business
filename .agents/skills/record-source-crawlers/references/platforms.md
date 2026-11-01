@@ -18,7 +18,7 @@
 ## 日本 Yahoo：yahoo_jp
 
 - 搜尋 `https://auctions.yahoo.co.jp/search/search?p=...&ei=utf-8`；續頁 `b=(page-1)*50+1`、`n=50`。
-- `parse_yahoo_jp` 讀 `li.Product` 裡帶 `data-auction-id` 的連結及 title／price。JPY，`price_kind=current_bid`，標示拍賣中／需確認結標。
+- 2026-11-01 起搜尋頁改為 Next.js：`parse_yahoo_jp` 先讀 `<script id="__NEXT_DATA__">` 的 `props.pageProps.initialState.search.items.listing.items`（auctionId、title、price、buyNowPrice、isFixedPrice），JPY；`isFixedPrice` 為即決價（listed，用 buyNowPrice），否則 current_bid、拍賣中／需確認結標。空清單回空結果；JSON 路徑不符視為結構改變。沒有 `__NEXT_DATA__` 時才退回舊版 `li.Product`／`data-auction-id` 解析。英文查詢會被 Yahoo 自動擴展日文別名（如 Tatsuro Yamashita → 山下達郎）。
 - 無卡片時僅遇程式認得的「一致する商品はありません」「見つかりません」才當空結果；其他狀況視為结构改變。
 - source-first 的 full_page 模式最多 50 筆；一般第一頁搜尋目前最多 40 筆。不要將出價當成含運即買價。
 
@@ -100,3 +100,12 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 
 測試：`tests/test_api_sources.py`（解析、金鑰位置、token 快取、請求參數、整合搜尋）。正式驗收需在 VPS 實際搜尋並回讀，fixture 不代表 API 可用。
 - 2026-10-31 補充：eBay Production keyset 建立時為 disabled，須先處理 Marketplace Account Deletion。本服務會保存 eBay 商品標題／價格／連結，不符合「Not persisting eBay data」豁免，改為訂閱通知：`GET /api/ebay/account-deletion?challenge_code=` 回 `{"challengeResponse": sha256(code+EBAY_VERIFICATION_TOKEN+EBAY_DELETION_ENDPOINT)}`（application/json），`POST` 同路徑直接回 204（未保存 eBay 使用者資料，無需刪除）。兩個環境變數未設定時回 404；此端點不需登入。啟用前 eBay 搜尋會回 401。
+
+## 2026-11-01 夜間找貨平台失敗修正
+
+11/01 03:00 夜間找貨 600 次平台搜尋失敗 289 次：Tower 100/100 HTTP 403、Yahoo JP 100/100 解析失敗（頁面改版）、露天 68/100（HTTP 503 為主，另 404、520）、樂天 21/100 HTTP 400；eBay 與 Yahoo TW 無失敗。
+- Yahoo JP：改讀 `__NEXT_DATA__`（見上），本機連線實測同查詢 50 件（16 件即決）。
+- Tower：伺服器與本機連線皆回 403，視為來源拒絕自動存取；夜間找貨 `demand_queue.PLATFORMS` 移除 Tower，不以變更 User-Agent 等方式規避，手動搜尋仍保留（目前同樣會 403）。
+- 露天：同平台兩次搜尋間隔由 3 秒加大到 10 秒（`platforms.SPACING`），每次搜尋含商品搜尋與明細兩個請求；本機連線測試正常，VPS 503 推測為頻率限制，待下一輪驗證。
+- 樂天：官方規定每個以空白分隔的關鍵字至少 2 個半形字元，`api_sources.keyword` 去除單一字元詞（如「Vol. 1」的 1、&）；全部被去除時保留原查詢。
+- 平台失敗回報新增 `error`（`HTTP <code>` 或例外類型）；`demand_queue` 結果新增 `platforms`：各平台有結果／無結果／失敗次數、商品件數與錯誤類型次數，前端工作明細逐平台顯示。

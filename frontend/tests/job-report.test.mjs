@@ -90,3 +90,10 @@ test('night demand batch shows the scan and the scarcity-list search',()=>{
  const text=jobReport(detail).join('\n');
  for(const part of ['新增 40 個版本','600 次請求','先篩掉 1800 筆','已達今晚上限','搜尋 24 張專輯','98 個版本','取得 610 件候選','可能配對 150 組','1 次平台未完成','找貨未完成：The Beatles Rubber Soul','Google Sheets 同步完成'])assert.ok(text.includes(part),part);
 });
+
+test('night demand batch lists each platform with its error kinds',()=>{
+ const detail=JSON.stringify({batches:[{flow:'demand_night',scan:{},demand:{albums:1,platforms:{tower:{success:0,empty:0,failed:3,items:0,errors:{'HTTP 403':3}},ebay:{success:2,empty:1,failed:0,items:40,errors:{}}}}}]});
+ const text=jobReport(detail).join('\n');
+ assert.ok(text.includes('Tower：有結果 0 · 無結果 0 · 失敗 3（HTTP 403 3 次） · 共 0 件'),text);
+ assert.ok(text.includes('eBay：有結果 2 · 無結果 1 · 失敗 0 · 共 40 件'),text);
+});

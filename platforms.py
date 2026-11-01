@@ -88,6 +88,20 @@ def parse_yahoo_tw(html):
  return out
 
 def parse_yahoo_jp(html):
+ # Current Yahoo! Auctions pages (Next.js) carry the result list as JSON; older pages had product cards.
+ data=re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',html,re.S)
+ if data:
+  try:listing=json.loads(data.group(1))['props']['pageProps']['initialState']['search']['items']['listing']
+  except (ValueError,KeyError,TypeError) as exc:raise ValueError('搜尋頁結構改變') from exc
+  items=listing.get('items')
+  if not isinstance(items,list):raise ValueError('搜尋頁結構改變')
+  out=[]
+  for item in items:
+   if not isinstance(item,dict) or not item.get('auctionId'):continue
+   fixed=bool(item.get('isFixedPrice'))
+   amount=item.get('price') if not fixed else item.get('buyNowPrice') or item.get('price')
+   out.append(candidate('yahoo_jp',item['auctionId'],item.get('title',''),amount,'listed' if fixed else 'current_bid','即決價' if fixed else '拍賣中／需確認結標'))
+  return out
  root=Tree(html).root;cards=root.find('li','Product');out=[]
  if not cards and not any(t in html for t in ('一致する商品はありません','見つかりません')):raise ValueError('搜尋頁結構改變')
  for card in cards:
@@ -143,6 +157,10 @@ def parse_ebay(raw):
  return __import__('api_sources').parse('ebay',raw)[0]
 
 PARSERS={'rottenblues':parse_rottenblues,'yahoo_tw':parse_yahoo_tw,'yahoo_jp':parse_yahoo_jp,'tower':parse_tower,'ruten':parse_ruten,'rakuten':parse_rakuten,'ebay':parse_ebay}
+# Seconds between two searches on the same platform. Ruten answered most nightly searches with HTTP 503 at 3 s
+# (each search is two requests), so it gets more room.
+SPACING={'ruten':10}
+
 def search_url(platform,query,page=1):
  q=quote(query,safe='')
  if not isinstance(page,int) or not 1<=page<=1000:raise ValueError('搜尋頁數無效')
@@ -177,7 +195,8 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
    if previous:
     from datetime import datetime,timezone
     elapsed=(datetime.now(timezone.utc)-datetime.fromisoformat(previous[0])).total_seconds()
-    if elapsed<3:time.sleep(3-elapsed)
+    gap=SPACING.get(platform,3)
+    if elapsed<gap:time.sleep(gap-elapsed)
    api=platform in __import__('api_sources').PLATFORMS
    raw=fetcher(__import__('api_sources').request(settings,platform,query,page) if api else search_url(platform,query,page))
    if platform=='ruten':
@@ -214,5 +233,5 @@ def search(settings,query,selected,fetcher=fetch,page=1,full_page=False):
    status=f'來源拒絕連線（HTTP {e.code}），請人工開啟平台' if isinstance(e,HTTPError) else '讀取失敗或頁面結構改變；請人工開啟平台'
    with connect(settings.db_path) as c:c.execute('INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES(?,?,?,?,?)',(platform,query,0,status,now()))
    failed+=1
-   reports.append({'platform':platform,'count':0,'status':'failed'})
+   reports.append({'platform':platform,'count':0,'status':'failed','error':f'HTTP {e.code}' if isinstance(e,HTTPError) else type(e).__name__})
  return {'candidates':total,'failed_platforms':failed,'platforms':reports}

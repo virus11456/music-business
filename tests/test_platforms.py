@@ -19,6 +19,21 @@ class PlatformTests(unittest.TestCase):
  def test_auction_is_not_buy_now_cost(self):
   r=platforms.parse_yahoo_jp('<li class="Product"><a data-auction-id="a123" data-auction-price="99" data-auction-title="Record"></a></li>')[0]
   self.assertEqual(r['price_kind'],'current_bid');self.assertEqual(r['currency'],'JPY')
+ def next_page(self,items,total=None):
+  listing={'items':items,'totalResultsAvailable':len(items) if total is None else total}
+  return '<html><script id="__NEXT_DATA__" type="application/json">'+json.dumps({'props':{'pageProps':{'initialState':{'search':{'items':{'listing':listing}}}}}})+'</script></html>'
+ def test_current_yahoo_jp_page_reads_listing_json(self):
+  rows=platforms.parse_yahoo_jp(self.next_page([
+   {'auctionId':'f125','title':'山下達郎 FOR YOU RAL8801','price':1210,'buyNowPrice':None,'isFixedPrice':False},
+   {'auctionId':'x9','title':'Fixed','price':3000,'buyNowPrice':3000,'isFixedPrice':True},{'title':'no id'}]))
+  self.assertEqual([(r['external_id'],r['price'],r['price_kind'],r['currency']) for r in rows],[('f125','1210','current_bid','JPY'),('x9','3000','listed','JPY')])
+  self.assertEqual(rows[0]['source_url'],'https://auctions.yahoo.co.jp/jp/auction/f125')
+  self.assertEqual(platforms.parse_yahoo_jp(self.next_page([],0)),[])
+  with self.assertRaises(ValueError):platforms.parse_yahoo_jp('<script id="__NEXT_DATA__" type="application/json">{"props":{}}</script>')
+ def test_ruten_searches_are_spaced_further_apart(self):
+  with connect(self.s.db_path) as c:c.execute("INSERT INTO platform_runs(platform,query,count,status,recorded_at) VALUES('ruten','q',0,'完成',?)",(platforms.now(),))
+  with patch('platforms.time.sleep') as sleep:platforms.search(self.s,'test',['ruten'],lambda _:'{"Rows":[]}')
+  self.assertGreater(sleep.call_args_list[0].args[0],5)
  def test_missing_markup_fails_visibly(self):
   for parser in platforms.PARSERS.values():
    with self.assertRaises((ValueError,KeyError)):parser('<html>please login</html>')
@@ -35,7 +50,7 @@ class PlatformTests(unittest.TestCase):
    if 'auctions.yahoo.co.jp' in url:raise HTTPError(url,403,'blocked',{},None)
    return self.yahoo()
   result=platforms.search(self.s,'test',['yahoo_jp','yahoo_tw'],fetch)
-  self.assertEqual(result,{'candidates':1,'failed_platforms':1,'platforms':[{'platform':'yahoo_jp','count':0,'status':'failed'},{'platform':'yahoo_tw','count':1,'status':'success'}]})
+  self.assertEqual(result,{'candidates':1,'failed_platforms':1,'platforms':[{'platform':'yahoo_jp','count':0,'status':'failed','error':'HTTP 403'},{'platform':'yahoo_tw','count':1,'status':'success'}]})
   self.assertIn('403',platforms.state(self.s)['runs'][1]['status'])
  def test_query_is_encoded_not_url_injected(self):
   self.assertEqual(platforms.search_url('tower','a/b?x=1'),'https://tower.jp/search/item/a%2Fb%3Fx%3D1')

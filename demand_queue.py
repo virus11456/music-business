@@ -12,7 +12,9 @@ import source_queue
 PREFIX='demand_search:'
 RECENT=timedelta(days=7)
 # Rotten Blues search only filters one catalogue page, so an album query there finds almost nothing.
-PLATFORMS=['yahoo_tw','yahoo_jp','ruten','tower','rakuten','ebay']
+# Tower answers every request from the server with HTTP 403 (since 11/01), so the nightly run leaves it out;
+# it remains available for manual searches.
+PLATFORMS=['yahoo_tw','yahoo_jp','ruten','rakuten','ebay']
 
 def album_key(artist,title):
     text=unicodedata.normalize('NFKC',f'{artist or ""}|{title or ""}').casefold()
@@ -48,7 +50,7 @@ def run(settings,limit=None,selected=None,instant=None):
     selected=selected or PLATFORMS
     instant=instant or datetime.now(timezone.utc)
     source_queue.init(settings)
-    result={'albums':0,'versions':0,'eligible_albums':0,'skipped_recent':0,'candidates':0,'linked':0,'failed_platforms':0,'errors':[]}
+    result={'albums':0,'versions':0,'eligible_albums':0,'skipped_recent':0,'candidates':0,'linked':0,'failed_platforms':0,'errors':[],'platforms':{}}
     albums=scarcity(settings);result['eligible_albums']=len(albums)
     for album in albums:
         if result['albums']>=limit:break
@@ -66,6 +68,11 @@ def run(settings,limit=None,selected=None,instant=None):
             result['errors'].append({'step':'demand_search','album':query[:80],'error':type(exc).__name__});continue
         result['albums']+=1;result['versions']+=len(album['release_ids'])
         result['candidates']+=found['candidates'];result['linked']+=found['possible_matches'];result['failed_platforms']+=found['failed_platforms']
+        # Per platform: searches that returned items, came back empty or failed (with the error kind), and items found.
+        for report in found.get('platforms',[]):
+            stats=result['platforms'].setdefault(report['platform'],{'success':0,'empty':0,'failed':0,'items':0,'errors':{}})
+            stats[report['status']]=stats.get(report['status'],0)+1;stats['items']+=report.get('count',0)
+            if report.get('error'):stats['errors'][report['error']]=stats['errors'].get(report['error'],0)+1
         ids=found.get('returned_ids',[])
         with connect(settings.db_path) as c:
             linked={r[0] for r in c.execute(f"SELECT candidate_id FROM version_searches WHERE candidate_id IN ({','.join('?'*len(ids))})",ids)} if ids else set()

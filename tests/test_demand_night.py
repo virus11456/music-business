@@ -156,6 +156,19 @@ class DemandTests(unittest.TestCase):
         with patch('demand_queue.sourcing.platforms.search',side_effect=self.fake_search) as search:
             later=demand_queue.run(self.s,selected=['ruten'],instant=datetime.now(timezone.utc)+timedelta(days=8))
         self.assertEqual(later['albums'],2)
+    def test_platform_results_are_counted_per_platform(self):
+        def search(s,query,selected,**kw):
+            report=self.fake_search(s,query,selected)
+            report['platforms']+= [{'platform':'tower','count':0,'status':'failed','error':'HTTP 403'},{'platform':'ebay','count':0,'status':'empty'}]
+            report['failed_platforms']=1
+            return report
+        with patch('demand_queue.sourcing.platforms.search',side_effect=search):
+            result=demand_queue.run(self.s,selected=['ruten','tower','ebay'])
+        self.assertEqual(result['platforms'],{'ruten':{'success':2,'empty':0,'failed':0,'items':6,'errors':{}},
+            'tower':{'success':0,'empty':0,'failed':2,'items':0,'errors':{'HTTP 403':2}},'ebay':{'success':0,'empty':2,'failed':0,'items':0,'errors':{}}})
+    def test_nightly_platforms_leave_out_tower(self):
+        self.assertNotIn('tower',demand_queue.PLATFORMS)
+        self.assertEqual(set(demand_queue.PLATFORMS),{'yahoo_tw','yahoo_jp','ruten','rakuten','ebay'})
     def test_album_limit_and_reverse_queue_checks_are_not_overwritten(self):
         with connect(self.s.db_path) as c:
             c.execute("INSERT INTO platform_candidates(id,platform,external_id,query,title,artist,format,catalog_no,price,currency,price_kind,availability,source_url,captured_at) VALUES(99,'ruten','The0','x','x','','CD','','1','TWD','listed','未確認','https://www.ruten.com.tw/item/show?99',?)",(now(),))

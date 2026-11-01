@@ -18,8 +18,10 @@ EBAY_LAST_OFFSET = 9950   # Browse search stops at 10,000 results
 AGENT = 'SimplesRecordResearch/0.1'
 
 def keyword(query, limit=128):
-    """Rakuten caps keyword at 128 single-byte characters, so trim by UTF-8 length."""
-    text = query.strip()
+    """Rakuten caps keyword at 128 single-byte characters, so trim by UTF-8 length. Every space-separated word
+    must be at least two single-byte characters (a lone "1" or "&" gets HTTP 400), so such words are dropped."""
+    words = [w for w in query.split() if len(w.encode()) >= 2]
+    text = ' '.join(words) or query.strip()
     while len(text.encode()) > limit:
         text = text[:-1]
     return text.strip()

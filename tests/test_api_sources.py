@@ -57,6 +57,9 @@ class RequestTests(unittest.TestCase):
         self.assertLessEqual(len(query['keyword'][0].encode()),128)
         with self.assertRaises(ValueError):api_sources.request(self.s,'rakuten','x',101)
         with self.assertRaises(ValueError):api_sources.request(replace(self.s,rakuten_access_key=''),'rakuten','x')
+    def test_rakuten_keyword_drops_single_character_words(self):
+        self.assertEqual(api_sources.keyword('Various Vol. 1 & 2 山下達郎'),'Various Vol. 山下達郎')
+        self.assertEqual(api_sources.keyword('A'),'A')  # nothing left to drop to: keep the query as typed
     def test_ebay_token_is_fetched_once_and_reused_until_near_expiry(self):
         calls=[];clock=[1000.0]
         def opener(req,timeout):
