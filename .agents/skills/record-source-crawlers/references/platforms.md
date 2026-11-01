@@ -115,3 +115,5 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 - `platform_health.record`：03:00 夜間找貨後依 `demand.platforms` 判斷，搜尋 ≥ 5 次且失敗 ≥ 50% 標為 failing；狀態改變（ok→failing、failing→ok）時發一次 Telegram（有設定時），狀態存 meta `platform_health:<platform>`（since、checked_at、searches、failed、items、errors），隨 Sheet 保存。不暫停、不重試任何平台。`/api/state.platform_health` 提供網站橫幅。
 - `scripts/platform_probe.py`：唯讀即時檢測，以固定查詢「Tatsuro Yamashita For You」抓各平台搜尋頁並跑解析器，輸出 JSON；狀態 ok／empty／broken／blocked／skipped（API 金鑰不在本機時略過樂天、eBay）。只有 broken 或 empty（程式可修）使結束碼為 1；blocked（HTTP 403 等來源拒絕）只回報，不規避。
 - 每日排程的 Claude 工作階段執行即時檢測；解析壞掉時修解析器、補測試與本 reference，推到新分支並開草稿 PR，部署仍待使用者同意。
+
+- 2026-11-01 14:11 部署後伺服器檢測：Yahoo TW／JP 正常，露天與 Tower 對伺服器 IP 回 HTTP 403（露天本機連線正常）。`platform_probe.py` 改為只從 `.env`／環境讀取樂天、eBay 四個 API 金鑰，不建立完整 Settings（會開啟業務資料庫）；缺任一平台的金鑰時該平台標 skipped。

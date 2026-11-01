@@ -1,3 +1,9 @@
+## 2026-11-01 正式部署 9492a07（平台修正、健康監測、掃描量加大）
+
+main 經發布守門於 14:09 fast-forward 至 9492a07（PR #18），推送未觸發 Vercel 自動部署。後端由使用者端操作部署於 14:11:03（49 個 .py，manifest SHA256 7e7fc51cd2eba2bd9015c5a1a1e5578220d21508578c45fba0c7f2cd926d3c3a，下載包與伺服器重算一致，備份 backups/full-20261101T061051Z，服務 active；重啟後第一次查詢 502 為啟動中，讀回 401）。`.env` 新增 SCAN_MAX_NEW=500、SCAN_REQUEST_BUDGET=1200、DEMAND_ALBUMS=200；TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 未設定，平台異常只顯示在網站。前端 Vercel 正式部署 dpl_ALteDGyDuPEVQbw2YuTgHsKBE9DS READY，`version.json` 讀回 9492a07。
+
+伺服器即時檢測（Tatsuro Yamashita For You）：Yahoo 台灣 ok 14 件、Yahoo 日本 ok 50 件（修正生效）、露天 HTTP 403、Tower HTTP 403；樂天、eBay 因檢測腳本讀不到 API 金鑰而略過（腳本建立完整設定時失敗），已改為只讀取四個 API 金鑰，待下次部署。露天由前晚的 503 轉為 403，伺服器 IP 可能被封鎖，本機連線正常；不規避，待今晚夜間工作的逐平台結果確認。
+
 ## 2026-11-01 平台健康監測與每日自動檢查（本機實作，待部署：先後端後前端）
 
 - 夜間找貨後計算各平台失敗率：搜尋 5 次以上且失敗一半以上標為「異常」。狀態改變時發 Telegram 通知（後端有設定時），網站頂端顯示異常平台、開始時間、失敗次數與錯誤類型，恢復後自動消失。不會自動停用或重試平台。

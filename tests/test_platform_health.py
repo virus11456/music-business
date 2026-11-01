@@ -54,3 +54,14 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(platform_probe.probe('tower',fetcher=blocked),{'platform':'tower','status':'blocked','error':'HTTP 403','seconds':0.0})
         self.assertEqual(platform_probe.probe('yahoo_jp',fetcher=lambda u:empty)['status'],'empty')
         self.assertEqual(platform_probe.probe('ebay')['status'],'skipped')
+        from types import SimpleNamespace
+        only_rakuten=SimpleNamespace(rakuten_app_id='a',rakuten_access_key='k',ebay_client_id='',ebay_client_secret='')
+        self.assertEqual(platform_probe.probe('ebay',only_rakuten)['status'],'skipped')
+    def test_api_keys_come_from_the_environment_without_building_settings(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ,{'RAKUTEN_APPLICATION_ID':'app','RAKUTEN_ACCESS_KEY':'key','EBAY_CLIENT_ID':'','EBAY_CLIENT_SECRET':''}),patch('config.load_env'):
+            keys=platform_probe.api_keys()
+        self.assertEqual((keys.rakuten_app_id,keys.rakuten_access_key,keys.ebay_client_id),('app','key',''))
+        with patch.dict(os.environ,{'RAKUTEN_APPLICATION_ID':'','EBAY_CLIENT_ID':''}),patch('config.load_env'):
+            self.assertIsNone(platform_probe.api_keys())

@@ -25,8 +25,9 @@ def probe(platform, settings=None, fetcher=platforms.fetch):
     started = time.monotonic()
     try:
         if platform in api_sources.PLATFORMS:
-            if settings is None:
-                return {'platform': platform, 'status': 'skipped', 'reason': 'API 金鑰只在伺服器'}
+            keys = {'rakuten': ('rakuten_app_id', 'rakuten_access_key'), 'ebay': ('ebay_client_id', 'ebay_client_secret')}[platform]
+            if settings is None or not all(getattr(settings, k, '') for k in keys):
+                return {'platform': platform, 'status': 'skipped', 'reason': '未讀到 API 金鑰（.env 不存在或無法讀取）'}
             raw = fetcher(api_sources.request(settings, platform, QUERY, 1))
             rows = api_sources.parse(platform, raw, 1)[0]
         else:
@@ -45,17 +46,24 @@ def probe(platform, settings=None, fetcher=platforms.fetch):
     return {'platform': platform, 'status': status, 'items': len(rows), 'sample': rows[0]['title'][:80] if rows else None,
             'seconds': round(time.monotonic() - started, 1)}
 
+def api_keys():
+    """Only the four API keys, read from the project's .env (the service's own file) or the environment. The full
+    Settings object is not built: it opens the business data store, which this read-only check does not need."""
+    import os
+    from types import SimpleNamespace
+    try:
+        from config import load_env
+        load_env()
+    except (OSError, ValueError):
+        pass  # No readable .env here: fall back to whatever the environment holds.
+    names = {'rakuten_app_id': 'RAKUTEN_APPLICATION_ID', 'rakuten_access_key': 'RAKUTEN_ACCESS_KEY',
+             'ebay_client_id': 'EBAY_CLIENT_ID', 'ebay_client_secret': 'EBAY_CLIENT_SECRET'}
+    keys = SimpleNamespace(**{k: os.getenv(v, '') for k, v in names.items()})
+    return keys if keys.rakuten_app_id or keys.ebay_client_id else None
+
 def main(argv):
     selected = argv or list(SCRAPED) + list(api_sources.PLATFORMS)
-    settings = None
-    try:
-        from config import Settings, load_env
-        load_env()
-        candidate = Settings()
-        if candidate.rakuten_app_id or candidate.ebay_client_id:
-            settings = candidate
-    except Exception:
-        settings = None  # No server configuration here: API platforms are skipped.
+    settings = api_keys()
     report = []
     for platform in selected:
         report.append(probe(platform, settings))
