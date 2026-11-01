@@ -1,3 +1,7 @@
+## 2026-11-01 README 新增系統運作說明
+
+README 開頭新增完整運作說明：整體架構、每日排程、從找機會到上架的流程、利潤公式、網站各頁用法、貨源平台現況、資料存放、監測與自動修復、部署與發布規則、主要設定、程式地圖、開發與測試、文件索引；原有逐日紀錄移到「變更紀錄（新到舊）」之下，內容不變。僅文件，未部署。
+
 ## 2026-11-01 正式部署 9492a07（平台修正、健康監測、掃描量加大）
 
 main 經發布守門於 14:09 fast-forward 至 9492a07（PR #18），推送未觸發 Vercel 自動部署。後端由使用者端操作部署於 14:11:03（49 個 .py，manifest SHA256 7e7fc51cd2eba2bd9015c5a1a1e5578220d21508578c45fba0c7f2cd926d3c3a，下載包與伺服器重算一致，備份 backups/full-20261101T061051Z，服務 active；重啟後第一次查詢 502 為啟動中，讀回 401）。`.env` 新增 SCAN_MAX_NEW=500、SCAN_REQUEST_BUDGET=1200、DEMAND_ALBUMS=200；TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 未設定，平台異常只顯示在網站。前端 Vercel 正式部署 dpl_ALteDGyDuPEVQbw2YuTgHsKBE9DS READY，`version.json` 讀回 9492a07。

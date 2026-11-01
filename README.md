@@ -1,3 +1,200 @@
+# SIMPLES 唱片生意系統
+
+找出 Discogs 上「想要的人多、擁有的人少」的唱片，到台灣、日本與海外平台找更便宜的貨源，扣掉實際費用後算出利潤，協助決定要不要進貨，再整理成 Discogs 刊登草稿。系統只做研究、比價與整理；**不會自動購買，也不會在沒有人工確認時刊登商品。**
+
+> 本節是系統運作說明（2026-11-01 依正式部署 9492a07 整理）。下方「變更紀錄」保留每次修改、部署與驗證的原始紀錄。
+
+## 1. 整體架構
+
+```mermaid
+flowchart LR
+  U[你：瀏覽器／手機] -->|登入後操作| FE[前端網站<br/>music-business.vercel.app<br/>Vercel]
+  FE -->|API（需登入）| BE[後端服務<br/>srv1542946.hstgr.cloud<br/>Hostinger VPS /opt/music-business]
+  BE <-->|唯一業務資料源| GS[(Google Sheet<br/>SIMPLES_Data_* 分頁)]
+  BE -->|行情、Want/Have、刊登| DG[Discogs API]
+  BE -->|搜尋貨源| SRC[Yahoo 台灣／Yahoo 日本／露天<br/>樂天 API／eBay API／Tower]
+  BE -->|參考匯率| FX[ExchangeRate-API]
+  BE -.->|平台異常通知（有設定才發）| TG[Telegram]
+```
+
+| 元件 | 位置 | 說明 |
+|---|---|---|
+| 前端 | `frontend/`，部署在 Vercel（music-business.vercel.app） | React／Vite 網站。未登入只看到登入畫面，看不到任何資料。 |
+| 後端 | 根目錄 `*.py`，部署在 Hostinger VPS srv1542946（`/opt/music-business`，systemd 服務 `music-business`） | Python 標準函式庫寫的 HTTP 服務與排程器，只有這一個正式執行程序。 |
+| 資料 | 使用者指定的 Google Sheet（`GOOGLE_SPREADSHEET_ID`） | 唯一業務主資料源。後端在本機用 SQLite 當快取運算，再完整同步回 Sheet；不以 VPS 磁碟資料庫取代 Sheet。分頁以 `SIMPLES_Data_` 開頭，另有給人看的 Comparisons、PlatformCandidates、Discogs 等分頁。 |
+| 外部來源 | Discogs、各購物平台、匯率 | 見第 6 節。 |
+
+## 2. 每天自動做什麼
+
+排程時間都是台灣時間，由後端 `scheduler.py` 執行；同一時段只跑一次，忙碌時在寬限時間內重試。
+
+| 時間 | 工作（flow） | 做的事 |
+|---|---|---|
+| **03:00** | 夜間稀缺掃描與依名單找貨（`demand_night`） | ① 依「掃描主題」（格式＋國別，可加歌手）到 Discogs 依 Want 由多到少搜尋，逐年分段，新增符合 Want/Have 門檻的版本，存行情與 Want/Have。每晚上限：`SCAN_REQUEST_BUDGET` 次請求（正式 1200）、`SCAN_MAX_NEW` 個新版本（正式 500）。<br/>② 從已追蹤版本挑出稀缺名單：Want ≥ `SCAN_MIN_WANT`（50）、Want/Have ≥ `DEMAND_MIN_RATIO`（2）、Discogs 在售 < `DEMAND_MAX_FOR_SALE`（10）張；依專輯合併，Discogs 沒人在賣的優先。<br/>③ 每晚取前 `DEMAND_ALBUMS`（正式 200）張專輯，用「歌手＋專輯名」到 Yahoo 台灣、Yahoo 日本、露天、樂天、eBay 各搜一次，結果比對到該專輯所有版本；同一專輯 7 天內不重搜。<br/>④ 記錄各平台結果並更新平台健康狀態，重新評分，同步 Google Sheet。 |
+| **10:00、16:00、22:00** | 反查與報價刷新（`source_first`） | ① 待反查商品不多時，輪流收集一個「搜尋主題」的平台商品。<br/>② 反查佇列：把平台上找到的商品反過來到 Discogs 找對應版本，每輪最多 60 件。<br/>③ 刷新已存貨源報價（價格、庫存、拍賣狀態），更新相關版本的 Discogs 行情。<br/>④ 重新評分，同步 Google Sheet。 |
+| 每天 13:41 | 平台健康檢查（排程的 Claude 工作階段） | 執行 `scripts/platform_probe.py` 實際抓各平台搜尋頁並測解析器；解析壞掉就修正、補測試並開 PR，部署仍需人工同意。見第 8 節。 |
+
+匯率：比價需要的外幣匯率取自 ExchangeRate-API 參考匯率（自動更新，也可在設定頁手動新增），超過 7 天視為過期，不計算跨幣別利潤。
+
+## 3. 從找機會到上架的流程
+
+```mermaid
+flowchart TD
+  A[Discogs 掃描<br/>Want 多、Have 少的版本] --> B[稀缺名單]
+  B --> C[到各平台找貨<br/>歌手＋專輯名搜尋]
+  P[搜尋主題收集的平台商品] --> R[反查 Discogs 版本]
+  C --> M[配對：商品 ↔ Discogs 版本<br/>品番／條碼／格式／名稱證據]
+  R --> M
+  M --> K[比價：售價 − 成本 − 實際費用]
+  K --> L[唱片清單／配對比價表<br/>預設只列可信且有利潤的配對]
+  L --> D{你決定}
+  D -->|要進貨| PL[進貨清單＋進貨報價]
+  D -->|觀察| W[觀察價格<br/>到價時記錄]
+  D -->|跳過| S[略過]
+  PL --> DR[Discogs 刊登草稿<br/>可用 AI 產生描述建議]
+  DR -->|人工確認後| PUB[匯出 CSV 或送出到 Discogs<br/>（需另外啟用）]
+```
+
+1. **找需求**：Discogs 的 Want（想要的人數）與 Have（擁有的人數）代表需求與供給。Want/Have 比越高、在售越少，越可能有溢價。
+2. **找貨源**：兩個方向同時進行。依稀缺名單到平台搜尋（需求找貨），以及把平台上的商品反查回 Discogs 版本（貨找需求）。
+3. **配對**（`source_match.py`、`matching.py`、`direct_matches.py`）：
+   - **可信配對**：規格品番一致、條碼一致，或你已人工核對版本。
+   - **待核對**：只有歌手／專輯名相近。同名不同版（例如復刻版對到首版）是表面高利潤的主要誤判來源，所以網站預設只顯示可信配對。
+   - 格式衝突（CD 對到黑膠）或編號衝突會排除。新舊與品相不作為排除條件，但會列為待確認事項。
+4. **比價與評分**（`comparisons.py`、`analyze.py`）：計算毛利、扣費用後淨利、淨利率；機會分數由需求（30%）、利潤（35%）、稀缺（15%）、價格動能（20%）組成，並標出「有利潤空間」「需求較高」「價格下跌」三種規則。
+5. **決策與進貨**：在網站把唱片標為要進貨、觀察或跳過；要進貨的可加入進貨清單、填入實際總成本（含運費、代購費）與品相。
+6. **上架**：已確認版本、品相、售價的報價可建立 Discogs 刊登草稿，匯出 Discogs CSV（QuickLister 格式），或在啟用 `DISCOGS_LISTING_WRITE` 後從網站送出（預設關閉；每次送出只嘗試一次，結果不明時以庫存讀回確認，不自動重試）。之後可讀回自己的 Discogs 庫存，確認刊登狀態。
+
+## 4. 利潤怎麼算
+
+依 2026-11 三筆實際 Discogs 訂單的 PayPal 帳單反推，三筆入帳金額都精確重現（`config.fee_terms`）：
+
+```
+毛收入     = 售價 + 向買家收取的運費
+Discogs 費 = 9% × 毛收入                         （Discogs 連運費一起抽成）
+PayPal 費  = 4.4% × 毛收入 × (1 + 買家稅率) + US$0.30（約 NT$10）
+換匯費     = 2.5% × (毛收入 − Discogs 費 − PayPal 費)   （美元提領到台灣銀行）
+淨利       = 售價 − 進貨成本 − Discogs 費 − PayPal 費 − 換匯費
+             − 實際郵資 − 包材 − 風險準備 + 向買家收取的運費
+淨利率     = 淨利 ÷ 售價
+```
+
+- 買家付的稅由 Discogs 代收代繳，不算收入，但 PayPal 會對稅金部分收手續費。
+- 所有比例與金額都在網站「掃描與設定 → 費用與最低利潤」調整，儲存後立即重新計算。正式設定（2026-11-01 使用者回報）：Discogs 9%、PayPal 4.4%、每筆 NT$10、換匯 2.5%、買家稅率 15%、向買家收取運費 NT$900、實際郵資 NT$600、包材 NT$50、風險準備 0、最低淨利率 15%。
+- 售價預設用 Discogs 目前最低掛牌價（不是成交價）；成本預設用平台標價（未含進貨運費與代購費），填入實際總成本後改用實際值。
+- 向買家收取的運費目前是單一數值（以黑膠國際件 US$28 計）；CD、卡帶若運費較低，利潤會被高估。
+
+## 5. 網站怎麼用
+
+登入後（單一管理者帳號，最多保持 8 小時）有五個頁面：
+
+| 頁面 | 用途 |
+|---|---|
+| 今日總覽 | 值得再看一眼的唱片、資料與排程狀態。平台異常時頁面頂端會顯示橫幅。 |
+| 唱片清單 | 已配對到貨源、毛利為正的 Discogs 版本。可依 Want、Want/Have 比、毛利、毛利率、機會分數排序。<br/>預設篩選：近 48 小時比價資料、編號一致或已核對版本、Discogs 在售少於 10 張、排除缺貨與未結標拍賣。清單是空的時，會列出每個篩選取消後會多出幾張。點進唱片可看價格歷史、所有貨源與決策按鈕。 |
+| 掃描與設定 | 掃描主題、匯率、費用與最低利潤、工作紀錄（每次排程的逐步數字與逐平台結果）、Discogs 刊登讀回。 |
+| 進貨與 Sheets | 配對比價表（手機版為卡片）、進貨報價、Google Sheet 連結與同步。 |
+| 上架整理 | Discogs 刊登草稿、AI 描述建議、CSV 匯出、送出與刊登紀錄。 |
+
+注意：Yahoo 日本多為拍賣，預設的「排除缺貨與未結標拍賣」會隱藏未結標拍賣；要看拍賣請把貨源狀態改成「全部貨源狀態」或「拍賣未結標」。
+
+## 6. 貨源平台
+
+| 平台 | 方式 | 夜間找貨 | 現況（2026-11-01） |
+|---|---|---|---|
+| Yahoo 台灣 | 搜尋頁內嵌資料 | ✅ | 正常 |
+| Yahoo 日本 | 搜尋頁內嵌 Next.js JSON | ✅ | 11/01 改版後已修正，伺服器實測 50 件 |
+| 露天 | 搜尋 API＋商品明細 | ✅ | 對伺服器回 HTTP 403（本機正常），同平台搜尋間隔 10 秒，待觀察 |
+| 樂天市場 | 官方 API（需金鑰與允許 IP） | ✅ | 正常；關鍵字每詞至少 2 個半形字元 |
+| eBay | 官方 Browse API（需金鑰；已設帳戶刪除通知端點） | ✅ | 正常 |
+| Tower Records | 搜尋頁 | ❌ | 對伺服器與本機都回 HTTP 403，已移出夜間找貨，不規避封鎖 |
+| Rotten Blues | 商店目錄 | ❌ | 只篩單頁目錄，不納入夜間找貨 |
+
+平台爬蟲、解析、反查與排程的細節見 [.agents/skills/record-source-crawlers/SKILL.md](.agents/skills/record-source-crawlers/SKILL.md)；修改平台或排程時必須同步更新其中的 reference。
+
+## 7. 資料存在哪裡
+
+- **Google Sheet 是唯一主資料源**：版本、行情快照、評分、決策、貨源、比價、草稿、刊登、工作紀錄與系統狀態（meta）都存在 `SIMPLES_Data_*` 分頁；給人閱讀的有 Comparisons、PlatformCandidates、Discogs、Sources、Analysis、Inputs 等分頁。詳見 [docs/SHEET_PRIMARY.md](docs/SHEET_PRIMARY.md)。
+- 後端啟動時從 Sheet 載入到本機 SQLite 運算，每輪工作後完整同步回 Sheet 並讀回驗證。
+- Sheet 的 Inputs 分頁屬於使用者，網站儲存費用設定不會覆寫它。
+- 不進 Git 的資料：`.env`、`secrets/`、`data/`、`logs/`、Google 服務帳戶憑證、Discogs token、各平台金鑰與使用者資料。
+
+## 8. 監測與自動修復
+
+- **每晚自動判斷**（`platform_health.py`）：夜間找貨後，某平台搜尋 5 次以上且失敗一半以上就標為「異常」，狀態改變（異常／恢復）時發一次 Telegram（`TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` 有設定才發；正式目前未設定），網站頂端顯示橫幅直到恢復。不會自動停用或重試平台。
+- **工作紀錄**：每輪工作記錄各步驟數字、耗時（`timings`）與逐平台的有結果／無結果／失敗次數、錯誤類型。
+- **即時檢測**：`python3 scripts/platform_probe.py [平台…]` 唯讀抓各平台搜尋頁並跑解析器，輸出 JSON。解析壞掉或搜不到東西（程式可修）時結束碼為 1；來源拒絕連線（HTTP 403 等）只回報，不以更換 User-Agent、代理等方式規避。
+- **每日自動修復**：每天 13:41 排程的 Claude 工作階段執行即時檢測；解析器壞掉時修正、補測試與文件，推到新分支，部署仍需使用者在對話中同意。目前排程沒有 GitHub 連接器，無法自己開 PR，會回報分支名稱。
+
+## 9. 部署與發布規則
+
+- **額度**：SIMPLES 在 Vercel 的正式與預覽部署每天（台灣時間）最多 20 次；Vercel 帳號每天 100 次另行盤點。VPS 後端不計入 Vercel 額度。
+- **發布守門**（`scripts/release_guard.py`，見 [deploy/README.md](deploy/README.md)）：每次推送 main 或部署前，都要寫入新鮮盤點檔，內容包括：當日 Vercel 次數、沒有排隊中的部署、自動部署已停用、測試通過、正式 API 狀態、距下一個排程超過 15 分鐘。盤點 5 分鐘內有效，API 狀態 2 分鐘內有效。不可直接設定 `SIMPLES_RELEASE_GUARDED` 或使用 `--no-verify` 繞過，不強制覆寫遠端歷史。
+- **流程**：功能在分支開發並開草稿 PR → 使用者同意（「閒置，合併到 main」）→ 守門 `sync` 把 main fast-forward（Vercel Git 自動部署已停用，推送不會觸發部署）→ 後端由使用者端（Cowork）在 VPS 依 SHA 下載、比對 `*.py` 數量與 manifest SHA256、備份、替換、重啟、寫入 `DEPLOYED_COMMIT` → 前端由守門 `frontend` 預留 1 次後建立 Vercel 正式部署，讀回 `version.json` 確認版本。依改動決定先後端或先前端，避免新前端呼叫舊後端。
+- **驗收**：以正式網站操作與正式 API／Sheet 讀回為準；單元測試與本機建置只能補充，不能當作正式流程已驗證。文件中會區分「已實測」「僅實作」「待完成」。
+
+## 10. 主要設定（`.env`，範例見 `.env.example`）
+
+| 變數 | 用途 | 正式值／預設 |
+|---|---|---|
+| `DISCOGS_TOKEN`、`DISCOGS_USER_AGENT` | Discogs API | 必填 |
+| `GOOGLE_SPREADSHEET_ID`、`DATA_BACKEND=google_sheets` | 主資料源 | 必填 |
+| `SCAN_REQUEST_BUDGET`、`SCAN_MAX_NEW` | 夜間 Discogs 掃描上限 | 1200、500 |
+| `SCAN_MIN_WANT`、`DEMAND_MIN_RATIO`、`DEMAND_MAX_FOR_SALE` | 稀缺名單門檻 | 50、2、10 |
+| `DEMAND_ALBUMS` | 每晚找貨專輯數 | 200 |
+| `RAKUTEN_APPLICATION_ID`、`RAKUTEN_ACCESS_KEY` | 樂天 API | 已設定 |
+| `EBAY_CLIENT_ID`、`EBAY_CLIENT_SECRET` 與帳戶刪除通知設定 | eBay API | 已設定 |
+| `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` | 平台異常通知 | 未設定 |
+| `DISCOGS_LISTING_WRITE` | 允許網站送出刊登 | 關閉 |
+| 費用相關（`TOTAL_FEE_PCT`、`PAYMENT_FEE_PCT` 等） | 費用預設值 | 正式以網站設定為準 |
+
+## 11. 程式地圖
+
+| 類別 | 檔案 |
+|---|---|
+| 服務與排程 | `server.py`（HTTP API、登入、狀態）、`scheduler.py`（03／10／16／22 時段）、`launch.py`、`password_login.py`、`remote_access.py` |
+| 設定與資料 | `config.py`（設定、費用公式）、`db.py`、`sheet_primary.py`、`sheet_records.py`、`sheet_repository.py`、`sheet_sync.py`、`sheet_audit.py`、`state_pack.py` |
+| Discogs | `discogs_client.py`、`ingest.py`（行情、夜間掃描）、`inventory_sync.py`（庫存讀回）、`discogs_publish.py`（送出刊登） |
+| 找貨與配對 | `demand_queue.py`（稀缺名單找貨）、`sourcing.py`、`source_queue.py`（反查佇列）、`platforms.py`（各平台搜尋與解析）、`api_sources.py`（樂天、eBay）、`rottenblues.py`、`yahoo_transport.py`、`source_refresh.py`、`source_details.py`、`source_match.py`、`matching.py`、`direct_matches.py`、`identity_data.py`、`refresh_priority.py` |
+| 比價與決策 | `analyze.py`（評分）、`comparisons.py`（比價表）、`workflow.py`（報價、草稿）、`purchase_store.py`（進貨清單）、`watch_alerts.py`、`fx.py`（匯率） |
+| 上架與通知 | `ai_listing.py`、`notify.py`、`notification_review.py`、`ebay_notifications.py`、`platform_health.py` |
+| 工具 | `scripts/release_guard.py`（發布守門）、`scripts/platform_probe.py`（平台即時檢測）、`cli.py`、`probe.py` |
+| 前端 | `frontend/app/page.tsx`（主畫面）、`frontend/components/`、`frontend/lib/` |
+
+## 12. 開發與測試
+
+```bash
+# 後端（Python 3.12，標準函式庫）
+python3 -m unittest discover -s tests
+
+# 前端
+cd frontend
+node --test tests/*.test.mjs
+npx tsc --noEmit -p .
+npx oxlint app components lib
+npm run build:vercel
+
+# 平台即時檢測（唯讀）
+python3 scripts/platform_probe.py
+```
+
+推送前查看差異並確認沒有金鑰或私人資料；完成功能時更新本 README、`CHANGELOG.md` 與相關 `docs/`。專案協作約定見 [AGENTS.md](AGENTS.md)。
+
+## 13. 其他文件
+
+- [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)：實作與驗證狀態
+- [docs/SHEET_PRIMARY.md](docs/SHEET_PRIMARY.md)：Google Sheet 主資料源
+- [docs/PLATFORM_API_STATUS.md](docs/PLATFORM_API_STATUS.md)：平台 API 狀態
+- [docs/DISCOGS_LISTING.md](docs/DISCOGS_LISTING.md)：Discogs 刊登
+- [docs/PURCHASE_LIST.md](docs/PURCHASE_LIST.md)：進貨清單
+- [docs/AI_LISTING.md](docs/AI_LISTING.md)：AI 刊登描述
+- [docs/VERCEL_DEPLOY.md](docs/VERCEL_DEPLOY.md)、[deploy/README.md](deploy/README.md)：部署與發布守門
+- [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md)：Google 設定
+
+---
+
+# 變更紀錄（新到舊）
+
 ## 2026-11-01 正式部署 9492a07（平台修正、健康監測、掃描量加大）
 
 main 經發布守門於 14:09 fast-forward 至 9492a07（PR #18），推送未觸發 Vercel 自動部署。後端由使用者端操作部署於 14:11:03（49 個 .py，manifest SHA256 7e7fc51cd2eba2bd9015c5a1a1e5578220d21508578c45fba0c7f2cd926d3c3a，下載包與伺服器重算一致，備份 backups/full-20261101T061051Z，服務 active；重啟後第一次查詢 502 為啟動中，讀回 401）。`.env` 新增 SCAN_MAX_NEW=500、SCAN_REQUEST_BUDGET=1200、DEMAND_ALBUMS=200；TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 未設定，平台異常只顯示在網站。前端 Vercel 正式部署 dpl_ALteDGyDuPEVQbw2YuTgHsKBE9DS READY，`version.json` 讀回 9492a07。
