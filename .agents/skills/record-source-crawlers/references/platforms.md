@@ -109,3 +109,9 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 - 露天：同平台兩次搜尋間隔由 3 秒加大到 10 秒（`platforms.SPACING`），每次搜尋含商品搜尋與明細兩個請求；本機連線測試正常，VPS 503 推測為頻率限制，待下一輪驗證。
 - 樂天：官方規定每個以空白分隔的關鍵字至少 2 個半形字元，`api_sources.keyword` 去除單一字元詞（如「Vol. 1」的 1、&）；全部被去除時保留原查詢。
 - 平台失敗回報新增 `error`（`HTTP <code>` 或例外類型）；`demand_queue` 結果新增 `platforms`：各平台有結果／無結果／失敗次數、商品件數與錯誤類型次數，前端工作明細逐平台顯示。
+
+## 2026-11-01 平台健康監測與每日即時檢測
+
+- `platform_health.record`：03:00 夜間找貨後依 `demand.platforms` 判斷，搜尋 ≥ 5 次且失敗 ≥ 50% 標為 failing；狀態改變（ok→failing、failing→ok）時發一次 Telegram（有設定時），狀態存 meta `platform_health:<platform>`（since、checked_at、searches、failed、items、errors），隨 Sheet 保存。不暫停、不重試任何平台。`/api/state.platform_health` 提供網站橫幅。
+- `scripts/platform_probe.py`：唯讀即時檢測，以固定查詢「Tatsuro Yamashita For You」抓各平台搜尋頁並跑解析器，輸出 JSON；狀態 ok／empty／broken／blocked／skipped（API 金鑰不在本機時略過樂天、eBay）。只有 broken 或 empty（程式可修）使結束碼為 1；blocked（HTTP 403 等來源拒絕）只回報，不規避。
+- 每日排程的 Claude 工作階段執行即時檢測；解析壞掉時修解析器、補測試與本 reference，推到新分支並開草稿 PR，部署仍待使用者同意。

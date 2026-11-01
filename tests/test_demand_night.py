@@ -188,5 +188,6 @@ class NightTests(unittest.TestCase):
         self.assertEqual(scan.call_args.kwargs,{'pages':40,'budget':s.scan_budget,'max_new':s.scan_max_new})
         self.assertEqual((result['flow'],result['failed'],result['scores_pruned'],result['sheet_sync']),('demand_night',1,5,{'synced':True}))
         self.assertEqual(set(result['timings']),{'scan','demand','analyze','sheet_sync'})
+        self.assertEqual(result['platform_health'],{'changes':[],'notified':False})
 
 if __name__=='__main__':unittest.main()

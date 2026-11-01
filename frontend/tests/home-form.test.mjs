@@ -8,9 +8,10 @@ const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.Common
 const realRequire=createRequire(import.meta.url);
 const queueSource=await readFile(new URL('../lib/refresh-queue.ts',import.meta.url),'utf8');
 const queueExports={};new Function('exports',ts.transpileModule(queueSource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(queueExports);
-function harness(post,publicView=false){
+function harness(post,publicView=false,extra={}){
  const record={release_id:42,artist:'Artist',title:'Album',format:'CD',history:[],analysis:null,cost:null,snapshot:{currency:'USD',lowest_price:'30'},decision:{decision:'watch',target_price:'3000',target_currency:'JPY'}};
  const state={csrf:'test',records:[record],workflow:{comparisons:[],drafts:[],offers:[]},configured:{discogs:true},jobs:[],targets:[],fx:[],active:null,schedule:{times:[]}};
+ Object.assign(state,extra);
  if(publicView){state.permissions={can_write:false};state.csrf='';state.workflow={comparisons:[]};}
  const slots=[];let cursor=0;
  const hooks={useEffect:()=>{},useCallback:fn=>fn,useMemo:fn=>fn(),useRef:value=>{const i=cursor++;return slots[i]??={current:value}},useState:value=>{const i=cursor++;if(!(i in slots))slots[i]=i===0?state:typeof value==='function'?value():value;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next}]}};
@@ -63,4 +64,14 @@ test('signed-out view shows only the sign-in form, no navigation or catalogue da
  assert.ok(find(tree,text('登入工作室')));assert.ok(find(tree,text('需登入才能查看資料。')));
  for(const label of ['加入唱片','今日總覽','唱片清單','Album','Artist'])assert.equal(find(tree,text(label)),undefined,label);
  assert.equal(find(tree,node=>node.props?.records!==undefined),undefined);
+});
+
+test('a platform the nightly run marked failing is announced; healthy ones are not',()=>{
+ const h=harness(()=>{throw Error('no request expected')},false,{platform_health:[{platform:'yahoo_jp',status:'failing',since:'2026-11-01T03:20:00+08:00',searches:100,failed:100,errors:{ValueError:100}},{platform:'ebay',status:'ok',since:'2026-11-01T03:20:00+08:00',searches:100,failed:0}]});
+ const node=find(h.render(),n=>n.props&&'health' in n.props);
+ const alert=node.type(node.props);
+ const words=JSON.stringify(alert.props.children);
+ assert.ok(words.includes('Yahoo 日本')&&words.includes('100/100 次搜尋失敗')&&words.includes('ValueError 100 次'),words);
+ assert.ok(!words.includes('eBay'));
+ assert.equal(node.type({health:[{platform:'ebay',status:'ok',since:'',searches:5,failed:0}]}),null);
 });

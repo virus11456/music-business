@@ -82,6 +82,7 @@ class Dashboard:
         return {'storage':storage,'schedule':self.scheduler.state(),'csrf':self.csrf,'records':records,'targets':targets,'jobs':jobs,'fx':fx,'workflow':workflow_state,
             'api':dict(health) if health else None,'active':self.active,'mode':mode[0] if mode else 'live',
             'configured':{'ai_listing':__import__('ai_listing').configured(),'discogs_listing_write':discogs_publish.configured() and bool(self.settings.token),'discogs':bool(self.settings.token),'telegram':bool(self.settings.telegram_token and self.settings.telegram_chat),'sheets':sheet_sync.configured()},
+            'platform_health':__import__('platform_health').state(self.settings),
             'assumptions':{**__import__('config').assumptions(self.settings),'min_margin':str(self.settings.min_margin)}}
 
     def warm(self):
