@@ -36,6 +36,10 @@ class QueryLookups:
   rate=self.rates[currency]
   if isinstance(rate,ValueError):raise rate
   return rate
+ def suggestion(self,rid):
+  row=self.c.execute('SELECT value FROM meta WHERE key=?',(f'price_suggestion:{rid}',)).fetchone()
+  try:return json.loads(row[0]) if row else None
+  except ValueError:return None
  def twd(self,amount,currency):
   if currency=='TWD':return money(amount)
   return money(amount)*self.rate(currency)
@@ -57,12 +61,14 @@ class Lookups(QueryLookups):
     except (ValueError,TypeError):self.barcodes[key[17:]]=[]
   self.excluded_pairs={(r['source_url'],r['release_id']) for r in c.execute('SELECT source_url,release_id FROM excluded_matches')}
   self.listings={(r['source_url'],r['release_id']):{'listing_id':r['listing_id'],'recorded_at':r['recorded_at']} for r in c.execute('SELECT * FROM published_listings')}
+  self.suggestions=__import__('price_suggestions').stored(c)
  def release(self,rid):return self.releases.get(rid)
  def snapshot(self,rid):return self.snapshots.get(rid)
  def label(self,rid):return self.labels.get(str(rid))
  def codes(self,rid):return self.barcodes.get(str(rid),[])
  def excluded(self,source_url,rid):return (source_url,rid) in self.excluded_pairs
  def listing(self,source_url,rid):return self.listings.get((source_url,rid))
+ def suggestion(self,rid):return self.suggestions.get(rid)
 
 def build(settings):
  rows=[]
@@ -195,6 +201,9 @@ def calculate(c,s,o,source,confirmed_offer,lookups=None):
  row['status']='已人工排除' if row['excluded'] else '可建立上架草稿' if row['ready'] else '待補資料／確認' if issues else '待檢查'
  if not confirmed_offer and not row['excluded']:row['status']='已找到候選，待核對版本'
  listing=lookups.listing(o['source_url'],o['release_id'])
+ suggested=lookups.suggestion(o['release_id']) or {}
+ # Discogs suggested prices by condition (seller account): shown beside the lowest listing, not used for profit.
+ row.update(suggest_currency=suggested.get('currency'),suggest_nm=suggested.get('NM'),suggest_vgp=suggested.get('VG+'),suggest_at=suggested.get('at'))
  row['listing_status']='listed' if listing else 'unlisted'
  row['listing_id']=listing['listing_id'] if listing else None
  if listing:row['ready']=False;row['status']='已上架（人工登錄）'

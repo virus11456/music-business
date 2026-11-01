@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/comparison-sort.ts',import.meta.url),'utf8');
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {hasPositiveMargin,buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison,wantHaveRatio,ratioLabel}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const {suggestedLabel,hasPositiveMargin,buildRecordIndex,meetsProfit,sortComparisons,referenceUsd,meetsMinimumUsd,marketFreshness,sourceFreshness,hasDemandAndSource,hasFreshComparison,wantHaveRatio,ratioLabel}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
 const rows=[{key:'a',want:100,gross_twd:'20',gross_margin:.2},{key:'b',want:200,gross_twd:'10',gross_margin:.3},{key:'c',want:null,gross_twd:null,gross_margin:null},{key:'d',want:0,gross_twd:'-10',gross_margin:-.1}];
 test('want, gross and margin sort numerically, with missing values last',()=>{
  assert.deepEqual(sortComparisons(rows,'want').map(r=>r.key),['b','a','d','c']);
@@ -108,4 +108,10 @@ test('Want/Have ratio treats Have 0 as 1 and rejects missing or invalid counts',
  assert.equal(wantHaveRatio(150,300),.5);
  for(const [w,h] of [[null,1],[1,null],[undefined,1],['',2],[5,-1],['x',1]])assert.equal(wantHaveRatio(w,h),null);
  assert.equal(ratioLabel(null),'—');assert.equal(ratioLabel(2.345),'2.3');assert.equal(ratioLabel(25.45),'25');
+});
+
+test('suggested prices show beside the listing price only when Discogs returned them',()=>{
+ assert.equal(suggestedLabel({suggest_currency:'USD',suggest_vgp:133.54,suggest_nm:174.63}),'Discogs 建議售價：VG+ USD 133.54 · NM 174.63');
+ assert.equal(suggestedLabel({suggest_currency:'USD',suggest_vgp:null,suggest_nm:174.63}),'Discogs 建議售價：VG+ USD — · NM 174.63');
+ assert.equal(suggestedLabel({suggest_currency:null}),'');assert.equal(suggestedLabel({}),'');
 });

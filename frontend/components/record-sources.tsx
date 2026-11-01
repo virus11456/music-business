@@ -2,7 +2,7 @@ import {useState} from 'react';
 import MediaBadge from '@/components/media-badge';
 import {matchLabel} from '@/lib/match-evidence';
 import {sourceAvailability,supplyLabels} from '@/lib/source-availability';
-import {candidateProfit,marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp} from '@/lib/comparison-sort';
+import {candidateProfit,marketFreshness,marketTimestamp,sourceFreshness,sourceTimestamp,suggestedLabel} from '@/lib/comparison-sort';
 import type {Comparison} from '@/components/comparison-table';
 const names:Record<string,string>={yahoo_tw:'Yahoo 台灣拍賣',yahoo_jp:'Yahoo 日本拍賣',ruten:'露天市集',tower:'Tower',rottenblues:'Rotten Blues 爛調唱片',rakuten:'樂天市場',ebay:'eBay'};
 let numberFormat:Intl.NumberFormat|undefined;
@@ -24,7 +24,7 @@ function Source({row:r,locked,onAction,onPurchase,purchaseKeys,purchaseLocked}:{
   </div>
   <div className="source-financials">
    <div><small>進貨標價</small><b>{r.source_price===null?'價格未取得':`${r.source_currency} ${money(r.source_price)}`}</b><small>{r.price_kind==='current_bid'?'拍賣參考出價':r.price_kind==='range'?'規格價格待確認':'未含運費'}</small><small className={sourceFreshness(quote)==='fresh'?'':'quote-warning'}>貨源 {sourceTimestamp(quote)} · {freshness(sourceFreshness(quote))}</small></div>
-   <div><small>Discogs 參考售價</small><b>{r.market_currency} {money(r.market_price)}</b><small>約 NT$ {money(r.sale_twd)} · 非成交價</small><small className={marketFreshness(r)==='fresh'?'':'quote-warning'}>行情 {marketTimestamp(r)} · {freshness(marketFreshness(r))}</small></div>
+   <div><small>Discogs 參考售價</small><b>{r.market_currency} {money(r.market_price)}</b><small>約 NT$ {money(r.sale_twd)} · 非成交價</small>{suggestedLabel(r)&&<small>{suggestedLabel(r)}</small>}<small className={marketFreshness(r)==='fresh'?'':'quote-warning'}>行情 {marketTimestamp(r)} · {freshness(marketFreshness(r))}</small></div>
    <div className={loss?'profit negative':'profit positive'}><small>價差／毛利</small><b>{r.gross_twd==null?'尚無估算':`NT$ ${money(r.gross_twd)}`}</b><small>{r.cost_basis==='confirmed_total'?'售價 − 已確認總成本':'售價 − 貨源標價（同幣別）'}</small></div>
    <div className={loss?'profit negative':'profit positive'}><small>毛利率</small><b>{known?`${(margin*100).toFixed(1)}%`:'—'}</b><div className="profit-bar" role="img" aria-label={known?`預估毛利率 ${(margin*100).toFixed(1)}%，${loss?'虧損':'正毛利'}`:'毛利率尚未取得'}><i style={{left:`${loss?50-width:50}%`,width:`${width}%`}}/></div></div>
   </div>

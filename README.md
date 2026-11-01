@@ -30,7 +30,7 @@ flowchart LR
 
 | 時間 | 工作（flow） | 做的事 |
 |---|---|---|
-| **03:00** | 夜間稀缺掃描與依名單找貨（`demand_night`） | ① 依「掃描主題」（格式＋國別，可加歌手）到 Discogs 依 Want 由多到少搜尋，逐年分段，新增符合 Want/Have 門檻的版本，存行情與 Want/Have。每晚上限：`SCAN_REQUEST_BUDGET` 次請求（正式 1200）、`SCAN_MAX_NEW` 個新版本（正式 500）。<br/>② 從已追蹤版本挑出稀缺名單：Want ≥ `SCAN_MIN_WANT`（50）、Want/Have ≥ `DEMAND_MIN_RATIO`（2）、Discogs 在售 < `DEMAND_MAX_FOR_SALE`（10）張；依專輯合併，Discogs 沒人在賣的優先。<br/>③ 每晚取前 `DEMAND_ALBUMS`（正式 200）張專輯，用「歌手＋專輯名」到 Yahoo 台灣、Yahoo 日本、露天、樂天、eBay 各搜一次，再用各版本的 Discogs 品番（最多 3 個）到 Yahoo 日本、Yahoo 台灣、樂天、eBay 各搜一次；結果比對到該專輯所有版本，同一專輯 7 天內不重搜。<br/>④ 記錄各平台結果並更新平台健康狀態，重新評分，同步 Google Sheet。 |
+| **03:00** | 夜間稀缺掃描與依名單找貨（`demand_night`） | ① 依「掃描主題」（格式＋國別，可加歌手）到 Discogs 依 Want 由多到少搜尋，逐年分段，新增符合 Want/Have 門檻的版本，存行情與 Want/Have。每晚上限：`SCAN_REQUEST_BUDGET` 次請求（正式 1200）、`SCAN_MAX_NEW` 個新版本（正式 500）。<br/>② 從已追蹤版本挑出稀缺名單：Want ≥ `SCAN_MIN_WANT`（50）、Want/Have ≥ `DEMAND_MIN_RATIO`（2）、Discogs 在售 < `DEMAND_MAX_FOR_SALE`（10）張；依專輯合併，Discogs 沒人在賣的優先。<br/>③ 每晚取前 `DEMAND_ALBUMS`（正式 200）張專輯，用「歌手＋專輯名」到 Yahoo 台灣、Yahoo 日本、露天、樂天、eBay 各搜一次，再用各版本的 Discogs 品番（最多 3 個）到 Yahoo 日本、Yahoo 台灣、樂天、eBay 各搜一次；結果比對到該專輯所有版本，同一專輯 7 天內不重搜。<br/>④ 記錄各平台結果並更新平台健康狀態；對已有貨源配對的版本查 Discogs 建議售價（每晚最多 150 個、每版本每週一次）；重新評分，同步 Google Sheet。 |
 | **10:00、16:00、22:00** | 反查與報價刷新（`source_first`） | ① 待反查商品不多時，輪流收集一個「搜尋主題」的平台商品。<br/>② 反查佇列：把平台上找到的商品反過來到 Discogs 找對應版本，每輪最多 60 件。<br/>③ 刷新已存貨源報價（價格、庫存、拍賣狀態），更新相關版本的 Discogs 行情。<br/>④ 重新評分，同步 Google Sheet。 |
 | 每天 13:41 | 平台健康檢查（排程的 Claude 工作階段） | 執行 `scripts/platform_probe.py` 實際抓各平台搜尋頁並測解析器；解析壞掉就修正、補測試並開 PR，部署仍需人工同意。見第 8 節。 |
 
@@ -81,7 +81,7 @@ PayPal 費  = 4.4% × 毛收入 × (1 + 買家稅率) + US$0.30（約 NT$10）
 
 - 買家付的稅由 Discogs 代收代繳，不算收入，但 PayPal 會對稅金部分收手續費。
 - 所有比例與金額都在網站「掃描與設定 → 費用與最低利潤」調整，儲存後立即重新計算。正式設定（2026-11-01 使用者回報）：Discogs 9%、PayPal 4.4%、每筆 NT$10、換匯 2.5%、買家稅率 15%、向買家收取運費 NT$900、實際郵資 NT$600、包材 NT$50、風險準備 0、最低淨利率 15%。
-- 售價預設用 Discogs 目前最低掛牌價（不是成交價）；成本預設用平台標價（未含進貨運費與代購費），填入實際總成本後改用實際值。
+- 售價預設用 Discogs 目前最低掛牌價（不是成交價），旁邊另顯示 Discogs 依品相的建議售價（VG+／NM）供參考，不影響利潤計算；成本預設用平台標價（未含進貨運費與代購費），填入實際總成本後改用實際值。
 - 運費分格式：黑膠用「向買家收取運費／實際郵資」，CD、卡帶可另填，空白時沿用黑膠；比價依商品格式套用。
 
 ## 5. 網站怎麼用
@@ -157,7 +157,7 @@ PayPal 費  = 4.4% × 毛收入 × (1 + 買家稅率) + US$0.30（約 NT$10）
 | Discogs | `discogs_client.py`、`ingest.py`（行情、夜間掃描）、`inventory_sync.py`（庫存讀回）、`discogs_publish.py`（送出刊登） |
 | 找貨與配對 | `demand_queue.py`（稀缺名單找貨）、`sourcing.py`、`source_queue.py`（反查佇列）、`platforms.py`（各平台搜尋與解析）、`api_sources.py`（樂天、eBay）、`rottenblues.py`、`yahoo_transport.py`、`source_refresh.py`、`source_details.py`、`source_match.py`、`matching.py`、`direct_matches.py`、`identity_data.py`、`refresh_priority.py` |
 | 比價與決策 | `analyze.py`（評分）、`comparisons.py`（比價表）、`workflow.py`（報價、草稿）、`purchase_store.py`（進貨清單）、`watch_alerts.py`、`fx.py`（匯率） |
-| 上架與通知 | `ai_listing.py`、`notify.py`、`notification_review.py`、`ebay_notifications.py`、`platform_health.py` |
+| 上架與通知 | `price_suggestions.py`（Discogs 建議售價）、`ai_listing.py`、`notify.py`、`notification_review.py`、`ebay_notifications.py`、`platform_health.py` |
 | 工具 | `scripts/release_guard.py`（發布守門）、`scripts/platform_probe.py`（平台即時檢測）、`cli.py`、`probe.py` |
 | 前端 | `frontend/app/page.tsx`（主畫面）、`frontend/components/`、`frontend/lib/` |
 
@@ -195,13 +195,13 @@ python3 scripts/platform_probe.py
 
 # 變更紀錄（新到舊）
 
-## 2026-11-01 品番搜尋、標題品番配對、運費分格式（本機實作，待部署：先後端後前端）
+## 2026-11-01 品番搜尋、標題品番配對、運費分格式、Discogs 建議售價（本機實作，待部署：先後端後前端）
 
 - 夜間找貨每張專輯在「歌手＋專輯名」之外，再用該專輯各版本的 Discogs 品番（最多 3 個；需含字母與數字、去符號後至少 4 碼）到 Yahoo 日本、Yahoo 台灣、樂天、eBay 各搜一次；工作紀錄新增品番搜尋次數、候選與配對數。
 - 標題裡沒有連字號或被空白隔開的品番（RAL8801、RAL 8801）也辨識為該版本品番，只比對完整字詞（TOCP-1 不會對到 TOCP-123）。
 - 「只看編號一致或已核對版本」改為也包含「標題品番與 Discogs 一致」的配對，標籤顯示「標題品番與 Discogs 一致 · 壓片待核對」；進貨清單仍要求核對壓片。原本標題品番一律只算線索，Yahoo 日本、eBay 這類品番寫在標題的平台因此幾乎看不到可靠配對。
 - 費用設定新增 CD、卡帶各自的「向買家收取運費」與「實際郵資」，空白沿用黑膠；比價、評分與進貨報價依商品格式套用。
-- Discogs 建議售價（第 3 項）尚未實作：API 未在正式帳號測試，先請使用者端以正式 token 唯讀試呼叫一次再決定。
+- Discogs 建議售價：11/01 使用者端以正式 token 唯讀呼叫 `/marketplace/price_suggestions/1369932` 回 HTTP 200，8 個品相皆有 USD 建議價。新增 `price_suggestions.py`：03:00 夜間找貨後，對已有貨源配對的版本（sourcing_offers 與 version_searches 連到的版本）每晚最多查 150 個、每版本每週一次，存 meta `price_suggestion:<release_id>`（M／NM／VG+／VG）。比價表與唱片貨源顯示「Discogs 建議售價：VG+／NM」，與最低掛牌價並列；利潤仍以最低掛牌價計算。工作明細顯示查詢、取得、無建議、失敗與待查數。
 
 驗證：品番搜尋、標題品番辨識、比價表標題品番、分格式運費與儲存讀回測試；後端與前端測試、tsc、oxlint 無新增錯誤。夜間工作預估增加約 1 小時（約 05:30 前結束）。正式環境未部署。
 

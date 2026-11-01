@@ -91,3 +91,6 @@ export function wantHaveRatio(want:unknown,have:unknown):number|null{
  return Number.isFinite(w)&&Number.isFinite(h)&&w>=0&&h>=0?w/Math.max(h,1):null;
 }
 export function ratioLabel(ratio:number|null){return ratio===null?'—':ratio>=10?ratio.toFixed(0):ratio.toFixed(1)}
+
+// Discogs suggested prices by condition (seller account); shown beside the lowest listing, not used for profit.
+export function suggestedLabel(r:{suggest_currency?:string|null;suggest_nm?:number|null;suggest_vgp?:number|null}){if(!r.suggest_currency||(r.suggest_vgp==null&&r.suggest_nm==null))return '';return `Discogs 建議售價：VG+ ${r.suggest_currency} ${r.suggest_vgp??'—'} · NM ${r.suggest_nm??'—'}`}

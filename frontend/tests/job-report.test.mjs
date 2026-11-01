@@ -97,3 +97,9 @@ test('night demand batch lists each platform with its error kinds',()=>{
  assert.ok(text.includes('Tower：有結果 0 · 無結果 0 · 失敗 3（HTTP 403 3 次） · 共 0 件'),text);
  assert.ok(text.includes('eBay：有結果 2 · 無結果 1 · 失敗 0 · 共 40 件'),text);
 });
+
+test('night report shows catalogue searches and suggested-price lookups',()=>{
+ const text=jobReport(JSON.stringify({batches:[{flow:'demand_night',scan:{},demand:{albums:1,catalog_searches:3,catalog_candidates:9,catalog_linked:4},price_suggestions:{checked:5,saved:4,empty:0,failed:1,due:7}}]})).join('\n');
+ assert.ok(text.includes('品番搜尋：3 次 · 取得 9 件候選 · 可能配對 4 組'),text);
+ assert.ok(text.includes('Discogs 建議售價：查詢 5 個版本 · 取得 4 · 無建議 0 · 失敗 1（待查 7）'),text);
+});

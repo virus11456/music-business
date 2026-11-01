@@ -30,6 +30,11 @@ def night(settings):
     result['demand']=demand_queue.run(settings)
     result['failed']+=result['demand']['failed'];lap('demand')
     result['platform_health']=__import__('platform_health').record(settings,result['demand'].get('platforms'))
+    # Discogs suggested prices for versions that now have a source pairing (read-only, weekly per version).
+    try:result['price_suggestions']=__import__('price_suggestions').refresh(settings)
+    except Exception as exc:
+        result['errors'].append({'step':'price_suggestions','error':type(exc).__name__});result['failed']+=1
+    lap('price_suggestions')
     result['scores_pruned']=(analyze.run(settings) or {}).get('scores_pruned',0);lap('analyze')
     try:result['sheet_sync']=sheet_sync.sync(settings)
     except Exception as exc:

@@ -197,11 +197,12 @@ class NightTests(unittest.TestCase):
         s=Settings(db_path=Path(tempfile.mkdtemp())/'t.db')
         with patch('ingest.scan',return_value={'discovered':3,'failed':1,'requests':40,'prefiltered':100,'budget_exhausted':False}) as scan,\
              patch('demand_queue.run',return_value={'albums':2,'failed':0}),patch('analyze.run',return_value={'scores_pruned':5}),\
-             patch('sheet_sync.sync',return_value={'synced':True}):
+             patch('sheet_sync.sync',return_value={'synced':True}),patch('price_suggestions.refresh',return_value={'checked':2}):
             result=scheduler.night(s)
         self.assertEqual(scan.call_args.kwargs,{'pages':40,'budget':s.scan_budget,'max_new':s.scan_max_new})
         self.assertEqual((result['flow'],result['failed'],result['scores_pruned'],result['sheet_sync']),('demand_night',1,5,{'synced':True}))
-        self.assertEqual(set(result['timings']),{'scan','demand','analyze','sheet_sync'})
+        self.assertEqual(set(result['timings']),{'scan','demand','price_suggestions','analyze','sheet_sync'})
+        self.assertEqual(result['price_suggestions'],{'checked':2})
         self.assertEqual(result['platform_health'],{'changes':[],'notified':False})
 
 if __name__=='__main__':unittest.main()
