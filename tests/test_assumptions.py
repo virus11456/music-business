@@ -96,3 +96,22 @@ class FormatShippingTests(AssumptionTests):
   self.assertEqual((saved['buyer_shipping_cd'],saved['shipping_cd'],saved['shipping_cassette']),('420','250',''))
  def test_negative_format_shipping_is_rejected(self):
   with self.assertRaises(ValueError):self.app.mutate('/api/assumptions',{**self.values,'shipping_cd':'-1'})
+
+class ImportCostTests(AssumptionTests):
+ def test_platform_import_cost_is_added_only_to_listed_price_estimates(self):
+  import comparisons,config
+  from db import now
+  self.app.mutate('/api/assumptions',{**self.values,'import_cost_jp':'700','import_cost_overseas':'800','import_cost_tw':'0'})
+  s=Settings(db_path=self.path)
+  self.assertEqual((config.import_cost(s,'yahoo_jp'),config.import_cost(s,'rakuten'),config.import_cost(s,'ebay'),config.import_cost(s,'ruten'),config.import_cost(s,'other')),(Decimal('700'),Decimal('700'),Decimal('800'),Decimal('0'),0))
+  source={'id':7,'platform':'yahoo_jp','external_id':'a7','title':'Record LP','artist':'','format':'LP','catalog_no':'','price':'1000','currency':'JPY',
+          'price_kind':'listed','availability':'即決價','source_url':'https://auctions.yahoo.co.jp/jp/auction/a7','captured_at':now()}
+  o={'id':None,'release_id':900000001,'title':'Japan pressing','vendor':'yahoo_jp','source_url':source['source_url'],'version_confirmed':0,'owned_confirmed':0,
+     'sale_price':None,'sale_currency':None,'amount':None,'currency':'JPY','media_cond':'未確認','sleeve_cond':'未確認','recorded_at':now()}
+  with connect(self.path) as c:row=comparisons.calculate(c,s,o,source,False)
+  self.assertEqual(row['import_twd'],'700.00')
+  self.assertEqual(Decimal(row['gross_twd']),Decimal(row['sale_twd'])-Decimal(row['source_twd'])-700)
+  self.assertIn('依來源標價＋設定的進貨附加成本估算',row['issues'])
+  # A confirmed total cost already includes everything: no extra.
+  self.assertIsNone(self.app.state()['workflow']['comparisons'][0].get('import_twd'))
+  self.assertEqual(Dashboard(Settings(db_path=self.path)).state()['assumptions']['import_cost_jp'],'700')

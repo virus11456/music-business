@@ -90,3 +90,9 @@ class PlatformTests(unittest.TestCase):
   self.assertEqual(platforms.parse_tower(empty),[])
   report=platforms.search(self.s,'test',['tower'],lambda _:'検索結果 0',full_page=True)
   self.assertEqual(report['failed_platforms'],1)
+
+class AuctionStatusTests(unittest.TestCase):
+ def test_auction_end_is_shown_in_taipei_time_with_bid_count(self):
+  self.assertEqual(platforms.auction_status({'endTime':'2026-11-07T22:40:51+09:00','bidCount':2}),'拍賣中／11/07 21:40 結標／2 人出價')
+  self.assertEqual(platforms.auction_status({'endTime':'2026-11-07T22:40:51+09:00'}),'拍賣中／11/07 21:40 結標')
+  self.assertEqual(platforms.auction_status({}),'拍賣中／需確認結標')

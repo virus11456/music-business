@@ -87,6 +87,16 @@ def parse_yahoo_tw(html):
   out.append(candidate('yahoo_tw',h['ec_productid'],h['ec_title'],h.get('ec_price'),kind))
  return out
 
+def auction_status(item):
+ """拍賣中／MM/DD HH:MM 結標／N 人出價 (Taipei time); the plain status when the end time is missing or invalid."""
+ from datetime import datetime
+ from zoneinfo import ZoneInfo
+ try:end=datetime.fromisoformat(str(item.get('endTime'))).astimezone(ZoneInfo('Asia/Taipei'))
+ except (TypeError,ValueError):return '拍賣中／需確認結標'
+ bids=item.get('bidCount')
+ bids=f'／{bids} 人出價' if isinstance(bids,int) and not isinstance(bids,bool) and bids>=0 else ''
+ return f"拍賣中／{end:%m/%d %H:%M} 結標{bids}"
+
 def parse_yahoo_jp(html):
  # Current Yahoo! Auctions pages (Next.js) carry the result list as JSON; older pages had product cards.
  data=re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',html,re.S)
@@ -100,7 +110,7 @@ def parse_yahoo_jp(html):
    if not isinstance(item,dict) or not item.get('auctionId'):continue
    fixed=bool(item.get('isFixedPrice'))
    amount=item.get('price') if not fixed else item.get('buyNowPrice') or item.get('price')
-   out.append(candidate('yahoo_jp',item['auctionId'],item.get('title',''),amount,'listed' if fixed else 'current_bid','即決價' if fixed else '拍賣中／需確認結標'))
+   out.append(candidate('yahoo_jp',item['auctionId'],item.get('title',''),amount,'listed' if fixed else 'current_bid','即決價' if fixed else auction_status(item)))
   return out
  root=Tree(html).root;cards=root.find('li','Product');out=[]
  if not cards and not any(t in html for t in ('一致する商品はありません','見つかりません')):raise ValueError('搜尋頁結構改變')

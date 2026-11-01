@@ -45,7 +45,7 @@ def business_values(data):
     if min(v for v in result.values() if v is not None)<0:raise ValueError('費用設定不可為負數')
     return result
 
-OPTIONAL_FIELDS=('payment_pct','payment_fixed','buyer_shipping','tax_pct','conversion_pct')
+OPTIONAL_FIELDS=('payment_pct','payment_fixed','buyer_shipping','tax_pct','conversion_pct','import_cost_jp','import_cost_overseas','import_cost_tw')
 FORMAT_FIELDS=('buyer_shipping_cd','shipping_cd','buyer_shipping_cassette','shipping_cassette')
 
 def shipping_for(settings,fmt=None):
@@ -74,6 +74,13 @@ def assumptions(settings):
         value=getattr(settings,k,None);out[k]='' if value is None else str(value)
     return out
 
+IMPORT_REGION={'yahoo_jp':'jp','rakuten':'jp','tower':'jp','ebay':'overseas','yahoo_tw':'tw','ruten':'tw','rottenblues':'tw'}
+
+def import_cost(settings, platform):
+    """Extra TWD per item bought on `platform` beyond its listed price; 0 for unknown platforms."""
+    region=IMPORT_REGION.get(platform)
+    return getattr(settings,'import_cost_'+region,0) if region else 0
+
 def fees(settings, sale, fmt=None):
     """Selling costs in TWD for one item of format `fmt` (Vinyl/CD/Cassette) sold at `sale` TWD; negative when
     buyer-paid shipping exceeds them."""
@@ -95,6 +102,11 @@ class Settings:
     buyer_shipping: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_SHIPPING_TWD') or '0'))
     tax_pct: Decimal = field(default_factory=lambda: money(os.getenv('BUYER_TAX_PCT') or '0'))
     conversion_pct: Decimal = field(default_factory=lambda: money(os.getenv('CONVERSION_FEE_PCT') or '0'))
+    # Extra cost per item bought from a platform, in TWD, on top of its listed price (proxy / forwarding fees,
+    # domestic and international shipping): Japanese platforms, overseas (eBay) and Taiwanese platforms.
+    import_cost_jp: Decimal = field(default_factory=lambda: money(os.getenv('IMPORT_COST_JP_TWD') or '0'))
+    import_cost_overseas: Decimal = field(default_factory=lambda: money(os.getenv('IMPORT_COST_OVERSEAS_TWD') or '0'))
+    import_cost_tw: Decimal = field(default_factory=lambda: money(os.getenv('IMPORT_COST_TW_TWD') or '0'))
     # CD and cassette shipping (TWD); None means the general values above apply.
     buyer_shipping_cd: object = None
     shipping_cd: object = None

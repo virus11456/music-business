@@ -123,7 +123,7 @@ class DemandTests(unittest.TestCase):
                 snapshot(c,rid,now(),'10','USD',sale,have,want)
     def tearDown(self):self.tmp.cleanup()
     def test_versions_with_plenty_for_sale_are_left_out(self):
-        with connect(self.s.db_path) as c:snapshot(c,3,'2026-11-01T00:00:00+00:00','10','USD',12,8,286)
+        with connect(self.s.db_path) as c:snapshot(c,3,(datetime.now(timezone.utc)+timedelta(minutes=1)).isoformat(),'10','USD',12,8,286)
         self.assertEqual([a['title'] for a in demand_queue.scarcity(self.s)],['Rubber Soul'])
         self.assertEqual([a['title'] for a in demand_queue.scarcity(replace(self.s,demand_max_for_sale=20))],['Rubber Soul','Mint Jams'])
     def test_scarcity_groups_versions_by_album_and_puts_unsold_first(self):

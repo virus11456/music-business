@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=await readFile(new URL('../lib/source-availability.ts',import.meta.url),'utf8');
 const exports={};new Function('exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(exports);
-const {sourceAvailability,meetsSupply}=exports;
+const {sourceAvailability,meetsSupply,auctionEnd,endingSoon}=exports;
 test('supply status avoids treating auction or unavailable text as stock',()=>{
  for(const availability of ['來源標示有庫存','在庫あり','在庫わずか'])assert.equal(sourceAvailability({availability}), 'stock');
  for(const availability of ['現在オンラインショップ取扱なし','お取り寄せ','予約受付中','缺貨','預購','out of stock','sold out'])assert.equal(sourceAvailability({availability}), 'unavailable');
@@ -28,4 +28,17 @@ test('explicit ordering restrictions in real source titles override unknown or r
  }
  assert.equal(sourceAvailability({source_title:'Album Sold Out CD',availability:'未確認'}),'unknown');
  assert.equal(sourceAvailability({source_title:'現貨 CD',availability:'未確認'}),'unknown');
+});
+
+test('auction end is read in Taipei time and ending-soon keeps only the next 24 hours',()=>{
+ const now=new Date('2026-11-01T12:00:00+08:00');
+ const row=t=>({availability:`拍賣中／${t} 結標／2 人出價`,price_kind:'current_bid'});
+ assert.equal(auctionEnd(row('11/01 21:40'),now).toISOString(),'2026-11-01T13:40:00.000Z');
+ assert.ok(endingSoon(row('11/01 21:40'),now));
+ assert.ok(!endingSoon(row('11/03 21:40'),now));      // more than a day away
+ assert.ok(!endingSoon(row('11/01 09:00'),now));      // already ended
+ assert.ok(meetsSupply(row('11/02 08:00'),'ending',now)&&!meetsSupply({availability:'即決價',price_kind:'listed'},'ending',now));
+ assert.equal(auctionEnd({availability:'拍賣中／需確認結標'},now),null);
+ // Around new year the nearest year wins.
+ assert.equal(auctionEnd(row('01/02 10:00'),new Date('2026-12-31T12:00:00+08:00')).toISOString(),'2027-01-02T02:00:00.000Z');
 });

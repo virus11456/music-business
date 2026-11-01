@@ -58,9 +58,9 @@ export function jobReport(detail:string|null):string[]{
    lines.push(`Discogs 稀缺掃描：新增 ${count(scan.discovered)??'未知'} 個版本 · 用掉 ${count(scan.requests)??'未知'} 次請求 · 搜尋結果先篩掉 ${count(scan.prefiltered)??'未知'} 筆${scan.budget_exhausted===true?' · 已達今晚上限，下次接續':''}`);
    lines.push(`依稀缺名單找貨：搜尋 ${count(demand.albums)??'未知'} 張專輯（${count(demand.versions)??'未知'} 個版本，合格 ${count(demand.eligible_albums)??'未知'} 張，7 天內已搜略過 ${count(demand.skipped_recent)??'未知'} 張） · 取得 ${count(demand.candidates)??'未知'} 件候選 · 可能配對 ${count(demand.linked)??'未知'} 組，仍需核對版本`);
    if(count(demand.failed_platforms))lines.push(`找貨時有 ${demand.failed_platforms} 次平台未完成，請至進貨頁檢查平台紀錄`);
-   if(count(demand.catalog_searches))lines.push(`品番搜尋：${demand.catalog_searches} 次 · 取得 ${count(demand.catalog_candidates)??0} 件候選 · 可能配對 ${count(demand.catalog_linked)??0} 組`);
+   if(count(demand.catalog_searches))lines.push(`品番搜尋：${count(demand.catalog_searches)} 次 · 取得 ${count(demand.catalog_candidates)??0} 件候選 · 可能配對 ${count(demand.catalog_linked)??0} 組`);
    const sug=obj(b.price_suggestions);
-   if(count(sug.checked)!==null)lines.push(`Discogs 建議售價：查詢 ${sug.checked} 個版本 · 取得 ${count(sug.saved)??0} · 無建議 ${count(sug.empty)??0} · 失敗 ${count(sug.failed)??0}（待查 ${count(sug.due)??0}）`);
+   if(count(sug.checked)!==null)lines.push(`Discogs 建議售價：查詢 ${count(sug.checked)} 個版本 · 取得 ${count(sug.saved)??0} · 無建議 ${count(sug.empty)??0} · 失敗 ${count(sug.failed)??0}（待查 ${count(sug.due)??0}）`);
    // Per platform: searches with items / empty / failed (error kinds), and items found.
    for(const [id,raw] of Object.entries(obj(demand.platforms))){
     const p=obj(raw),errors=Object.entries(obj(p.errors)).filter(([,n])=>count(n)).map(([k,n])=>`${k.slice(0,40)} ${String(n)} 次`);

@@ -123,3 +123,5 @@ Tower 商品 JSON-LD 的 name 省略了可見 h1.PC-item-info-title 中的初回
 - 夜間找貨加做品番搜尋（見 pipeline.md）；品番需含字母與數字、去符號後至少 4 碼，同專輯去重最多 3 個。
 - `source_match.title_catalog`：標題中無連字號或被空白分開的品番（RAL8801、RAL 8801）以完整字詞比對 Discogs catno（去符號後 ≥ 5 碼、含字母與數字），符合時 evidence 加「規格品番一致」與「取自賣場標題」；`comparisons` 以此補 `source_catalog_no`，`source_catalog_from_title=true`。
 - 前端 `matchLevel` 新增 `title_catalog`（標題品番與版本一致、格式一致、無衝突），計入「只看編號一致或已核對版本」；進貨清單仍標示壓片待核對。
+
+- 2026-11-01：Yahoo JP 拍賣 availability 改為 `拍賣中／MM/DD HH:MM 結標／N 人出價`（endTime 換算台灣時間、bidCount），缺結標時間時維持 `拍賣中／需確認結標`；前端以「拍賣中」判定為拍賣，`auctionEnd` 解析結標時間，篩選「24 小時內結標的拍賣」。source_details 刷新仍寫回 `拍賣中／需確認結標`。availability 不在反查指紋內，出價變動不會重排反查。

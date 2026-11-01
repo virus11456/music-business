@@ -179,13 +179,16 @@ def calculate(c,s,o,source,confirmed_offer,lookups=None):
  buy=twd(source['price'],source['currency'],'標價') if source else None
  cost=twd(o['amount'],o['currency'],'成本') if o['amount'] is not None else None
  row['cost_basis']='confirmed_total' if o['amount'] is not None else 'source_price'
- estimated_cost=cost if o['amount'] is not None else buy
+ # A listed price is not what the item costs landed: add the configured per-platform import cost.
+ extra=__import__('config').import_cost(s,source['platform']) if source and o['amount'] is None and buy is not None else 0
+ row['import_twd']=amount(extra) if extra else None
+ estimated_cost=cost if o['amount'] is not None else (buy+extra if buy is not None else None)
  row.update(sale_twd=amount(sale),source_twd=amount(buy),cost_twd=amount(cost),spread_twd=amount(sale-buy) if sale is not None and buy is not None else None)
  if sale is not None and estimated_cost is not None and sale>0:
   gross=sale-estimated_cost;fees=__import__('config').fees(s,sale,row['format']);net=gross-fees
   row.update(gross_twd=amount(gross),gross_margin=float(gross/sale),fees_twd=amount(fees),net_twd=amount(net),net_margin=float(net/sale))
  if not o['version_confirmed']:issues.append('待核對版本')
- if o['amount'] is None:issues.append('依来源標價估算，未含進貨運費與代購費')
+ if o['amount'] is None:issues.append('依來源標價＋設定的進貨附加成本估算' if row.get('import_twd') else '依来源標價估算，未含進貨運費與代購費')
  if not o.get('sale_price'):issues.append('待確認預定售價')
  if not snapshot or snapshot['lowest_price'] is None:issues.append('待抓 Discogs 行情')
  elif stale(snapshot['captured_at']):issues.append('行情超過兩天')
